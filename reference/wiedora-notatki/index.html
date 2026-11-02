@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f7f8fa">
+<meta name="robots" content="index,follow">
+<title>Zrób notatkę — Centrum aplikacji</title>
+<meta name="description" content="Nagrywaj wykłady i transkrybuj nagrania audio oraz wideo na tekst.">
+<link rel="stylesheet" href="/assets/portal-home.css">
+<link rel="stylesheet" href="/assets/portal-layout.css?v=20261011-mobile-1">
+<link rel="stylesheet" href="/apps/shared/portal-nav.css?v=20261018-gray-2">
+<link rel="stylesheet" href="/apps/notatki/notatki.css?v=20261018-drop-1">
+</head>
+<body class="portal-home lecture-app">
+<a class="skip-link" href="#mainContent">Przejdź do treści</a>
+<div class="portal-shell">
+<header class="site-header">
+  <div class="header-inner">
+    <a class="brand" href="/" aria-label="Centrum aplikacji — strona główna"><span class="brand-mark" aria-hidden="true">A</span><span class="brand-copy"><strong>Centrum aplikacji</strong><small>Nauka · plan · postęp</small></span></a>
+    <nav class="header-nav" aria-label="Nawigacja"><a href="/">Strona główna</a><a href="/#aplikacje">Aplikacje</a></nav>
+    <a class="button lecture-account" href="/konto/">Moje konto</a>
+  </div>
+</header>
+<main id="mainContent" tabindex="-1">
+  <section class="lecture-hero">
+    <div><span class="eyebrow">Transkrypcja nagrań lokalnie</span><h1>Zrób <span>notatkę.</span></h1><p>Nagraj wykład lub wybierz plik audio albo wideo. Whisper przygotuje transkrypcję, którą możesz sprawdzić i poprawić.</p></div>
+    <div class="lecture-hero-panel"><span>Tryb 1:1</span><strong>Dźwięk → pełny zapis wypowiedzi</strong></div>
+  </section>
+  <section class="lecture-workspace" aria-label="Narzędzia tworzenia notatki">
+    <div class="lecture-sidebar">
+      <section class="lecture-card" aria-labelledby="sourceTitle">
+        <span class="lecture-kicker">Krok 1</span><h2 id="sourceTitle">Źródło materiału</h2>
+        <label for="lectureTitle">Tytuł wykładu</label>
+        <input id="lectureTitle" maxlength="120" placeholder="Np. Prawo administracyjne — wykład 1" autocomplete="off">
+        <label class="lecture-mic-option"><input id="includeMicrophone" type="checkbox"> Dołącz mikrofon — nagrywaj też otoczenie</label>
+        <div class="lecture-actions"><button id="recordScreen" class="button primary" type="button">▣ Nagrywaj dźwięk komputera</button><button id="recordMic" class="button" type="button">🎙 Tylko mikrofon</button><button id="stopRecord" class="button danger" type="button" disabled>■ Zakończ nagrywanie</button></div>
+        <div class="lecture-record-status" role="status" aria-live="polite"><span class="lecture-dot" aria-hidden="true"></span><span id="recordStatus">Gotowy do nagrywania</span><time id="recordTimer">00:00:00 / 02:00:00</time></div>
+        <p class="lecture-hint">W Chrome lub Edge wybierz <strong>Cały ekran → udostępnij dźwięk systemowy</strong>, aby nagrać komputer, albo kartę przeglądarki z włączonym dźwiękiem. Mikrofon jest domyślnie wyłączony. Dostępność dźwięku systemowego zależy od systemu i przeglądarki; zapisywany jest sam dźwięk.</p>
+        <p class="lecture-hint">Automatyczny podział: <strong>2 godziny → zapis → kolejna część</strong>. Pozostaw otwartą kartę i nie usypiaj komputera. Zapisane nagrania znajdziesz poniżej również po odświeżeniu.</p>
+        <div class="lecture-separator">lub prześlij plik</div>
+        <label for="lectureFile">Nagranie audio/wideo</label>
+        <div id="lectureDropZone" class="lecture-drop-zone" role="button" tabindex="0" aria-controls="lectureFile" aria-label="Przeciągnij i upuść plik audio lub wideo albo naciśnij, aby wybrać plik"><strong>⬇ Przeciągnij tutaj plik audio lub wideo</strong><span>Upuść plik albo kliknij, aby wybrać z urządzenia.</span></div>
+        <input id="lectureFile" type="file" accept="audio/*,video/*,.m4a,.mp3,.wav,.webm,.mp4,.mov,.mkv,.avi">
+        <p class="lecture-hint" id="fileHint">Możesz wybrać także duży film, np. MP4 3 GB. Plik nie trafia na serwer; dźwięk jest odczytywany w małych fragmentach. Dla filmów program pracuje w tempie odtwarzania (lub wolniej), więc nie zamykaj karty. Program zapamiętuje punkt wznowienia po każdym przetworzonym fragmencie. MKV i niektóre kodeki mogą wymagać wcześniejszej konwersji do MP4/WebM.</p>
+        <div class="lecture-separator">lub wklej link do YouTube</div>
+        <section class="lecture-youtube" aria-label="Film z YouTube">
+          <label for="youtubeUrl">Adres filmu YouTube</label>
+          <input id="youtubeUrl" type="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off">
+          <div class="lecture-inline lecture-youtube-actions">
+            <button id="youtubeLoad" class="button" type="button">Wczytaj film</button>
+            <button id="youtubeRecord" class="button" type="button" disabled aria-disabled="true" title="Przechwytywanie dźwięku z YouTube jest tymczasowo wyłączone">Przechwytywanie z YouTube (Tymczasowo nieaktywne)</button>
+            <a id="youtubeOpen" class="button" target="_blank" rel="noopener noreferrer" hidden>Otwórz na YouTube</a>
+          </div>
+          <p id="youtubeStatus" class="lecture-hint" role="status" aria-live="polite">Możesz wyświetlić film. Przechwytywanie dźwięku z YouTube jest tymczasowo nieaktywne.</p>
+          <div id="youtubePlayer" class="lecture-youtube-player" hidden>
+            <iframe id="youtubeFrame" title="Odtwarzacz filmu YouTube" loading="lazy"
+              allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen
+              referrerpolicy="strict-origin-when-cross-origin"></iframe>
+          </div>
+          <p class="lecture-hint">Podgląd filmu jest dostępny, ale przechwytywanie YouTube zostało czasowo wyłączone. Możesz nadal transkrybować własne pliki audio i wideo oraz nagrywać dźwięk komputera.</p>
+        </section>
+        <div class="lecture-offline-options"><label for="whisperModel">Jakość rozpoznawania</label><select id="whisperModel"><option value="tiny">Szybsza — Whisper tiny (mniejszy model)</option><option value="base" selected>Dokładniejsza — Whisper base (większy model)</option></select></div><button id="transcribeFile" class="button primary" type="button" disabled>Transkrybuj lokalnie 1:1</button><button id="cancelTranscription" class="button" type="button" disabled>Przerwij transkrypcję</button><div class="lecture-progress"><strong id="whisperStatus" role="status" aria-live="polite">Wybierz plik albo nagraj wypowiedź.</strong><progress id="whisperProgress" value="0" max="1"></progress><small id="whisperCounter">0 / 1 fragmentów</small></div>
+        <div id="mediaPlayer" class="lecture-player" hidden><audio id="audioPreview" controls preload="metadata"></audio><video id="videoPreview" controls preload="metadata" hidden></video><a id="downloadAudio" class="button" download="wyklad.webm" hidden>Pobierz własne nagranie</a></div>
+      </section>
+      <section class="lecture-card" aria-labelledby="recordingsTitle"><h2 id="recordingsTitle">Zapisane nagrania</h2><p id="recordingsEmpty" class="lecture-hint">Nie ma jeszcze nagrań w tej przeglądarce.</p><ul id="recordingsList" class="lecture-recordings"></ul><p class="lecture-hint">Audio jest zapisywane na tym urządzeniu. Pobierz ważne nagrania: wyczyszczenie danych witryny usuwa lokalny zapis.</p></section>
+      <section class="lecture-card" aria-labelledby="infoTitle"><span class="lecture-kicker">Jak to działa?</span><h2 id="infoTitle">Transkrypcja bez opłat</h2><p>Przy pierwszej transkrypcji przeglądarka pobiera model Whisper z Hugging Face i bibliotekę Transformers.js. Następnie rozpoznaje dźwięk lokalnie, bez wysyłania nagrania na serwer.</p><p>Zapisana część trafia do kolejki transkrypcji, a nagrywanie może trwać dalej. Długie nagrania są rozpoznawane z krótkich fragmentów. Przechwytywanie filmu przez wbudowany moduł YouTube jest tymczasowo wyłączone. Duże pliki wideo i audio są dekodowane strumieniowo, bez sztywnego limitu 120 MB ani 2 godzin. Prędkość zależy od sprzętu i długości nagrania, a obsługiwane kodeki od przeglądarki. Sprawdź wynik z odsłuchem.</p></section>
+    </div>
+    <div class="lecture-main">
+      <section class="lecture-card" aria-labelledby="transcriptTitle">
+        <div class="lecture-card-head"><div><span class="lecture-kicker">Krok 2</span><h2 id="transcriptTitle">Pełna transkrypcja 1:1</h2></div><span class="lecture-chip">Tekst edytowalny</span></div>
+        <label class="sr-only" for="transcript">Transkrypcja wykładu</label>
+        <textarea id="transcript" rows="13" placeholder="Tutaj pojawi się tekst z rozpoznawania mowy. Możesz też wkleić lub poprawić transkrypcję ręcznie."></textarea>
+        <div class="lecture-inline"><label class="button file-button" for="textFile">Wczytaj TXT <input id="textFile" type="file" accept=".txt,text/plain" hidden></label><button class="button" id="downloadTranscript" type="button">Pobierz TXT</button><button class="button" id="saveCompletedTranscript" type="button" disabled>Zapisz na koncie</button><button class="button" id="newLectureDocument" type="button">Nowy dokument</button><span id="wordCount">0 słów</span></div>
+        <p class="lecture-hint" id="completedNoteStatus" role="status" aria-live="polite">Trwa sprawdzanie sesji konta…</p>
+        <p class="lecture-hint">Po ukończeniu transkrypcji zalogowanego użytkownika tekst TXT zapisuje się w <a href="/konto/#accountNotes">Gotowych notatkach na koncie</a>. Po 30 dniach trafia do archiwum, a po kolejnych 30 dniach zostaje trwale usunięty. Audio pozostaje lokalnie.</p>
+        <p class="lecture-hint" id="liveHint">Transkrypcja rozpocznie się automatycznie po zakończeniu nagrywania. Dla zaimportowanego pliku kliknij „Transkrybuj lokalnie 1:1”. Tekst pojawia się stopniowo i można go poprawiać na bieżąco.</p>
+      </section>
+      <section class="lecture-card" aria-labelledby="notesTitle">
+        <div class="lecture-card-head"><div><span class="lecture-kicker">Przyszła funkcja</span><h2 id="notesTitle">Opracuj notatki</h2></div><span class="lecture-chip">Nieaktywne</span></div>
+        <div class="lecture-inline"><button id="generateNotes" class="button primary" type="button" disabled aria-disabled="true">✦ Opracuj notatki — wkrótce</button><button id="simpleNotes" class="button" type="button" disabled>Prosty konspekt</button><button id="downloadNotes" class="button" type="button" disabled>Pobierz notatkę</button></div>
+        <label class="sr-only" for="notes">Treść notatki</label><textarea id="notes" rows="5" disabled placeholder="Opracowywanie notatek będzie dostępne w kolejnym etapie. Aktualnie pracujemy wyłącznie nad transkrypcją 1:1."></textarea>
+        <p class="lecture-hint">Ten etap jest wyłączony. Transkrypcja powyżej zachowuje wypowiedzi zamiast je podsumowywać.</p>
+      </section>
+      <div id="lectureMessage" class="lecture-message" role="status" aria-live="polite">Nagrania i tekst są zapisywane lokalnie w tej przeglądarce. Możesz pobrać ich kopię na dysk.</div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer"><div class="footer-bottom"><span>© <span id="footerYear">2026</span> Centrum aplikacji · Notatki</span><a href="/">← Wróć do strony głównej</a></div></footer>
+</div>
+<script src="/assets/vendor/supabase-2.117.2.js"></script>
+<script src="/js/supabase-client.js"></script>
+<script src="/js/completed-notes.js?v=20261018-lifecycle-1"></script>
+<!-- WIEDORA-CHANGE: WD-20261030-WIE-157-REDACTION | TASK: WIE-157 | AUTHOR: Codex / GPT-6 -->
+<!-- WIEDORA-CHANGE: WD-20261031-WIE-157-ERROR-PATH-ROOT-01 | TASK: WIE-157 | AUTHOR: ChatGPT / GPT-6 -->
+<script src="/js/error-monitor.js?v=20261031-errorpath-1"></script>
+<script src="/apps/shared/i18n-core.js?v=20261004-i18n-1"></script>
+<script src="/apps/shared/portal-nav.js?v=20261011-study-theme-1"></script>
+<script src="/apps/notatki/transcript-core.js?v=20261018-local-1"></script><script src="/apps/notatki/recording-store.js?v=20261018-recording-4"></script><script src="/apps/notatki/recording-session.js?v=20261018-media-5"></script><script src="/apps/notatki/youtube-links.js?v=20261018-youtube-1"></script><script src="/apps/notatki/notatki.js?v=20261018-lifecycle-1"></script><script src="/apps/notatki/completed-note-sync.js?v=20261018-lifecycle-1"></script><script src="/apps/notatki/youtube-source.js?v=20261018-youtube-off-1"></script><script src="/apps/notatki/streamed-media.js?v=20261018-media-7"></script><script src="/apps/notatki/local-transcription.js?v=20261018-media-7"></script>
+</body></html>
