@@ -1,0 +1,96 @@
+.lecture-app .lecture-hero{max-width:1240px;margin:auto;padding:60px 24px 28px;display:grid;grid-template-columns:minmax(0,1.5fr) minmax(260px,.8fr);gap:28px;align-items:center}
+.lecture-app .lecture-hero h1{font-size:clamp(40px,6vw,70px)}.lecture-app .lecture-hero h1 span{color:var(--accent)}
+.lecture-app .lecture-hero p{font-size:16px;color:var(--muted);line-height:1.65;max-width:720px}
+.lecture-app .lecture-hero-panel{border-radius:24px;padding:26px;background:linear-gradient(140deg,#172945,#294775);color:white;display:grid;gap:12px}
+.lecture-app .lecture-hero-panel span{font-size:12px;color:#c2d5ee;font-weight:800;text-transform:uppercase;letter-spacing:.07em}
+.lecture-app .lecture-hero-panel strong{font-size:23px;line-height:1.25}.lecture-app .lecture-hero-panel small{line-height:1.55;color:#d8e3f2}
+.lecture-app .lecture-workspace{max-width:1240px;padding:0 24px 80px;margin:auto;display:grid;grid-template-columns:minmax(280px,.83fr) minmax(0,1.45fr);align-items:start;gap:20px}
+.lecture-app .lecture-sidebar,.lecture-app .lecture-main{display:grid;gap:18px;min-width:0}
+.lecture-app .lecture-card{background:var(--surface);border:1px solid var(--line);padding:24px;border-radius:22px;box-shadow:var(--shadow-sm);min-width:0}
+.lecture-app .lecture-card h2{font-size:22px;margin:4px 0 20px;letter-spacing:-.025em}
+.lecture-app .lecture-card p{line-height:1.6;font-size:13px;color:var(--muted)}
+.lecture-app .lecture-kicker{font-size:11px;color:var(--accent);text-transform:uppercase;font-weight:850;letter-spacing:.09em}
+.lecture-app .lecture-card label:not(.file-button){display:block;font-weight:750;font-size:13px;margin:12px 0 8px}
+.lecture-app .lecture-card input:not([type=file]),.lecture-app .lecture-card textarea{width:100%;border:1px solid #dce3ed;border-radius:13px;padding:13px;background:var(--surface);color:var(--text);font:inherit;min-width:0}
+.lecture-app .lecture-card textarea{resize:vertical;min-height:195px;line-height:1.6;font-size:14px}
+.lecture-app #transcript{min-height:260px}.lecture-app #notes{min-height:245px}
+.lecture-app .lecture-card input[type=file]{display:block;width:100%;max-width:100%;font-size:12px}
+.lecture-app .lecture-actions{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 14px}.lecture-app .lecture-actions .button{flex:1 1 170px}
+.lecture-app .button.danger{background:#fff2f0;border-color:#f9c1ba;color:#b42318}.lecture-app .button:disabled{cursor:not-allowed;opacity:.48;transform:none}
+.lecture-app .lecture-record-status{display:flex;gap:9px;align-items:center;background:var(--surface-2);padding:12px 14px;border:1px solid var(--line);border-radius:12px;font-size:12px;color:var(--text)}
+.lecture-app .lecture-record-status time{margin-left:auto;font-variant-numeric:tabular-nums}.lecture-app .lecture-dot{width:9px;height:9px;border-radius:50%;background:#94a3b8;flex:none}
+.lecture-app .lecture-record-status.active .lecture-dot{background:#e5484d;box-shadow:0 0 0 5px rgba(229,72,77,.1);animation:lecture-pulse 1.2s infinite}
+@keyframes lecture-pulse{50%{opacity:.35}}.lecture-app .lecture-hint{font-size:12px!important;color:var(--muted);margin:12px 0 2px}
+.lecture-app .lecture-separator{text-align:center;color:var(--muted);font-size:12px;margin:20px 0 8px}
+.lecture-app .lecture-card-head{display:flex;justify-content:space-between;align-items:start;gap:12px}.lecture-app .lecture-chip{display:inline-block;background:#edf3ff;border:1px solid #dce6ff;color:#3559aa;border-radius:20px;padding:6px 10px;font-size:11px;font-weight:700;white-space:nowrap}
+.lecture-app .lecture-inline{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 15px}.lecture-app .lecture-inline #wordCount{font-size:12px;color:var(--muted);margin-left:auto}
+.lecture-app .lecture-player{margin-top:12px;display:grid;gap:10px}.lecture-app .lecture-player[hidden]{display:none}.lecture-app .lecture-player audio,.lecture-app .lecture-player video{width:100%;max-height:300px}
+.lecture-app .lecture-message{background:#f0f5ff;color:#294b80;border:1px solid #d6e3fa;border-radius:16px;padding:14px 16px;font-size:13px;line-height:1.55}
+.lecture-app .lecture-message.error{background:#fff3f1;color:#a32e20;border-color:#facac2}
+.lecture-app .lecture-message.success{background:#edf9f2;color:#176941;border-color:#c4ead3}
+.lecture-app .lecture-account{margin-left:auto}
+html[data-portal-theme="blue"] .lecture-app .lecture-card{background:#142d43;color:#f4f8fb;border-color:#284965}html[data-portal-theme="blue"] .lecture-app textarea,html[data-portal-theme="blue"] .lecture-app input:not([type=file]){background:#10283a;color:#f4f8fb;border-color:#42607a}
+html[data-portal-theme="blue"] .lecture-app .lecture-record-status{background:#10283a}html[data-portal-theme="gray"] .lecture-app .lecture-card{background:#eef0f2;border-color:#c7cdd3}
+@media(max-width:920px){.lecture-app .lecture-hero{grid-template-columns:1fr;padding-top:40px}.lecture-app .lecture-workspace{grid-template-columns:1fr}.lecture-app .lecture-account{margin-left:auto}}
+@media(max-width:600px){.lecture-app .lecture-hero{padding:34px 14px 16px}.lecture-app .lecture-hero-panel{padding:20px}.lecture-app .lecture-workspace{padding:0 14px 65px}.lecture-app .lecture-card{padding:18px}.lecture-app .lecture-inline .button{flex:1 1 auto}}
+
+/* Transkrypcja lokalna Whisper */
+.lecture-app .lecture-offline-options{margin:16px 0 12px}
+.lecture-app .lecture-offline-options label{font-weight:750;font-size:13px;display:block;margin-bottom:8px}
+.lecture-app #whisperModel{width:100%;max-width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--text);font:inherit;font-size:13px}
+.lecture-app #transcribeFile,.lecture-app #cancelTranscription{width:100%;margin-top:10px}
+.lecture-app .lecture-progress{margin-top:15px;padding:13px;border:1px solid var(--line);border-radius:13px;background:var(--surface-2);display:grid;gap:8px;overflow-wrap:anywhere}
+.lecture-app .lecture-progress strong{font-size:12px;font-weight:700;line-height:1.5}
+.lecture-app .lecture-progress progress{display:block;width:100%;height:13px;accent-color:var(--accent)}
+.lecture-app .lecture-progress small{font-size:11px;color:var(--muted)}
+.lecture-app #notes[disabled]{background:var(--surface-2);opacity:.8;cursor:not-allowed}
+.lecture-app button[disabled]{cursor:not-allowed}
+html[data-portal-theme="blue"] .lecture-app #whisperModel{background:#10283a;color:#f4f8fb;border-color:#42607a}
+@media(max-width:560px){.lecture-app #whisperModel{font-size:12px}}
+
+.lecture-app .lecture-card label.lecture-mic-option{display:flex;align-items:center;gap:10px;line-height:1.5;margin-top:14px}.lecture-app .lecture-card label.lecture-mic-option input[type=checkbox]{width:20px;height:20px;padding:0;margin:0;flex:0 0 auto;accent-color:var(--accent)}
+.lecture-recordings{list-style:none;padding:0;margin:0;display:grid;gap:14px}.lecture-recording{display:grid;gap:8px;padding:14px 0;border-bottom:1px solid var(--border)}.lecture-recording small{color:var(--muted);overflow-wrap:anywhere}.lecture-recording .button{font-size:12px;white-space:normal}.lecture-app .lecture-record-status{flex-wrap:wrap}.lecture-app #recordTimer{font-variant-numeric:tabular-nums;white-space:nowrap}
+
+
+/* Raport 2026-10-18: widoczny status Whisper i licznik w każdej skórce. */
+.lecture-app .lecture-progress {background:var(--portal-surface,#fff)!important;border:2px solid var(--portal-line,#9daabe)!important}
+.lecture-app #whisperStatus,.lecture-app #whisperCounter {color:var(--portal-ink,#203246)!important;opacity:1!important}
+.lecture-app #whisperStatus {font-size:14px!important;line-height:1.55;font-weight:800}
+.lecture-app #whisperCounter {font-size:12px}
+.lecture-app .lecture-record-status{background:var(--portal-surface,#fff)!important;border:2px solid var(--portal-line,#9daabe)!important;color:var(--portal-ink,#203246)!important}
+.lecture-app #recordStatus {color:var(--portal-ink,#203246)!important;font-weight:700}
+.lecture-app #recordTimer {display:inline-flex;align-items:center;min-height:34px;background:var(--portal-soft,#eaf0f6);border-radius:8px;padding:5px 9px;color:var(--portal-ink,#203246);font-weight:850;font-size:13px}
+html[data-portal-theme="blue"] .lecture-app .lecture-progress,
+html[data-portal-theme="blue"] .lecture-app .lecture-record-status{background:#142d43!important;border-color:#718ca8!important}
+html[data-portal-theme="blue"] .lecture-app :is(#whisperStatus,#whisperCounter,#recordStatus,#recordTimer){color:#f5faff!important}
+html[data-portal-theme="blue"] .lecture-app #recordTimer{background:#254763}
+html[data-portal-theme="gray"] .lecture-app :is(.lecture-progress,.lecture-record-status){background:#e1e5ea!important;border-color:#8896a4!important}
+html[data-portal-theme="gray"] .lecture-app #recordTimer{background:#cbd2db}
+
+/* Local YouTube link capture. Nothing is downloaded from the video URL. */
+.lecture-app .lecture-youtube{margin:12px 0 18px;min-width:0}
+.lecture-app .lecture-youtube input[type="url"]{width:100%;min-width:0;min-height:43px}
+.lecture-app .lecture-youtube-actions{display:flex;align-items:stretch;gap:8px;margin:12px 0 8px}
+.lecture-app .lecture-youtube-actions .button{flex:1 1 150px;min-width:0;line-height:1.35;text-align:center}
+.lecture-app .lecture-youtube-actions .button[hidden]{display:none!important}
+.lecture-app .lecture-youtube-player{aspect-ratio:16/9;position:relative;width:100%;max-width:100%;overflow:hidden;border-radius:13px;background:#101827;margin:12px 0}
+.lecture-app .lecture-youtube-player[hidden]{display:none!important}
+.lecture-app .lecture-youtube-player iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.lecture-app #youtubeStatus{padding:10px 12px;border:1px solid var(--portal-line,#b8c5d4);border-radius:10px;min-height:42px;color:var(--portal-ink,#203247)!important;background:var(--portal-soft,#e9eef3)}
+.lecture-app #youtubeStatus[data-state="error"]{border-color:#de938e;color:#992e25!important;background:#fff2f0}
+.lecture-app #youtubeStatus[data-state="success"]{border-color:#68a587;color:#17613e!important;background:#ebf8f1}
+html[data-portal-theme="blue"] .lecture-app #youtubeStatus{background:#18364d;color:#edf6ff!important;border-color:#6786a4}
+html[data-portal-theme="blue"] .lecture-app #youtubeStatus[data-state="error"]{background:#4a2930;color:#ffdde0!important;border-color:#e2969c}
+html[data-portal-theme="blue"] .lecture-app #youtubeStatus[data-state="success"]{background:#183e35;color:#c9f9e1!important;border-color:#6ca88d}
+html[data-portal-theme="gray"] .lecture-app #youtubeStatus{background:#cdd6df;color:#1f2b39!important}
+@media(max-width:480px){.lecture-app .lecture-youtube-actions .button{flex:1 1 100%}}
+
+/* Import audio/video by drag-and-drop, with keyboard fallback. */
+.lecture-app .lecture-drop-zone{display:grid;gap:6px;place-items:center;text-align:center;min-height:136px;padding:20px 16px;margin:14px 0 12px;border:2px dashed var(--portal-line,#94a3b8);border-radius:15px;background:var(--portal-soft,#edf3f9);color:var(--portal-ink,#203246);cursor:pointer;transition:border-color .15s,background .15s,transform .15s}
+.lecture-app .lecture-drop-zone strong{font-size:15px;line-height:1.45;color:inherit}
+.lecture-app .lecture-drop-zone span{font-size:12px;color:var(--portal-muted,#465b73)}
+.lecture-app .lecture-drop-zone:hover,.lecture-app .lecture-drop-zone.is-dragover{border-color:var(--portal-link,#2764aa);background:var(--portal-surface,#fff);transform:translateY(-1px)}
+.lecture-app .lecture-drop-zone:focus-visible{outline:3px solid var(--portal-link,#2764aa);outline-offset:3px}
+html[data-portal-theme="blue"] .lecture-app .lecture-drop-zone{background:#1b3950;color:#fff;border-color:#7294b4}
+html[data-portal-theme="blue"] .lecture-app .lecture-drop-zone span{color:#d1e3f2}
+html[data-portal-theme="gray"] .lecture-app .lecture-drop-zone{background:#c6d0da;color:#22354a;border-color:#6f8398}
