@@ -88,7 +88,7 @@ def create_internal_bundle(*, app: Path, ffmpeg: Path, ffprobe: Path, whisper: P
                 raise VideoNotesError("Skopiowany składnik pakietu nie zgadza się z SHA-256 źródła.")
             checksums[relative] = {"sha256": digest, "size_bytes": size}
         (staging / "START-VIDEO-NOTES.cmd").write_bytes(LAUNCHER.encode("ascii"))
-        (staging / "INTERNAL-ONLY.txt").write_bytes(NOTICE.encode("ascii"))
+        (staging / "INTERNAL-ONLY.txt").write_bytes(NOTICE.encode("utf-8"))
         manifest = {"schema": SCHEMA, "distribution": "internal-only",
                     "license_verified": False, "hardware_tested": False,
                     "signature_verified": False, "dependencies_auto_downloaded": False,
