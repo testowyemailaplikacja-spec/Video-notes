@@ -48,7 +48,7 @@ jobs:
         run: |
           python -m compileall -q videonotes tests
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python -m unittest tests.test_contracts tests.test_asr tests.test_notes tests.test_advanced_notes tests.test_quality tests.test_notes_cli tests.test_backup tests.test_backup_cli tests.test_note_revisions tests.test_note_revisions_cli tests.test_asr_lab tests.test_asr_lab_cli tests.test_windows_console -v
+          python -m unittest tests.test_contracts tests.test_asr tests.test_notes tests.test_advanced_notes tests.test_microphone tests.test_quality tests.test_notes_cli tests.test_backup tests.test_backup_cli tests.test_note_revisions tests.test_note_revisions_cli tests.test_asr_lab tests.test_asr_lab_cli tests.test_windows_console -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m videonotes --version
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

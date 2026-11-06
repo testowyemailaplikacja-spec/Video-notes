@@ -10,6 +10,7 @@ from . import __version__
 from .errors import VideoNotesError
 from .exports import edit_segment, export_project
 from .media import probe
+from .microphone import record_microphone, recording_status
 from .notes import generate_basic_notes, edit_note_point, export_basic_notes
 from .advanced_notes import export_advanced_outline
 from .note_revisions import regenerate_basic_notes, list_note_versions, restore_note_version
@@ -103,6 +104,14 @@ def parser() -> argparse.ArgumentParser:
     relink.add_argument("--model", type=Path, required=True)
     relink.add_argument("--whisper-cli", required=True)
     relink.add_argument("--ffprobe", default="ffprobe")
+    mic = sub.add_parser("record-mic", help="Nagraj lokalny mikrofon Windows jako WAV")
+    mic.add_argument("--device", required=True, help="Dokładna nazwa urządzenia DirectShow")
+    mic.add_argument("--output", required=True, type=Path, help="Nowy katalog nagrania; istniejące są chronione")
+    mic.add_argument("--consent", required=True, action="store_true", help="Potwierdź świadome włączenie mikrofonu")
+    mic.add_argument("--max-minutes", type=int, help="Opcjonalny limit 1–1440 minut")
+    mic.add_argument("--ffmpeg", default="ffmpeg")
+    mic_status = sub.add_parser("record-status", help="Sprawdź lokalne pliki nagrania i dziennik sesji")
+    mic_status.add_argument("folder", type=Path)
     sub.add_parser("gui", help="Uruchom prosty interfejs Windows/Tkinter")
     return cmd
 
@@ -198,6 +207,14 @@ def main(argv: list[str] | None = None) -> int:
         elif args.action == "relink":
             relink_backup(args.project, args.source, args.model, whisper_cli=args.whisper_cli, ffprobe=args.ffprobe)
             print("Potwierdzono SHA-256 nagrania i modelu; projekt jest podłączony lokalnie.")
+        elif args.action == "record-mic":
+            if args.max_minutes is not None and not 1 <= args.max_minutes <= 1440:
+                raise VideoNotesError("Limit nagrywania musi wynosić 1–1440 minut.")
+            result = record_microphone(args.device, args.output, consent=args.consent,
+                                       ffmpeg=args.ffmpeg, max_seconds=args.max_minutes * 60 if args.max_minutes is not None else None)
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        elif args.action == "record-status":
+            print(json.dumps(recording_status(args.folder), ensure_ascii=False, indent=2))
         elif args.action == "gui":
             from .gui import launch
             launch()
