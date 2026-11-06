@@ -12,6 +12,7 @@ from .exports import edit_segment, export_project
 from .media import probe
 from .microphone import record_microphone, recording_status
 from .notes import generate_basic_notes, edit_note_point, export_basic_notes
+from .advanced_notes import export_advanced_outline
 from .note_revisions import regenerate_basic_notes, list_note_versions, restore_note_version
 from .quality import compare_text_files
 from .asr_lab import run_real_benchmark
@@ -68,6 +69,11 @@ def parser() -> argparse.ArgumentParser:
     revert.add_argument("--revision", required=True)
     note_export = sub.add_parser("notes-export", help="Zapisz lokalny notes-basic.md")
     note_export.add_argument("project", type=Path)
+    advanced = sub.add_parser("advanced-notes", help="Źródłowy konspekt wielopoziomowy bez dopisywania faktów (VN-03)")
+    advanced.add_argument("project", type=Path)
+    advanced.add_argument("--template", choices=["lecture", "tutorial", "meeting", "study"], default="lecture")
+    advanced.add_argument("--detail", choices=["brief", "standard", "full"], default="standard")
+    advanced.add_argument("--section-minutes", type=int, default=10)
     real = sub.add_parser("benchmark-real", help="Uruchom lokalne whisper.cpp i faster-whisper na tym samym audio OBS (bez chmury)")
     real.add_argument("source", type=Path)
     real.add_argument("--reference", type=Path, required=True, help="Ręcznie sprawdzona transkrypcja wybranego fragmentu")
@@ -98,9 +104,9 @@ def parser() -> argparse.ArgumentParser:
     relink.add_argument("--model", type=Path, required=True)
     relink.add_argument("--whisper-cli", required=True)
     relink.add_argument("--ffprobe", default="ffprobe")
-    mic = sub.add_parser("record-mic", help="Nagraj lokalny mikrofon Windows jako WAV (bez transkrypcji w tle)")
+    mic = sub.add_parser("record-mic", help="Nagraj lokalny mikrofon Windows jako WAV")
     mic.add_argument("--device", required=True, help="Dokładna nazwa urządzenia DirectShow")
-    mic.add_argument("--output", required=True, type=Path, help="Nowy katalog nagrania; istniejące katalogi są chronione")
+    mic.add_argument("--output", required=True, type=Path, help="Nowy katalog nagrania; istniejące są chronione")
     mic.add_argument("--consent", required=True, action="store_true", help="Potwierdź świadome włączenie mikrofonu")
     mic.add_argument("--max-minutes", type=int, help="Opcjonalny limit 1–1440 minut")
     mic.add_argument("--ffmpeg", default="ffmpeg")
@@ -172,6 +178,9 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"previous_version_backup": previous, "notes_export": str(export_basic_notes(args.project))}, ensure_ascii=False))
         elif args.action == "notes-export":
             print(export_basic_notes(args.project))
+        elif args.action == "advanced-notes":
+            for path in export_advanced_outline(args.project, template=args.template, detail=args.detail, section_minutes=args.section_minutes):
+                print(path)
         elif args.action == "benchmark-real":
             report = run_real_benchmark(args.source, args.reference, cpp_executable=args.cpp_executable,
                                         cpp_model=args.cpp_model, faster_model_dir=args.faster_model_dir,

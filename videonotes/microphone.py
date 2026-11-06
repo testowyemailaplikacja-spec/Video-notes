@@ -128,7 +128,16 @@ def record_microphone(device: str, folder: Path, *, consent: bool,
                             proc.stdin.write(b"q\n")
                             proc.stdin.flush()
                         break
-                returncode = proc.wait(timeout=15 if stopped else None)
+                try:
+                    returncode = proc.wait(timeout=15 if stopped else None)
+                except subprocess.TimeoutExpired as error:
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                        proc.wait(timeout=5)
+                    raise VideoNotesError("FFmpeg nie zakończył nagrywania po poleceniu stop. Pliki zachowano.") from error
         finally:
             if proc.stdin:
                 proc.stdin.close()
@@ -139,6 +148,10 @@ def record_microphone(device: str, folder: Path, *, consent: bool,
                        "segments": len(parts), "duration_ms": sum(x["duration_ms"] for x in parts)})
         save_json(folder / "recording.json", report)
         return recording_status(folder)
+    except OSError as error:
+        report["status"] = "needs_review"
+        save_json(folder / "recording.json", report)
+        raise VideoNotesError("Nie można uruchomić lokalnego FFmpeg lub zapisać sesji mikrofonowej.") from error
     except Exception:
         report["status"] = "needs_review"
         save_json(folder / "recording.json", report)
