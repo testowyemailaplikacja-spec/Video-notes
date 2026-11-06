@@ -13,6 +13,7 @@ from .media import probe
 from .notes import generate_basic_notes, edit_note_point, export_basic_notes
 from .note_revisions import regenerate_basic_notes, list_note_versions, restore_note_version
 from .quality import compare_text_files
+from .asr_lab import run_real_benchmark
 from .backup import create_backup, restore_backup, relink_backup
 from .pipeline import create_project, transcribe_project
 from .storage import read_project
@@ -66,6 +67,20 @@ def parser() -> argparse.ArgumentParser:
     revert.add_argument("--revision", required=True)
     note_export = sub.add_parser("notes-export", help="Zapisz lokalny notes-basic.md")
     note_export.add_argument("project", type=Path)
+    real = sub.add_parser("benchmark-real", help="Uruchom lokalne whisper.cpp i faster-whisper na tym samym audio OBS (bez chmury)")
+    real.add_argument("source", type=Path)
+    real.add_argument("--reference", type=Path, required=True, help="Ręcznie sprawdzona transkrypcja wybranego fragmentu")
+    real.add_argument("--cpp-executable", required=True)
+    real.add_argument("--cpp-model", type=Path, required=True)
+    real.add_argument("--faster-model-dir", type=Path, required=True)
+    real.add_argument("--language", default="pl", choices=["pl", "en", "auto"])
+    real.add_argument("--threads", type=int, default=4)
+    real.add_argument("--stream", type=int)
+    real.add_argument("--start-seconds", type=int, default=0)
+    real.add_argument("--duration-seconds", type=int, default=120)
+    real.add_argument("--ffmpeg", default="ffmpeg")
+    real.add_argument("--ffprobe", default="ffprobe")
+    real.add_argument("--output", type=Path, required=True)
     benchmark = sub.add_parser("benchmark", help="Porównaj WER/CER gotowych plików TXT, bez nagrywania lub wysyłki danych")
     benchmark.add_argument("--reference", required=True, type=Path)
     benchmark.add_argument("--candidate", required=True, action="append", help="etykieta=plik.txt; wymaga prawdziwych wyników ASR")
@@ -136,6 +151,13 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"previous_version_backup": previous, "notes_export": str(export_basic_notes(args.project))}, ensure_ascii=False))
         elif args.action == "notes-export":
             print(export_basic_notes(args.project))
+        elif args.action == "benchmark-real":
+            report = run_real_benchmark(args.source, args.reference, cpp_executable=args.cpp_executable,
+                                        cpp_model=args.cpp_model, faster_model_dir=args.faster_model_dir,
+                                        language=args.language, threads=args.threads, stream=args.stream,
+                                        start_seconds=args.start_seconds, duration_seconds=args.duration_seconds,
+                                        ffmpeg=args.ffmpeg, ffprobe=args.ffprobe, output=args.output)
+            print(json.dumps(report, ensure_ascii=False, indent=2))
         elif args.action == "benchmark":
             candidates = {}
             for item in args.candidate:
