@@ -13,7 +13,7 @@ permissions:
 jobs:
   unit-linux:
     name: Python stdlib and real FFmpeg synthetic media (Linux)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -23,8 +23,8 @@ jobs:
       - name: Verify local FFmpeg tooling (bounded install only if absent)
         run: |
           if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
-            timeout 120s sudo apt-get update -qq
-            timeout 120s sudo apt-get install -y ffmpeg
+            timeout 240s sudo apt-get update -qq
+            timeout 300s sudo apt-get install -y --no-install-recommends ffmpeg
           fi
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
@@ -48,7 +48,7 @@ jobs:
         run: |
           python -m compileall -q videonotes tests
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python -m unittest tests.test_contracts tests.test_asr tests.test_notes tests.test_quality tests.test_notes_cli tests.test_backup tests.test_backup_cli tests.test_note_revisions tests.test_note_revisions_cli -v
+          python -m unittest tests.test_contracts tests.test_asr tests.test_notes tests.test_quality tests.test_notes_cli tests.test_backup tests.test_backup_cli tests.test_note_revisions tests.test_note_revisions_cli tests.test_asr_lab tests.test_asr_lab_cli -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m videonotes --version
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
