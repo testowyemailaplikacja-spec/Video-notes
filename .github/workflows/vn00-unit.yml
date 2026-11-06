@@ -1,0 +1,47 @@
+name: Video Notes VN-00 source tests
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'videonotes/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - '.github/workflows/vn00-unit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  unit-linux:
+    name: Python stdlib and real FFmpeg synthetic media (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install local FFmpeg tooling
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+      - name: Run all tests
+        run: |
+          python -m compileall -q videonotes tests
+          python -m unittest discover -s tests -v
+      - name: Confirm CLI responds without remote services
+        run: python -m videonotes --version
+  unit-windows:
+    name: Python stdlib contracts on Windows (not full Windows acceptance)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify interpreter and core contracts without external ASR
+        shell: pwsh
+        run: |
+          python -m compileall -q videonotes tests
+          python -m unittest tests.test_contracts tests.test_asr -v
+          python -m videonotes --version
