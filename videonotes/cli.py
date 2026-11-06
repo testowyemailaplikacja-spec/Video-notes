@@ -12,6 +12,7 @@ from .exports import edit_segment, export_project
 from .media import probe
 from .notes import generate_basic_notes, edit_note_point, export_basic_notes
 from .quality import compare_text_files
+from .backup import create_backup, restore_backup, relink_backup
 from .pipeline import create_project, transcribe_project
 from .storage import read_project
 
@@ -59,6 +60,18 @@ def parser() -> argparse.ArgumentParser:
     benchmark.add_argument("--reference", required=True, type=Path)
     benchmark.add_argument("--candidate", required=True, action="append", help="etykieta=plik.txt; wymaga prawdziwych wyników ASR")
     benchmark.add_argument("--output", type=Path)
+    backup = sub.add_parser("backup", help="Utwórz lokalną kopię projektu bez audio i modelu")
+    backup.add_argument("project", type=Path)
+    backup.add_argument("--output", type=Path, required=True)
+    restore = sub.add_parser("restore", help="Przywróć projekt z bezpiecznego archiwum do nowego katalogu")
+    restore.add_argument("archive", type=Path)
+    restore.add_argument("--project", type=Path, required=True)
+    relink = sub.add_parser("relink", help="Po odtworzeniu podłącz lokalne pliki o tych samych SHA-256")
+    relink.add_argument("project", type=Path)
+    relink.add_argument("--source", type=Path, required=True)
+    relink.add_argument("--model", type=Path, required=True)
+    relink.add_argument("--whisper-cli", required=True)
+    relink.add_argument("--ffprobe", default="ffprobe")
     sub.add_parser("gui", help="Uruchom prosty interfejs Windows/Tkinter")
     return cmd
 
@@ -114,6 +127,15 @@ def main(argv: list[str] | None = None) -> int:
                     raise VideoNotesError("Pusta ścieżka lub powielona etykieta benchmarku.")
                 candidates[label] = Path(filename)
             print(json.dumps(compare_text_files(args.reference, candidates, output=args.output), ensure_ascii=False, indent=2))
+        elif args.action == "backup":
+            print(create_backup(args.project, args.output))
+            print("Kopia nie zawiera nagrań ani modelu. Zachowaj pliki źródłowe osobno.", file=sys.stderr)
+        elif args.action == "restore":
+            print(restore_backup(args.archive, args.project))
+            print("Projekt przywrócony. Przed wznowieniem ASR użyj relink.", file=sys.stderr)
+        elif args.action == "relink":
+            relink_backup(args.project, args.source, args.model, whisper_cli=args.whisper_cli, ffprobe=args.ffprobe)
+            print("Potwierdzono SHA-256 nagrania i modelu; projekt jest podłączony lokalnie.")
         elif args.action == "gui":
             from .gui import launch
             launch()

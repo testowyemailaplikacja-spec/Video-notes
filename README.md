@@ -67,3 +67,13 @@ python -m videonotes benchmark --reference prawdziwy_tekst.txt --candidate whisp
 ```
 
 Program porównuje lokalne pliki TXT, wylicza WER/CER i zapisuje **wyłącznie skróty SHA-256 i liczby**, bez tekstów nagrań. **Nie uruchamia** żadnego silnika ASR, nie dowodzi jego jakości, nie mierzy RAM/czasu i nie wysyła plików. Aby zamknąć VN-00, należy wykonać prawdziwy, kontrolowany eksperyment obu silników. Instrukcja: [ASR_QUALITY_BENCHMARK.md](docs/ASR_QUALITY_BENCHMARK.md).
+
+## Przenośna kopia projektu (VN-01/VN-06, wersja rozwojowa)
+
+```bash
+python -m videonotes backup moje-notatki --output kopia.vnproj
+python -m videonotes restore kopia.vnproj --project odzyskane-notatki
+python -m videonotes relink odzyskane-notatki --source nagranie.mkv --model ggml-base.bin --whisper-cli whisper-cli
+```
+
+Kopia lokalna zawiera transkrypcję i notatki, ale **nie nagranie, model ani binaria**. Usuwa ze skopiowanych metadanych bezwzględne ścieżki do lokalnych plików i sprawdza integralność SHA-256. Po przywróceniu można przeglądać tekst offline; wznowienie ASR wymaga ponownego podłączenia identycznego źródła i modelu. Kopia zawiera treść użytkownika, dlatego nie należy udostępniać jej publicznie. Funkcja nie oznacza jeszcze pełnego odbioru systemu backupów ani etapu VN-06. [Opis i ograniczenia](docs/VN_LOCAL_BACKUP.md).
