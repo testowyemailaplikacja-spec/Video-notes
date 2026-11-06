@@ -81,3 +81,7 @@ python -m videonotes relink odzyskane-notatki --source nagranie.mkv --model ggml
 ```
 
 Kopia lokalna zawiera transkrypcję i notatki, ale **nie nagranie, model ani binaria**. Usuwa ze skopiowanych metadanych bezwzględne ścieżki do lokalnych plików i sprawdza integralność SHA-256. Po przywróceniu można przeglądać tekst offline; wznowienie ASR wymaga ponownego podłączenia identycznego źródła i modelu. Kopia zawiera treść użytkownika, dlatego nie należy udostępniać jej publicznie. Funkcja nie oznacza jeszcze pełnego odbioru systemu backupów ani etapu VN-06. [Opis i ograniczenia](docs/VN_LOCAL_BACKUP.md).
+
+### Historia i odbudowa notatek
+
+Po późniejszej poprawce transkrypcji można wykonać `python -m videonotes notes-regenerate moje-notatki`, sprawdzić wcześniejsze wersje komendą `notes-history` i przywrócić zgodną wersję przez `notes-restore --revision <ID>`. Ręczne uwagi do nadal istniejących segmentów są zachowywane; zmiany do usuniętych segmentów pozostają w lokalnej historii. Funkcja dostępna jest także w GUI. [Dokładne zasady](docs/VN02_HISTORY.md).

@@ -11,6 +11,7 @@ from .errors import VideoNotesError
 from .exports import edit_segment, export_project
 from .media import probe
 from .notes import generate_basic_notes, read_basic_notes, edit_note_point, export_basic_notes
+from .note_revisions import regenerate_basic_notes, list_note_versions
 from .pipeline import create_project, transcribe_project
 from .storage import read_project
 
@@ -226,8 +227,20 @@ class VideoNotesWindow:
             notes, changes = read_basic_notes(folder)
             export_basic_notes(folder)
         except VideoNotesError as error:
-            messagebox.showerror("Notatka podstawowa", str(error))
-            return
+            if "Transkrypcja zmieniła się" in str(error) and messagebox.askyesno(
+                "Notatka nieaktualna",
+                "Transkrypcja została poprawiona. Odbudować notatkę z aktualnych wypowiedzi, zachowując ręczne zmiany i poprzednią wersję?"
+            ):
+                try:
+                    regenerate_basic_notes(folder)
+                    notes, changes = read_basic_notes(folder)
+                    export_basic_notes(folder)
+                except VideoNotesError as recovery_error:
+                    messagebox.showerror("Odbudowa notatki", str(recovery_error))
+                    return
+            else:
+                messagebox.showerror("Notatka podstawowa", str(error))
+                return
 
         window = tk.Toplevel(self.root)
         window.title("Notatka podstawowa — fragmenty źródłowe")
@@ -286,6 +299,23 @@ class VideoNotesWindow:
             except VideoNotesError as error:
                 messagebox.showerror("Notatka", str(error))
         ttk.Button(right, text="Zapisz poprawkę i Markdown", command=save_edit).pack(anchor="e", pady=7)
+        def regenerate() -> None:
+            if not messagebox.askyesno(
+                "Odbudowa notatki",
+                "Ponownie wybierać cytaty z transkrypcji? Poprzednia wersja zostanie zapisana w historii. Ręczne poprawki do istniejących segmentów pozostaną."
+            ):
+                return
+            try:
+                report = regenerate_basic_notes(folder)
+                export_basic_notes(folder)
+                if report["unmatched_edits"]:
+                    messagebox.showwarning("Odbudowa", "Część zmian dotyczy usuniętych wypowiedzi. Została w poprzedniej wersji historii.")
+                window.destroy()
+                self._show_notes()
+            except VideoNotesError as error:
+                messagebox.showerror("Odbudowa", str(error))
+        ttk.Button(right, text="Odbuduj notatkę z historią", command=regenerate).pack(anchor="e")
+        ttk.Label(right, text=f"Wcześniejsze wersje: {len(list_note_versions(folder))}", wraplength=290).pack(anchor="w", pady=4)
         if content_by_id:
             first = next(iter(content_by_id))
             view.selection_set(first)

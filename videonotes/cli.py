@@ -11,6 +11,7 @@ from .errors import VideoNotesError
 from .exports import edit_segment, export_project
 from .media import probe
 from .notes import generate_basic_notes, edit_note_point, export_basic_notes
+from .note_revisions import regenerate_basic_notes, list_note_versions, restore_note_version
 from .quality import compare_text_files
 from .backup import create_backup, restore_backup, relink_backup
 from .pipeline import create_project, transcribe_project
@@ -54,6 +55,15 @@ def parser() -> argparse.ArgumentParser:
     note_edit.add_argument("project", type=Path)
     note_edit.add_argument("--point", required=True)
     note_edit.add_argument("--text", required=True)
+    regen = sub.add_parser("notes-regenerate", help="Odbuduj cytaty z aktualnej transkrypcji, zachowując ręczne poprawki i historię")
+    regen.add_argument("project", type=Path)
+    regen.add_argument("--window-minutes", type=int, default=5)
+    regen.add_argument("--points", type=int, default=6)
+    versions = sub.add_parser("notes-history", help="Pokaż zapisane wersje lokalne bez treści notatek")
+    versions.add_argument("project", type=Path)
+    revert = sub.add_parser("notes-restore", help="Przywróć zgodną ze źródłem wersję notatek")
+    revert.add_argument("project", type=Path)
+    revert.add_argument("--revision", required=True)
     note_export = sub.add_parser("notes-export", help="Zapisz lokalny notes-basic.md")
     note_export.add_argument("project", type=Path)
     benchmark = sub.add_parser("benchmark", help="Porównaj WER/CER gotowych plików TXT, bez nagrywania lub wysyłki danych")
@@ -115,6 +125,15 @@ def main(argv: list[str] | None = None) -> int:
         elif args.action == "notes-edit":
             edit_note_point(args.project, args.point, args.text)
             print(f"Zaktualizowano {export_basic_notes(args.project)}")
+        elif args.action == "notes-regenerate":
+            report = regenerate_basic_notes(args.project, window_minutes=args.window_minutes, points_per_section=args.points)
+            path = export_basic_notes(args.project)
+            print(json.dumps({**report, "notes_export": str(path)}, ensure_ascii=False, indent=2))
+        elif args.action == "notes-history":
+            print(json.dumps(list_note_versions(args.project), ensure_ascii=False, indent=2))
+        elif args.action == "notes-restore":
+            previous = restore_note_version(args.project, args.revision)
+            print(json.dumps({"previous_version_backup": previous, "notes_export": str(export_basic_notes(args.project))}, ensure_ascii=False))
         elif args.action == "notes-export":
             print(export_basic_notes(args.project))
         elif args.action == "benchmark":
