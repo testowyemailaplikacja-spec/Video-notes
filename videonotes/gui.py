@@ -11,6 +11,7 @@ from .errors import VideoNotesError
 from .exports import edit_segment, export_project
 from .media import probe
 from .notes import generate_basic_notes, read_basic_notes, edit_note_point, export_basic_notes
+from .advanced_notes import export_advanced_outline
 from .note_revisions import regenerate_basic_notes, list_note_versions
 from .pipeline import create_project, transcribe_project
 from .storage import read_project
@@ -64,6 +65,7 @@ class VideoNotesWindow:
         self.cancel_button.pack(side="left", padx=(0, 8))
         ttk.Button(commands, text="Otwórz projekt", command=self._load).pack(side="left")
         ttk.Button(outer, text="Notatka podstawowa — wybrane cytaty z transkrypcji", command=self._show_notes).pack(anchor="w", pady=(0, 7))
+        ttk.Button(outer, text="Konspekt źródłowy — rozdziały i cytaty (VN-03)", command=self._show_advanced).pack(anchor="w", pady=(0, 7))
         self.status = tk.StringVar(value="Gotowe. Wybierz plik i lokalny model.")
         ttk.Label(outer, textvariable=self.status, wraplength=700).pack(anchor="w", pady=4)
         self.progress = ttk.Progressbar(outer, orient="horizontal", mode="determinate")
@@ -211,6 +213,32 @@ class VideoNotesWindow:
         except VideoNotesError as error:
             messagebox.showerror("Video Notes", str(error))
 
+
+    def _show_advanced(self) -> None:
+        """Read-only local Markdown preview, without cloud processing."""
+        if self.active:
+            messagebox.showwarning("Video Notes", "Zakończ transkrypcję przed tworzeniem konspektu.")
+            return
+        if not self.project.get().strip():
+            messagebox.showwarning("Video Notes", "Wskaż katalog projektu.")
+            return
+        try:
+            markdown, structured = export_advanced_outline(Path(self.project.get()))
+        except VideoNotesError as error:
+            messagebox.showerror("Konspekt źródłowy", str(error))
+            return
+        preview = tk.Toplevel(self.root)
+        preview.title("Konspekt źródłowy — wersja ekstrakcyjna")
+        preview.geometry("900x620")
+        body = ttk.Frame(preview, padding=10)
+        body.pack(fill="both", expand=True)
+        ttk.Label(body, text="Cytaty podzielone na rozdziały czasowe, nie streszczenie AI.",
+                  wraplength=850).pack(anchor="w")
+        content = tk.Text(body, wrap="word")
+        content.pack(fill="both", expand=True)
+        content.insert("1.0", markdown.read_text(encoding="utf-8"))
+        content.configure(state="disabled")
+        self.status.set(f"Zapisano lokalnie: {markdown.name} i {structured.name}.")
 
     def _show_notes(self) -> None:
         """Display and edit source-cited, offline basic notes."""
