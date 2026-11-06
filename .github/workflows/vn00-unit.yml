@@ -39,7 +39,10 @@ jobs:
         with:
           node-version: '22'
       - name: Test browser transcript contract without npm dependencies
-        run: node --test tests/web-core.test.cjs
+        run: |
+          node --check web/transcript-core.js
+          node --check web/app.js
+          node --test tests/web-core.test.cjs
   unit-windows:
     name: Python stdlib contracts on Windows (not full Windows acceptance)
     runs-on: windows-latest
@@ -62,4 +65,7 @@ jobs:
         with:
           node-version: '22'
       - name: Test browser transcript contract without npm dependencies
-        run: node --test tests/web-core.test.cjs
+        run: |
+          node --check web/transcript-core.js
+          node --check web/app.js
+          node --test tests/web-core.test.cjs
