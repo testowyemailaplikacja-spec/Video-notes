@@ -10,6 +10,7 @@ from tkinter import filedialog, messagebox, ttk
 from .errors import VideoNotesError
 from .exports import edit_segment, export_project
 from .media import probe
+from .notes import generate_basic_notes, read_basic_notes, edit_note_point, export_basic_notes
 from .pipeline import create_project, transcribe_project
 from .storage import read_project
 
@@ -61,6 +62,7 @@ class VideoNotesWindow:
         self.cancel_button = ttk.Button(commands, text="Przerwij po fragmencie", command=self.cancel.set, state="disabled")
         self.cancel_button.pack(side="left", padx=(0, 8))
         ttk.Button(commands, text="Otwórz projekt", command=self._load).pack(side="left")
+        ttk.Button(outer, text="Notatka podstawowa — wybrane cytaty z transkrypcji", command=self._show_notes).pack(anchor="w", pady=(0, 7))
         self.status = tk.StringVar(value="Gotowe. Wybierz plik i lokalny model.")
         ttk.Label(outer, textvariable=self.status, wraplength=700).pack(anchor="w", pady=4)
         self.progress = ttk.Progressbar(outer, orient="horizontal", mode="determinate")
@@ -207,6 +209,87 @@ class VideoNotesWindow:
             self.status.set("Poprawkę i eksport zapisano lokalnie.")
         except VideoNotesError as error:
             messagebox.showerror("Video Notes", str(error))
+
+
+    def _show_notes(self) -> None:
+        """Display and edit source-cited, offline basic notes."""
+        if self.active:
+            messagebox.showwarning("Video Notes", "Poczekaj na zapis bieżącego fragmentu nagrania.")
+            return
+        if not self.project.get().strip():
+            messagebox.showwarning("Video Notes", "Najpierw wskaż istniejący katalog projektu.")
+            return
+        folder = Path(self.project.get())
+        try:
+            if not (folder / "notes.json").exists():
+                generate_basic_notes(folder)
+            notes, changes = read_basic_notes(folder)
+            export_basic_notes(folder)
+        except VideoNotesError as error:
+            messagebox.showerror("Notatka podstawowa", str(error))
+            return
+
+        window = tk.Toplevel(self.root)
+        window.title("Notatka podstawowa — fragmenty źródłowe")
+        window.geometry("940x560")
+        frame = ttk.Frame(window, padding=12)
+        frame.pack(fill="both", expand=True)
+        ttk.Label(frame, text="To wybrane wypowiedzi z transkrypcji, nie opracowanie AI.", wraplength=860).pack(anchor="w")
+        ttk.Label(frame, text="Każdy punkt zawiera identyfikator wypowiedzi i czas. Zmiany zostają zapisane osobno.", wraplength=860).pack(anchor="w", pady=(0, 10))
+        panes = ttk.PanedWindow(frame, orient="horizontal")
+        panes.pack(fill="both", expand=True)
+        left = ttk.Frame(panes)
+        right = ttk.Frame(panes)
+        panes.add(left, weight=3)
+        panes.add(right, weight=2)
+        view = ttk.Treeview(left, columns=("time", "quote"), show="headings", selectmode="browse")
+        view.heading("time", text="Czas")
+        view.heading("quote", text="Wypowiedź")
+        view.column("time", width=85, stretch=False)
+        view.column("quote", width=400)
+        view.pack(fill="both", expand=True)
+        content_by_id: dict[str, dict] = {}
+        for section in notes["sections"]:
+            for point in section["points"]:
+                key = point["id"]
+                content_by_id[key] = point
+                mm, ss = divmod(point["start_ms"] // 1000, 60)
+                value = changes["edits"].get(key, point["text"])
+                view.insert("", "end", iid=key, values=(f"{mm:02d}:{ss:02d}", value.replace("\n", " ")))
+        ttk.Label(right, text="Tekst punktu (zmieniaj tylko świadomie):").pack(anchor="w")
+        editor = tk.Text(right, wrap="word", undo=True)
+        editor.pack(fill="both", expand=True, pady=(4, 8))
+        status = tk.StringVar(value="Wybierz punkt, aby odczytać i ewentualnie poprawić tekst.")
+        ttk.Label(right, textvariable=status, wraplength=320).pack(anchor="w")
+        def selected(_event=None) -> None:
+            ids = view.selection()
+            if ids:
+                key = ids[0]
+                value = changes["edits"].get(key, content_by_id[key]["text"])
+                editor.delete("1.0", "end")
+                editor.insert("1.0", value)
+                status.set("Źródło: " + content_by_id[key]["segment_id"])
+        view.bind("<<TreeviewSelect>>", selected)
+        def save_edit() -> None:
+            ids = view.selection()
+            if not ids:
+                messagebox.showinfo("Notatka", "Najpierw wybierz punkt.")
+                return
+            key = ids[0]
+            value = editor.get("1.0", "end-1c")
+            try:
+                edit_note_point(folder, key, value)
+                export_basic_notes(folder)
+                changes["edits"][key] = value
+                view.set(key, "quote", value.replace("\n", " "))
+                status.set("Poprawka zapisana lokalnie w notes-edits.json i notes-basic.md.")
+            except VideoNotesError as error:
+                messagebox.showerror("Notatka", str(error))
+        ttk.Button(right, text="Zapisz poprawkę i Markdown", command=save_edit).pack(anchor="e", pady=7)
+        if content_by_id:
+            first = next(iter(content_by_id))
+            view.selection_set(first)
+            selected()
 
 
 def launch() -> None:
