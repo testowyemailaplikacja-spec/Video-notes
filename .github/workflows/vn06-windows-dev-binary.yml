@@ -42,10 +42,13 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or -not $helpOutput.Contains("benchmark-real")) {
             throw "Development executable failed CLI help smoke test"
           }
+          $PSNativeCommandUseErrorActionPreference = $false
           & $binary inspect "__no_such_video_notes_file__.mp4" 2>$null
-          if ($LASTEXITCODE -ne 2) {
-            throw "Development executable did not safely reject missing media"
+          $missingCode = $LASTEXITCODE
+          if ($missingCode -ne 2) {
+            throw "Development executable did not safely reject missing media (exit: $missingCode)"
           }
+          $global:LASTEXITCODE = 0
       - name: Fingerprint artifact and explain missing dependencies
         shell: pwsh
         run: |
