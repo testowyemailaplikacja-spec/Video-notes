@@ -111,7 +111,7 @@ def _checked_source(folder: Path) -> tuple[dict, list[dict]]:
     project, transcript, changes = read_project(folder)
     total = (project["source"]["duration_ms"] + project["processing"]["chunk_ms"] - 1) // project["processing"]["chunk_ms"]
     if len(transcript["completed_chunks"]) != total:
-        raise VideoNotesError("Najpierw ukończ transkrypcję przed regeneracją notatki.")
+        raise VideoNotesError("Ukończ transkrypcję przed regeneracją notatki.")
     source = _source(transcript, changes)
     if not source:
         raise VideoNotesError("Transkrypcja jest pusta.")
