@@ -61,6 +61,27 @@ class QualityHarnessTest(unittest.TestCase):
                 compare_text_files(ref, {"valid": root / "no-file.txt"}, output=report)
             self.assertFalse(report.exists())
 
+    def test_bitvector_equals_reference_dynamic_programming(self):
+        import random
+        from videonotes.quality import _distance
+        rng = random.Random(20261106)
+        for _ in range(500):
+            a = [rng.choice("abc") for _ in range(rng.randrange(0, 22))]
+            b = [rng.choice("abc") for _ in range(rng.randrange(0, 22))]
+            previous = list(range(len(b) + 1))
+            for row, symbol in enumerate(a, 1):
+                current = [row]
+                for column, letter in enumerate(b, 1):
+                    current.append(min(current[-1] + 1, previous[column] + 1, previous[column - 1] + (symbol != letter)))
+                previous = current
+            self.assertEqual(_distance(a, b), previous[-1])
+
+    def test_long_character_sample_is_feasible_without_quadratic_ram(self):
+        base = "abcdefghij" * 2400
+        result = error_rates(base, base[:-1])
+        self.assertEqual(result["word_errors"], 1)
+        self.assertEqual(result["character_errors"], 1)
+
     def test_bounded_word_count(self):
         with self.assertRaisesRegex(VideoNotesError, "6000"):
             error_rates("słowo " * 6001, "słowo")
