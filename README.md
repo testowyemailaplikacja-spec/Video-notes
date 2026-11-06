@@ -89,3 +89,7 @@ Po późniejszej poprawce transkrypcji można wykonać `python -m videonotes not
 ## Rzeczywisty benchmark dwóch lokalnych silników (narzędzie VN-00)
 
 Po zainstalowaniu lokalnych modeli `whisper.cpp` oraz `faster-whisper` można uruchomić `python -m videonotes benchmark-real` na tym samym fragmencie OBS. Otrzymasz WER/CER, czas obliczeń i — gdy dostępny jest opcjonalny `psutil` — RAM. Wykorzystuje realne procesy silników, nie tylko dwa gotowe pliki TXT. Pełna instrukcja: [REAL_ASR_LAB.md](docs/REAL_ASR_LAB.md). **Sam kod i testy z atrapami nie są dowodem rzeczywistej jakości rozpoznawania polskiej mowy.**
+
+## Import audio (część VN-05)
+
+Transkrypcję można uruchamiać również z plików WAV, MP3, M4A, FLAC, OGG i OPUS, nie tylko z filmów OBS. Dekodowanie odbywa się lokalnie przez FFmpeg i korzysta z tych samych checkpointów i eksportów. Obsługa zależy od zainstalowanych kodeków FFmpeg. Nagrywanie dźwięku systemowego i urządzeń jest nadal osobnym, nieukończonym zadaniem. [Opis i testy](docs/VN05_AUDIO_IMPORT.md).
