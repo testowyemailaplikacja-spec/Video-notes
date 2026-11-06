@@ -133,5 +133,42 @@ class MicrophoneTest(unittest.TestCase):
                 list_microphone_devices()
 
 
+    def test_explicit_system_audio_consent_and_two_device_mix(self):
+        combo = capture_command("ffmpeg", "Microphone USB",
+                                self.folder / "part-%05d.wav",
+                                system_device="Stereo Mix", max_seconds=600)
+        self.assertEqual(combo.count("-f"), 3)
+        self.assertIn("audio=Microphone USB", combo)
+        self.assertIn("audio=Stereo Mix", combo)
+        self.assertIn("-filter_complex", combo)
+        self.assertIn("amix=inputs=2", combo[combo.index("-filter_complex") + 1])
+        self.assertEqual(combo[combo.index("-map") + 1], "[aout]")
+        self.assertEqual(combo[combo.index("-t") + 1], "600")
+        self.assertEqual(combo[-1], str(self.folder / "part-%05d.wav"))
+        self.assertNotIn("shell", combo)
+        with self.assertRaisesRegex(VideoNotesError, "osobnej zgody"):
+            self._record(system_device="Stereo Mix")
+        self.assertFalse(self.folder.exists())
+        with self.assertRaisesRegex(VideoNotesError, "różnymi urządzeniami"):
+            self._record(system_device="Mic (USB)", system_consent=True)
+        self.assertFalse(self.folder.exists())
+        with self.assertRaisesRegex(VideoNotesError, "bez wyboru"):
+            self._record(system_consent=True)
+        self.assertFalse(self.folder.exists())
+        report = self._record(system_device="Stereo Mix", system_consent=True)
+        self.assertEqual(report["status"], "finished")
+        journal = json.loads((self.folder / "recording.json").read_text("utf-8"))
+        self.assertTrue(journal["system_audio_requested"])
+        self.assertTrue(journal["system_audio_consented"])
+        private_content = (self.folder / "recording.json").read_text("utf-8")
+        self.assertNotIn("Stereo Mix", private_content)
+        self.assertNotIn("Mic (USB)", private_content)
+
+    def test_invalid_system_device_is_refused_before_files_created(self):
+        for value in ("", "  Mix", "Bad\nDevice", "Mic (USB)", "X" * 201):
+            with self.subTest(value=value), self.assertRaises(VideoNotesError):
+                self._record(system_device=value, system_consent=True)
+            self.assertFalse(self.folder.exists())
+
 if __name__ == "__main__":
     unittest.main()
