@@ -1,0 +1,153 @@
+"""Local extractive notes: only quotes from corrected transcript, never invented facts.
+
+Generated notes and subsequent manual edits are stored separately. Each quote
+has a stable segment ID and timestamp. This is a deterministic fallback rather
+than a semantic LLM summary.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+from collections import Counter
+from pathlib import Path
+
+from .errors import VideoNotesError
+from .storage import atomic_write, load_json, read_project, save_json
+
+SCHEMA = "videonotes-basic-notes-v1"
+EDITS_SCHEMA = "videonotes-note-edits-v1"
+STOPWORDS = frozenset(("oraz i a ale lub więc że to na o od do dla w we z ze po przy albo także też jest są był była były jako czy jak jeśli przez gdy tak nie ten ta te tego tej ja ty on ona it the an and or in of is are was were we you he she as for with from by if then but this that not have has").split())
+
+
+def _source(transcript: dict, edits: dict) -> list[dict]:
+    return [
+        {"id": row["id"], "start_ms": row["start_ms"], "text": edits["edits"].get(row["id"], row["text"]).strip()}
+        for row in transcript["segments"]
+        if edits["edits"].get(row["id"], row["text"]).strip()
+    ]
+
+
+def _hash(source: list[dict]) -> str:
+    body = json.dumps(source, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()
+
+
+def _tokens(value: str) -> set[str]:
+    return {s for s in re.findall(r"[^\W_]+", value.casefold()) if len(s) > 2 and s not in STOPWORDS}
+
+
+def _select(group: list[dict], limit: int) -> list[dict]:
+    if len(group) <= limit:
+        return group
+    counts = Counter(token for row in group for token in _tokens(row["text"]))
+    chosen = {0, len(group) - 1}
+    while len(chosen) < limit:
+        def score(i: int) -> tuple[float, int]:
+            terms = _tokens(group[i]["text"])
+            lexical = sum(counts[w] for w in terms) / max(len(terms), 1)
+            distance = min(abs(group[i]["start_ms"] - group[j]["start_ms"]) for j in chosen)
+            return (lexical + min(distance / 60_000, 10), distance)
+        chosen.add(max((i for i in range(len(group)) if i not in chosen), key=score))
+    return [group[i] for i in sorted(chosen)]
+
+
+def generate_basic_notes(folder: Path, *, window_minutes: int = 5, points_per_section: int = 6) -> dict:
+    if not (1 <= window_minutes <= 60 and 2 <= points_per_section <= 20):
+        raise VideoNotesError("Nieprawidłowy zakres sekcji lub liczba punktów.")
+    folder = Path(folder)
+    project, transcript, corrections = read_project(folder)
+    chunk = project["processing"]["chunk_ms"]
+    expected = (project["source"]["duration_ms"] + chunk - 1) // chunk
+    if len(transcript["completed_chunks"]) != expected:
+        raise VideoNotesError("Ukończ transkrypcję przed tworzeniem notatki.")
+    if (folder / "notes.json").exists() or (folder / "notes-edits.json").exists():
+        raise VideoNotesError("Notatka już istnieje; nie nadpisuję wcześniejszych poprawek.")
+    source = _source(transcript, corrections)
+    if not source:
+        raise VideoNotesError("Transkrypcja jest pusta. Nie można utworzyć notatki.")
+    duration = window_minutes * 60_000
+    groups: dict[int, list[dict]] = {}
+    for row in source:
+        groups.setdefault(row["start_ms"] // duration, []).append(row)
+    sections = [
+        {"id": f"time-{index:06d}",
+         "heading": f"Fragment {index * window_minutes}–{(index + 1) * window_minutes} min",
+         "points": [{"id": f"quote-{row['id']}", "segment_id": row["id"],
+                     "start_ms": row["start_ms"], "text": row["text"]}
+                    for row in _select(rows, points_per_section)]}
+        for index, rows in sorted(groups.items())
+    ]
+    notes = {"schema": SCHEMA, "project_id": project["id"],
+             "source_sha256": _hash(source), "method": "extractive-verbatim-v1",
+             "complete": True, "title": "Notatka podstawowa — fragmenty wypowiedzi",
+             "sections": sections}
+    # Writing edits first means an interruption fails safely on retry.
+    save_json(folder / "notes-edits.json", {"schema": EDITS_SCHEMA, "edits": {}})
+    save_json(folder / "notes.json", notes)
+    return notes
+
+
+def read_basic_notes(folder: Path) -> tuple[dict, dict]:
+    folder = Path(folder)
+    project, transcript, corrections = read_project(folder)
+    notes, edits = load_json(folder / "notes.json"), load_json(folder / "notes-edits.json")
+    if not isinstance(notes, dict) or notes.get("schema") != SCHEMA or notes.get("project_id") != project["id"]:
+        raise VideoNotesError("Nieprawidłowa struktura lub identyfikator notatki.")
+    source = _source(transcript, corrections)
+    if notes.get("source_sha256") != _hash(source) or notes.get("method") != "extractive-verbatim-v1":
+        raise VideoNotesError("Transkrypcja zmieniła się po wygenerowaniu notatki. Zachowaj kopię i utwórz nową wersję.")
+    if not isinstance(notes.get("sections"), list) or not isinstance(edits, dict) or edits.get("schema") != EDITS_SCHEMA:
+        raise VideoNotesError("Uszkodzona struktura notatki.")
+    sources = {row["id"]: row for row in source}
+    ids: set[str] = set()
+    for section in notes["sections"]:
+        if not isinstance(section, dict) or not isinstance(section.get("points"), list) or not isinstance(section.get("heading"), str):
+            raise VideoNotesError("Nieprawidłowa sekcja notatki.")
+        for point in section["points"]:
+            if not isinstance(point, dict) or not isinstance(point.get("id"), str):
+                raise VideoNotesError("Nieprawidłowy punkt notatki.")
+            original = sources.get(point.get("segment_id"))
+            if not original or point["id"] in ids or point.get("text") != original["text"] or point.get("start_ms") != original["start_ms"]:
+                raise VideoNotesError("Punkt notatki nie odpowiada transkrypcji.")
+            ids.add(point["id"])
+    overrides = edits.get("edits")
+    if not isinstance(overrides, dict) or not set(overrides).issubset(ids):
+        raise VideoNotesError("Poprawki odnoszą się do nieznanych punktów.")
+    if any(not isinstance(text, str) or len(text) > 10_000 or "\x00" in text for text in overrides.values()):
+        raise VideoNotesError("Nieprawidłowe poprawki notatki.")
+    return notes, edits
+
+
+def edit_note_point(folder: Path, point_id: str, new_text: str) -> None:
+    notes, changes = read_basic_notes(folder)
+    if not isinstance(new_text, str) or len(new_text) > 10_000 or "\x00" in new_text:
+        raise VideoNotesError("Nieprawidłowy tekst poprawki.")
+    if not any(point["id"] == point_id for section in notes["sections"] for point in section["points"]):
+        raise VideoNotesError("Nie znaleziono punktu do edycji.")
+    changes["edits"][point_id] = new_text
+    save_json(Path(folder) / "notes-edits.json", changes)
+
+
+def render_basic_markdown(folder: Path) -> str:
+    notes, changes = read_basic_notes(folder)
+    lines = ["# " + notes["title"], "", "> Notatka ekstrakcyjna: wyłącznie wybrane wypowiedzi ze źródła.", ""]
+    for section in notes["sections"]:
+        lines.extend(["## " + section["heading"], ""])
+        for point in section["points"]:
+            chosen = changes["edits"].get(point["id"], point["text"]).strip()
+            if not chosen:
+                continue
+            mm, ss = divmod(point["start_ms"] // 1000, 60)
+            marker = " · poprawka użytkownika" if point["id"] in changes["edits"] else ""
+            lines.extend([f"Źródło {mm:02d}:{ss:02d} · {point['segment_id']}{marker}", ""])
+            # Indented code renders untrusted transcript as plain text, not HTML.
+            lines.extend("    " + row for row in chosen.splitlines())
+            lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def export_basic_notes(folder: Path) -> Path:
+    target = Path(folder) / "exports" / "notes-basic.md"
+    atomic_write(target, render_basic_markdown(folder).encode("utf-8"))
+    return target
