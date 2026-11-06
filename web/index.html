@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Video Notes — lokalny podgląd transkrypcji · beta KWN</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script defer src="./transcript-core.js"></script>
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <main class="layout">
+    <header class="masthead">
+      <div>
+        <span class="eyebrow">KWN / VIDEO NOTES · BETA</span>
+        <h1>Twoja transkrypcja, lokalnie.</h1>
+        <p>Otwórz plik transcript.json wyeksportowany z Video Notes. Przeszukuj, poprawiaj i eksportuj tekst bez wysyłania go do serwera.</p>
+      </div>
+      <div class="privacy" aria-label="Prywatność">
+        <span aria-hidden="true">●</span> Praca bez chmury
+      </div>
+    </header>
+    <section class="import-area" aria-labelledby="import-heading">
+      <div class="section-heading">
+        <h2 id="import-heading">1. Otwórz lokalną transkrypcję</h2>
+        <p>Wymagany format: videonotes-export-v1, czyli plik z polecenia export.</p>
+      </div>
+      <label for="source-file" class="upload-label">Wybierz transcript.json</label>
+      <input id="source-file" type="file" accept=".json,application/json">
+      <p id="status" class="status" role="status" aria-live="polite">Plik pozostaje tylko na tym urządzeniu. Zmiany nie są zapisywane automatycznie.</p>
+    </section>
+    <section class="workbench" aria-label="Podgląd i poprawki transkrypcji">
+      <div class="toolbar">
+        <div class="searchbox">
+          <label for="search">2. Szukaj w wypowiedziach</label>
+          <input id="search" type="search" placeholder="Słowo, fraza lub identyfikator segmentu" disabled>
+        </div>
+        <div class="summary" aria-live="polite">
+          <strong id="match-count">0 wypowiedzi</strong>
+          <span id="edit-count">0 poprawek</span>
+        </div>
+      </div>
+      <div class="workspace">
+        <div class="segments">
+          <div class="table-scroller">
+            <table>
+              <thead>
+                <tr><th scope="col">Czas</th><th scope="col">Wypowiedź</th></tr>
+              </thead>
+              <tbody id="segment-rows">
+                <tr><td colspan="2">Wybierz plik JSON, aby wyświetlić transkrypcję.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pager">
+            <button id="previous" disabled>Poprzednia</button>
+            <span id="page-number">Strona 0 / 0</span>
+            <button id="next" disabled>Następna</button>
+          </div>
+        </div>
+        <aside class="editor">
+          <h2>3. Popraw wypowiedź</h2>
+          <p id="selected-label">Wybierz wiersz transkrypcji.</p>
+          <label for="edit-text">Treść segmentu</label>
+          <textarea id="edit-text" rows="10" disabled spellcheck="true"></textarea>
+          <button id="save-edit" class="primary" disabled>Zachowaj poprawkę</button>
+          <p class="note">Oryginalny plik nie jest zmieniany. Aby zachować poprawki na dysku, wyeksportuj nowy plik.</p>
+        </aside>
+      </div>
+    </section>
+    <section class="export-area" aria-labelledby="export-heading">
+      <div class="section-heading">
+        <h2 id="export-heading">4. Pobierz poprawioną transkrypcję</h2>
+        <p>Każdy eksport jest tworzony na tym urządzeniu. Żadne dane nie są automatycznie synchronizowane.</p>
+      </div>
+      <div class="download-actions">
+        <button data-export="transcript.txt" disabled>TXT</button>
+        <button data-export="transcript.srt" disabled>SRT</button>
+        <button data-export="transcript.vtt" disabled>VTT</button>
+        <button data-export="transcript.json" disabled>JSON</button>
+      </div>
+    </section>
+    <footer>Wersja beta wyłącznie KWN · Podgląd/edycja eksportu, bez transkrypcji ASR w przeglądarce.</footer>
+  </main>
+</body>
+</html>

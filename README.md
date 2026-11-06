@@ -6,7 +6,7 @@ Video Notes powstaje na bazie doświadczeń modułu **[Notatki](https://github.c
 
 ## Aktualne moduły KWN / Video Notes (06.11.2026)
 
-Wszystkie funkcje są rozwijane wyłącznie w tym repozytorium; gałąź `develop` zawiera przetestowane integracje, `main` pozostaje stabilnym punktem odniesienia. Obecny rejestr: **0/9 etapów DONE, 7/9 W TRAKCIE, 2/9 PLANOWANE**. To osobny stan od historycznych 189 kryteriów KWN w Wiedora.
+Wszystkie funkcje są rozwijane wyłącznie w tym repozytorium; gałąź `develop` zawiera przetestowane integracje, `main` pozostaje stabilnym punktem odniesienia. Obecny rejestr: **0/9 etapów DONE, 8/9 W TRAKCIE, 1/9 PLANOWANY**. To osobny stan od historycznych 189 kryteriów KWN w Wiedora.
 
 - **VN-03:** Konspekt źródłowy z cytatami, czasami, rozdziałami i szablonami: `python -m videonotes advanced-notes moje-notatki --template lecture --detail standard`. Edytowalne notatki podstawowe pozostają odrębne; nie ma automatycznego semantycznego streszczenia. [Dokumentacja](docs/VN03_OUTLINES.md).
 - **VN-04:** Lokalny mikrofon na Windows przez DirectShow/FFmpeg: `python -m videonotes record-devices` oraz `python -m videonotes record-mic --device "Microphone (USB)" --output NOWY_KATALOG --consent`. Dostępne także dialog w GUI, kontrola Start/Stop i zapis WAV co 2 godziny. Potrzebny fizyczny test sprzętowy. [Dokumentacja](docs/VN04_MICROPHONE_CAPTURE.md).
@@ -14,6 +14,10 @@ Wszystkie funkcje są rozwijane wyłącznie w tym repozytorium; gałąź `develo
 - **VN-06:** `python -m videonotes bundle-dev ... --internal-only` składa z *własnych*, lokalnych plików prywatny pakiet testowy z DEV EXE, FFmpeg/FFprobe, Whisper CLI i modelem. To **nie jest publiczny instalator** ani potwierdzony sprzętowo produkt offline. [Instrukcja i ograniczenia](docs/VN06_PRIVATE_BUNDLE.md).
 
 CI sprawdza kod źródłowy na Linux i Windows oraz plik Windows DEV EXE. **Nie potwierdza rzeczywistej jakości polskiej transkrypcji ani działania pełnego zestawu na fizycznym Windows bez internetu.** Wymagane są rzeczywiste modele, sprawdzenie licencji, próbki użytkownika dostępne legalnie i urządzenia do odbioru.
+
+## Wersja przeglądarkowa offline — prototyp VN-07
+
+Otwórz lokalnie `web/index.html` i wybierz plik `exports/transcript.json` utworzony przez program Windows/Python (`python -m videonotes export KATALOG_PROJEKTU`). Możesz bez serwera i internetu przeszukiwać wypowiedzi, nanosić poprawki i pobierać TXT/SRT/VTT/JSON. **Nie ma jeszcze transkrypcji ASR w przeglądarce ani integracji z Wiedorą.** [Instrukcja i ograniczenia](docs/VN07_WEB_ADAPTER.md).
 
 ## Kolejność rozwoju
 
@@ -81,7 +85,7 @@ Program porównuje lokalne pliki TXT, wylicza WER/CER i zapisuje **wyłącznie s
 
 ## Historyczny punkt kontrolny po PR #3 i #4 (06.11.2026)
 
-Kod **PR #3 i #4** jest w `develop`; `main` pozostaje bez zmian. Testy [CI #42248878505](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42248878505): **46/46 PASS Linux, 36/36 PASS Windows** (Windows obejmuje kontrakty, notatki i archiwum, nie całe urządzenie i ASR). Nie wykonano jeszcze pełnego benchmarku prawdziwego modelu Whisper ani testu kompletnego instalatora Windows. **Żaden etap nie jest formalnie DONE.** Aktualny status 9 etapów: [VN_STATUS.json](docs/VN_STATUS.json) — 7 W TRAKCIE, 2 PLANOWANE, 0 DONE. Nie przenosimy tego postępu automatycznie do historycznego rejestru 189 kryteriów w głównym repo Wiedory.
+Kod **PR #3 i #4** jest w `develop`; `main` pozostaje bez zmian. Testy [CI #42248878505](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42248878505): **46/46 PASS Linux, 36/36 PASS Windows** (Windows obejmuje kontrakty, notatki i archiwum, nie całe urządzenie i ASR). Nie wykonano jeszcze pełnego benchmarku prawdziwego modelu Whisper ani testu kompletnego instalatora Windows. **Żaden etap nie jest formalnie DONE.** Aktualny status 9 etapów: [VN_STATUS.json](docs/VN_STATUS.json) — 8 W TRAKCIE, 1 PLANOWANY, 0 DONE. Nie przenosimy tego postępu automatycznie do historycznego rejestru 189 kryteriów w głównym repo Wiedory.
 
 ## Przenośna kopia projektu (VN-01/VN-06, wersja rozwojowa)
 

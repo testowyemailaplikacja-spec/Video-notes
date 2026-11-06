@@ -8,8 +8,8 @@
   "totals": {
     "stages": 9,
     "DONE": 0,
-    "W_TRAKCIE": 7,
-    "PLANOWANE": 2
+    "W_TRAKCIE": 8,
+    "PLANOWANE": 1
   },
   "phases": [
     {
@@ -113,12 +113,15 @@
     },
     {
       "id": "VN-07",
-      "status": "PLANOWANE",
-      "evidence": [],
+      "status": "W_TRAKCIE",
+      "evidence": [
+        "Separate web/index.html offline transcript viewer with source-linked JSON import/export and local editing, tests/web-core.test.cjs on Linux/Windows CI (pending PR checks)"
+      ],
       "blockers": [
-        "Functional web adapter",
-        "Wiedora isolated integration tests",
-        "Separate batched authorization and Netlify publication"
+        "Real desktop browser acceptance Chrome/Edge/Firefox and accessibility testing",
+        "Full real web ASR/recording adapter with matching desktop results",
+        "Wiedora isolated integration behind KWN gate and host regression",
+        "Separate authorization for Netlify staging / any portal deployment"
       ]
     },
     {
