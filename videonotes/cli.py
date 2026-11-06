@@ -17,6 +17,7 @@ from .note_revisions import regenerate_basic_notes, list_note_versions, restore_
 from .quality import compare_text_files
 from .asr_lab import run_real_benchmark
 from .backup import create_backup, restore_backup, relink_backup
+from .bundle import create_internal_bundle
 from .pipeline import create_project, transcribe_project
 from .storage import read_project
 
@@ -114,6 +115,10 @@ def parser() -> argparse.ArgumentParser:
     mic.add_argument("--ffmpeg", default="ffmpeg")
     mic_status = sub.add_parser("record-status", help="Sprawdź lokalne pliki nagrania i dziennik sesji")
     mic_status.add_argument("folder", type=Path)
+    bundle = sub.add_parser("bundle-dev", help="Złóż prywatny pakiet Windows z własnych binariów i modelu (nie wydanie)")
+    for flag in ("app", "ffmpeg", "ffprobe", "whisper", "model", "output"):
+        bundle.add_argument("--" + flag, required=True, type=Path)
+    bundle.add_argument("--internal-only", required=True, action="store_true", help="Potwierdź, że nie rozpowszechniasz niezweryfikowanego pakietu")
     sub.add_parser("gui", help="Uruchom prosty interfejs Windows/Tkinter")
     return cmd
 
@@ -219,6 +224,11 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(result, ensure_ascii=False, indent=2))
         elif args.action == "record-status":
             print(json.dumps(recording_status(args.folder), ensure_ascii=False, indent=2))
+        elif args.action == "bundle-dev":
+            report = create_internal_bundle(app=args.app, ffmpeg=args.ffmpeg, ffprobe=args.ffprobe,
+                                            whisper=args.whisper, model=args.model, output=args.output,
+                                            internal_only=args.internal_only)
+            print(json.dumps(report, ensure_ascii=False, indent=2))
         elif args.action == "gui":
             from .gui import launch
             launch()

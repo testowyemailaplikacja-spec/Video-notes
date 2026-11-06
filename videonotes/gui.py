@@ -1,6 +1,7 @@
 """Simple real offline Windows UI. Packaging and hardware acceptance remain VN-06."""
 from __future__ import annotations
 
+import os
 import queue
 import threading
 import uuid
@@ -26,7 +27,7 @@ class VideoNotesWindow:
         root.minsize(740, 540)
         self.source = tk.StringVar()
         self.project = tk.StringVar()
-        self.model = tk.StringVar()
+        self.model = tk.StringVar(value=os.environ.get("VIDEO_NOTES_MODEL", ""))
         self.engine = tk.StringVar(value="whisper-cli")
         self.language = tk.StringVar(value="pl")
         self.stream = tk.StringVar()
