@@ -1,0 +1,67 @@
+name: Video Notes Windows development executable
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - 'videonotes/**'
+      - 'scripts/videonotes_entry.py'
+      - '.github/workflows/vn06-windows-dev-binary.yml'
+      - 'pyproject.toml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-dev-binary:
+    name: Windows CLI/GUI prototype (not an offline installer)
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Build isolated development EXE with PyInstaller
+        shell: pwsh
+        run: |
+          python -m pip install "pyinstaller==6.16.0"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m PyInstaller --clean --noconfirm --onefile --console --name VideoNotes-DEV --paths . scripts/videonotes_entry.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Smoke test packaged EXE without ASR model
+        shell: pwsh
+        run: |
+          $binary = (Resolve-Path ".\dist\VideoNotes-DEV.exe").Path
+          $version = & $binary --version
+          if ($LASTEXITCODE -ne 0 -or $version -notmatch "Video Notes 0\.1\.0\.dev1") {
+            throw "Development executable failed version smoke test"
+          }
+          $helpOutput = & $binary --help
+          if ($LASTEXITCODE -ne 0 -or $helpOutput -notmatch "benchmark-real") {
+            throw "Development executable failed CLI help smoke test"
+          }
+          & $binary inspect "__no_such_video_notes_file__.mp4" 2>$null
+          if ($LASTEXITCODE -ne 2) {
+            throw "Development executable did not safely reject missing media"
+          }
+      - name: Fingerprint artifact and explain missing dependencies
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash ".\dist\VideoNotes-DEV.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  VideoNotes-DEV.exe" | Out-File -FilePath ".\dist\VideoNotes-DEV.exe.sha256" -Encoding ascii
+          @'
+          DEVELOPMENT ARTIFACT ONLY - NOT A COMPLETE OFFLINE INSTALLER.
+          FFmpeg/FFprobe, whisper-cli and legal ASR model are NOT bundled.
+          Full Windows, GUI, offline installation and real ASR tests remain open.
+          '@ | Out-File -FilePath ".\dist\README-DEVELOPMENT.txt" -Encoding utf8
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VideoNotes-Windows-DEV-NOT-OFFLINE
+          path: |
+            dist/VideoNotes-DEV.exe
+            dist/VideoNotes-DEV.exe.sha256
+            dist/README-DEVELOPMENT.txt
+          retention-days: 7
+          if-no-files-found: error
