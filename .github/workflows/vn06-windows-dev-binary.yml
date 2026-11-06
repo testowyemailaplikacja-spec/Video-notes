@@ -38,8 +38,8 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or $version -notmatch "Video Notes 0\.1\.0\.dev1") {
             throw "Development executable failed version smoke test"
           }
-          $helpOutput = & $binary --help
-          if ($LASTEXITCODE -ne 0 -or $helpOutput -notmatch "benchmark-real") {
+          $helpOutput = (& $binary --help) -join [Environment]::NewLine
+          if ($LASTEXITCODE -ne 0 -or -not $helpOutput.Contains("benchmark-real")) {
             throw "Development executable failed CLI help smoke test"
           }
           & $binary inspect "__no_such_video_notes_file__.mp4" 2>$null
