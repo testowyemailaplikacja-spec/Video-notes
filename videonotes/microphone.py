@@ -156,3 +156,36 @@ def record_microphone(device: str, folder: Path, *, consent: bool,
         report["status"] = "needs_review"
         save_json(folder / "recording.json", report)
         raise
+
+
+def list_microphone_devices(ffmpeg: str = "ffmpeg") -> list[str]:
+    """Enumerate local Windows DirectShow audio inputs without recording anything."""
+    if sys.platform != "win32":
+        raise VideoNotesError("Lista urządzeń mikrofonowych wymaga Windows/DirectShow.")
+    tool = executable(ffmpeg)
+    try:
+        result = subprocess.run(
+            [tool, "-hide_banner", "-list_devices", "true", "-f", "dshow", "-i", "dummy"],
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, encoding="utf-8", errors="replace", timeout=20, check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise VideoNotesError("Nie można pobrać listy urządzeń audio z lokalnego FFmpeg.") from error
+    # FFmpeg returns nonzero after device enumeration: this is expected.
+    in_audio = False
+    devices: list[str] = []
+    for line in result.stderr.splitlines():
+        if "DirectShow audio devices" in line:
+            in_audio = True
+            continue
+        if "DirectShow video devices" in line:
+            in_audio = False
+            continue
+        if not in_audio or "Alternative name" in line:
+            continue
+        match = re.search(r'\[dshow[^\]]*\]\s+"([^"\r\n]+)"\s*$', line)
+        if match and match.group(1) not in devices:
+            devices.append(match.group(1))
+    if not devices:
+        raise VideoNotesError("Nie znaleziono urządzeń DirectShow audio. Sprawdź FFmpeg i uprawnienia mikrofonu Windows.")
+    return devices
