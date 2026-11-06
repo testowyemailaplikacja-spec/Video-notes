@@ -28,6 +28,22 @@ Dokument główny projektu: [Plan rozwoju Video Notes](docs/PLAN_ROZWOJU_VIDEO_N
 
 ## Stan
 
-- Repozytorium zainicjalizowane.
-- Program Windows, testy na sprzęcie, instalator i integracja z portalem — **niezaimplementowane**.
+- **06.11.2026: VN-00 i VN-01 W TRAKCIE.** Dodano lokalny prototyp źródłowy Python z FFmpeg/FFprobe, opcjonalnym whisper.cpp, CLI, GUI Tkinter, checkpointami i eksportem.
+- **19/19 testów PASS** lokalnie na Linux z syntetycznymi próbkami. Realny silnik ASR i instalator Windows nie były jeszcze testowane; żaden etap nie jest DONE.
+- `Constant_app` pozostaje bez zmian; prace prowadzone są wyłącznie tutaj.
 - Repozytorium źródłowe Wiedora pozostaje bez zmian.
+
+## Uruchomienie kodu rozwojowego VN-00 / VN-01
+
+Wymagania: Python 3.10+, FFmpeg/FFprobe, lokalny program `whisper-cli` i legalnie pozyskany model `.bin`. Brak automatycznego pobierania modeli, kont i usług w chmurze. To nie jest jeszcze samodzielny instalator Windows.
+
+```bash
+python -m videonotes inspect nagranie.mkv
+python -m videonotes transcribe nagranie.mkv --project moje-notatki --model ggml-base.bin --whisper-cli whisper-cli --language pl --stream 1
+python -m videonotes resume moje-notatki
+python -m videonotes export moje-notatki
+python -m videonotes gui
+python -m unittest discover -s tests -v
+```
+
+Indeks `--stream` należy odczytać poleceniem `inspect`. Przy wielu ścieżkach dźwiękowych trzeba go wybrać jawnie. Program zachowuje surowe segmenty w `transcript.json`, poprawki w `edits.json`, a cztery formaty eksportu w katalogu `exports`. Szczegółowe ograniczenia opisują `docs/VN00_IMPLEMENTATION.md` i `docs/CONTRACT_V1.md`.

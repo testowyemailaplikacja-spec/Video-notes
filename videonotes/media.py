@@ -1,0 +1,83 @@
+"""FFprobe discovery and constant-memory FFmpeg extraction from OBS media."""
+from __future__ import annotations
+
+import json
+import math
+import shutil
+import subprocess
+import wave
+from pathlib import Path
+
+from .errors import VideoNotesError
+
+SUPPORTED_SOURCE_SUFFIXES = {".mp4", ".mkv", ".webm", ".wav"}
+
+
+def executable(command: str) -> str:
+    if not command or not isinstance(command, str):
+        raise VideoNotesError("Nie podano ścieżki do programu.")
+    path = Path(command)
+    resolved = str(path.resolve()) if path.is_file() else shutil.which(command)
+    if not resolved:
+        raise VideoNotesError("Nie znaleziono narzędzia lokalnego. Zainstaluj je ręcznie.")
+    return resolved
+
+
+def _run(args: list[str], *, timeout: int = 120) -> subprocess.CompletedProcess[str]:
+    try:
+        return subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout, check=True, stdin=subprocess.DEVNULL)
+    except FileNotFoundError as err:
+        raise VideoNotesError("Brakuje wymaganego lokalnego programu.") from err
+    except subprocess.TimeoutExpired as err:
+        raise VideoNotesError("Przekroczono czas działania narzędzia lokalnego.") from err
+    except subprocess.CalledProcessError as err:
+        # Do not echo stderr/stdout: engines may include spoken words or paths.
+        raise VideoNotesError("Lokalne narzędzie zgłosiło błąd. Sprawdź format i kodek źródła.") from err
+
+
+def probe(source: Path, ffprobe: str = "ffprobe") -> dict:
+    source = Path(source).expanduser().resolve()
+    if not source.is_file() or source.suffix.lower() not in SUPPORTED_SOURCE_SUFFIXES:
+        raise VideoNotesError("Wybierz istniejący plik MP4, MKV, WebM lub WAV.")
+    if source.stat().st_size == 0:
+        raise VideoNotesError("Plik źródłowy jest pusty.")
+    result = _run([executable(ffprobe), "-v", "error", "-show_entries", "format=duration:stream=index,codec_type,codec_name,channels:stream_tags=language,title", "-of", "json", str(source)])
+    try:
+        data = json.loads(result.stdout)
+        duration = float(data.get("format", {}).get("duration", "nan"))
+        if not math.isfinite(duration) or duration <= 0 or duration > 24 * 3600:
+            raise ValueError("unsupported duration")
+        streams = [
+            {"index": int(s["index"]), "codec": str(s.get("codec_name") or "unknown"), "channels": int(s.get("channels") or 0),
+             "language": str(s.get("tags", {}).get("language") or ""), "title": str(s.get("tags", {}).get("title") or "")}
+            for s in data.get("streams", []) if s.get("codec_type") == "audio"
+        ]
+    except (ValueError, TypeError, KeyError, json.JSONDecodeError) as error:
+        raise VideoNotesError("FFprobe nie rozpoznał czasu lub ścieżek audio.") from error
+    if not streams:
+        raise VideoNotesError("Nagranie nie zawiera ścieżki dźwiękowej.")
+    return {"source": str(source), "duration_ms": round(duration * 1000), "audio_streams": streams}
+
+
+def choose_stream(media: dict, requested: int | None) -> dict:
+    streams = media["audio_streams"]
+    if requested is None and len(streams) > 1:
+        raise VideoNotesError("Nagranie ma wiele ścieżek audio. Wybierz --stream z wyniku inspect.")
+    wanted = requested if requested is not None else streams[0]["index"]
+    for item in streams:
+        if item["index"] == wanted:
+            return item
+    raise VideoNotesError("Wybrany indeks ścieżki nie jest ścieżką audio.")
+
+
+def extract_chunk(source: Path, stream_index: int, *, start_ms: int, duration_ms: int, destination: Path, ffmpeg: str = "ffmpeg") -> None:
+    if start_ms < 0 or duration_ms < 1 or stream_index < 0:
+        raise VideoNotesError("Nieprawidłowy zakres fragmentu audio.")
+    target = Path(destination)
+    _run([executable(ffmpeg), "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{start_ms / 1000:.3f}", "-i", str(source), "-map", f"0:{stream_index}", "-vn", "-sn", "-dn", "-t", f"{duration_ms / 1000:.3f}", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", str(target)], timeout=1800)
+    try:
+        with wave.open(str(target), "rb") as wav:
+            if wav.getnframes() == 0 or wav.getframerate() != 16000 or wav.getnchannels() != 1 or wav.getsampwidth() != 2:
+                raise VideoNotesError("Fragment audio jest pusty albo ma niewłaściwy format PCM.")
+    except (OSError, EOFError, wave.Error) as error:
+        raise VideoNotesError("FFmpeg nie zwrócił poprawnego pliku WAV.") from error
