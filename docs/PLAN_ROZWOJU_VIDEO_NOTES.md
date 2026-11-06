@@ -128,9 +128,9 @@ Użytkownik nagrał wykład lub tutorial w OBS, np. do MP4 albo MKV. Wybiera pli
 
 ### VN-05 — Inne źródła dźwięku (v0.5)
 
-**Cel:** rozszerzać wejścia bez kopiowania osobnego silnika transkrypcji. **Status: PLANOWANE.**
+**Cel:** rozszerzać wejścia bez kopiowania osobnego silnika transkrypcji. **Status: W TRAKCIE (import plików audio i testy syntetyczne; sprzętowe źródła dźwięku nadal niezaimplementowane).**
 
-- [ ] Import samych plików audio WAV, MP3, M4A, FLAC, OGG i obsługiwanych kodeków.
+- [x] Import plików WAV/MP3/M4A/FLAC/OGG/OPUS przez FFprobe/FFmpeg i wspólną kolejkę ASR; zgodność kodeków zależy od lokalnej instalacji FFmpeg. Syntetyczne testy audio PASS, realne ASR i fizyczny Windows niezweryfikowane.
 - [ ] Przechwytywanie dźwięku systemowego/loopback w Windows, w granicach możliwości i uprawnień systemu.
 - [ ] Rejestrowanie mikrofonu i dźwięku systemowego jednocześnie, z osobnymi ścieżkami i świadomym mieszaniem.
 - [ ] Opcjonalne źródła USB / zewnętrzny mikrofon; w przyszłości karta przeglądarki lub połączenie konferencyjne, bez obchodzenia zabezpieczeń aplikacji.
@@ -265,9 +265,13 @@ Dodatkowo wykonano narzędzie porównania WER/CER na dwóch gotowych TXT, ale be
 
 **Jedynym repo roboczym KWN jest `Video-notes`.** PR #3 (`develop`: `064ebf7625b7895e88fe2e34f59471bab7fa88dc`) dodał lokalne notatki ekstrakcyjne z cytatami/edycją i porównanie WER/CER gotowych TXT. GitHub Actions #42247184304: 37/37 Linux PASS i 27/27 Windows PASS. PR #4 (`develop`: `1d9022450f0792631161090f22ecb95835c88f84`) dodał przenośną kopię bez mediów, SHA-256, bezpieczne odtworzenie i relink; Actions #42248878505: **46/46 Linux PASS i 36/36 Windows PASS**. Weryfikacja Windows obejmuje testy kontraktów i backupu, **nie** realne działanie pełnego ASR, FFmpeg i instalatora na fizycznym urządzeniu.
 
-**Etapy formalne:** VN-00, VN-01, VN-02, VN-06 = W TRAKCIE; VN-03, VN-04, VN-05, VN-07, VN-08 = PLANOWANE. Żaden etap nie otrzymał DONE, ponieważ nie przeszedł wszystkich bramek odbiorowych. Historyczny rejestr KWN (189 kryteriów i 22 etapy) w `Constant_app` nie jest automatycznie równoważny dziewięciu etapom VN. Szczegółowy stan i bramki: `docs/VN_STATUS.json`, `docs/VN_LOCAL_BACKUP.md`, `docs/VN02_NOTES.md`, `docs/ASR_QUALITY_BENCHMARK.md`.
+**Etapy formalne:** VN-00, VN-01, VN-02, VN-05, VN-06 = W TRAKCIE; VN-03, VN-04, VN-07, VN-08 = PLANOWANE. Żaden etap nie otrzymał DONE, ponieważ nie przeszedł wszystkich bramek odbiorowych. Historyczny rejestr KWN (189 kryteriów i 22 etapy) w `Constant_app` nie jest automatycznie równoważny dziewięciu etapom VN. Szczegółowy stan i bramki: `docs/VN_STATUS.json`, `docs/VN_LOCAL_BACKUP.md`, `docs/VN02_NOTES.md`, `docs/ASR_QUALITY_BENCHMARK.md`.
 
 **Dalsze zadania krytyczne:** legalne próbki PL/EN OBS i modele do realnego ASR, rzetelny benchmark whisper.cpp vs faster-whisper wraz z WER/RAM/czasem i licencjami, wersjonowane poprawki notatek z możliwością regeneracji, wygodny instalator Windows offline z potrzebnymi bibliotekami i modelem, testy urządzeń, test pliku 2h, a dopiero potem zbiorcza aktualizacja portalu Wiedora. Główna gałąź `main` Video-notes i host `Constant_app` pozostają bez zmian.
+
+## Postęp 06.11.2026 — PR #6, #7, #8
+
+PR #6: historia regeneracji notatek (Linux 56/56, Windows 46/46 PASS). PR #7: realny runner dwóch lokalnych silników ASR z opcjonalnym pomiarem RAM, ale testowany automatycznie **tylko atrapami** (Linux 63/63, Windows 53/53 PASS). PR #8: import dodatkowych formatów audio i testy rzeczywistego dekodowania FFmpeg oraz symulowanego ASR (Linux 66/66, Windows 53/53 PASS). Ostrzeżenia o końcowym, niedekodowalnym paddingu MP3 są zapisywane jawnie. Mimo tego żaden etap nie przeszedł wszystkich kryteriów odbioru; liczniki: 5 W TRAKCIE, 4 PLANOWANE, 0 DONE. Do formalnego zamknięcia VN-00/VN-01/VN-02/VN-05/VN-06 nadal potrzebny prawdziwy model PL/EN, testy użytkownika i rzeczywisty Windows offline. Bieżący rejestr: `docs/VN_STATUS.json`.
 
 ## G. Pierwsze pięć zadań do wykonania
 

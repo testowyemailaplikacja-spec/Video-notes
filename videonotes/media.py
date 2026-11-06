@@ -10,7 +10,7 @@ from pathlib import Path
 
 from .errors import VideoNotesError
 
-SUPPORTED_SOURCE_SUFFIXES = {".mp4", ".mkv", ".webm", ".wav"}
+SUPPORTED_SOURCE_SUFFIXES = {".mp4", ".mkv", ".webm", ".mov", ".wav", ".mp3", ".m4a", ".flac", ".ogg", ".opus"}
 
 
 def executable(command: str) -> str:
@@ -38,7 +38,7 @@ def _run(args: list[str], *, timeout: int = 120) -> subprocess.CompletedProcess[
 def probe(source: Path, ffprobe: str = "ffprobe") -> dict:
     source = Path(source).expanduser().resolve()
     if not source.is_file() or source.suffix.lower() not in SUPPORTED_SOURCE_SUFFIXES:
-        raise VideoNotesError("Wybierz istniejący plik MP4, MKV, WebM lub WAV.")
+        raise VideoNotesError("Wybierz istniejący plik wideo OBS lub audio (MP4/MKV/WebM/MOV/WAV/MP3/M4A/FLAC/OGG/OPUS).")
     if source.stat().st_size == 0:
         raise VideoNotesError("Plik źródłowy jest pusty.")
     result = _run([executable(ffprobe), "-v", "error", "-show_entries", "format=duration:stream=index,codec_type,codec_name,channels:stream_tags=language,title", "-of", "json", str(source)])

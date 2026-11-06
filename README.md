@@ -70,7 +70,7 @@ Program porównuje lokalne pliki TXT, wylicza WER/CER i zapisuje **wyłącznie s
 
 ## Stan potwierdzony po najnowszych integracjach (06.11.2026)
 
-Kod **PR #3 i #4** jest w `develop`; `main` pozostaje bez zmian. Testy [CI #42248878505](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42248878505): **46/46 PASS Linux, 36/36 PASS Windows** (Windows obejmuje kontrakty, notatki i archiwum, nie całe urządzenie i ASR). Nie wykonano jeszcze pełnego benchmarku prawdziwego modelu Whisper ani testu kompletnego instalatora Windows. **Żaden etap nie jest formalnie DONE.** Status 9 etapów: [VN_STATUS.json](docs/VN_STATUS.json) — 4 W TRAKCIE, 5 PLANOWANE. Nie przenosimy tego postępu automatycznie do historycznego rejestru 189 kryteriów w głównym repo Wiedory.
+Kod **PR #3 i #4** jest w `develop`; `main` pozostaje bez zmian. Testy [CI #42248878505](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42248878505): **46/46 PASS Linux, 36/36 PASS Windows** (Windows obejmuje kontrakty, notatki i archiwum, nie całe urządzenie i ASR). Nie wykonano jeszcze pełnego benchmarku prawdziwego modelu Whisper ani testu kompletnego instalatora Windows. **Żaden etap nie jest formalnie DONE.** Status 9 etapów: [VN_STATUS.json](docs/VN_STATUS.json) — 5 W TRAKCIE, 4 PLANOWANE. Nie przenosimy tego postępu automatycznie do historycznego rejestru 189 kryteriów w głównym repo Wiedory.
 
 ## Przenośna kopia projektu (VN-01/VN-06, wersja rozwojowa)
 
@@ -89,3 +89,9 @@ Po późniejszej poprawce transkrypcji można wykonać `python -m videonotes not
 ## Rzeczywisty benchmark dwóch lokalnych silników (narzędzie VN-00)
 
 Po zainstalowaniu lokalnych modeli `whisper.cpp` oraz `faster-whisper` można uruchomić `python -m videonotes benchmark-real` na tym samym fragmencie OBS. Otrzymasz WER/CER, czas obliczeń i — gdy dostępny jest opcjonalny `psutil` — RAM. Wykorzystuje realne procesy silników, nie tylko dwa gotowe pliki TXT. Pełna instrukcja: [REAL_ASR_LAB.md](docs/REAL_ASR_LAB.md). **Sam kod i testy z atrapami nie są dowodem rzeczywistej jakości rozpoznawania polskiej mowy.**
+
+## Import audio (część VN-05)
+
+Transkrypcję można uruchamiać również z plików WAV, MP3, M4A, FLAC, OGG i OPUS, nie tylko z filmów OBS. Dekodowanie odbywa się lokalnie przez FFmpeg i korzysta z tych samych checkpointów i eksportów. Obsługa zależy od zainstalowanych kodeków FFmpeg. Nagrywanie dźwięku systemowego i urządzeń jest nadal osobnym, nieukończonym zadaniem. [Opis i testy](docs/VN05_AUDIO_IMPORT.md).
+
+**Bieżące wyniki regresji PR #8:** [66 testów Linux i 53 Windows PASS](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42295088894). To testy kodu, a nie odbiór fizycznego urządzenia ani realnej dokładności ASR.

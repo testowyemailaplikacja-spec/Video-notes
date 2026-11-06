@@ -107,6 +107,16 @@ def validate_transcript(data: Any, project: dict[str, Any]) -> dict[str, Any]:
             raise VideoNotesError("Duplikat identyfikatora lub nieprawidłowa kolejność.")
         ids.add(sid)
         last = (idx, start, end)
+    warnings = data.get("warnings", [])
+    if not isinstance(warnings, list) or len(warnings) > 1000:
+        raise VideoNotesError("Nieprawidłowa lista ostrzeżeń transkrypcji.")
+    for item in warnings:
+        if not isinstance(item, dict) or item.get("kind") != "undecodable_final_padding":
+            raise VideoNotesError("Nieobsługiwane ostrzeżenie transkrypcji.")
+        start = _number(item.get("start_ms"), "warning.start_ms")
+        length = _number(item.get("duration_ms"), "warning.duration_ms")
+        if not 1 <= length <= 250 or start + length != duration:
+            raise VideoNotesError("Ostrzeżenie o paddingu nie dotyczy końca nagrania.")
     return data
 
 

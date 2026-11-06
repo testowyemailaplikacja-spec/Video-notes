@@ -3,14 +3,13 @@
   "updated_date": "2026-11-06",
   "owner_repo": "testowyemailaplikacja-spec/Video-notes",
   "integration_policy": "Develop KWN/Video-notes only. Constant_app and Netlify get only later, independently accepted larger batches.",
-  "develop_after_pr4": "1d9022450f0792631161090f22ecb95835c88f84",
   "main_unchanged": "4da53b3bff580e07a16218e5f7017cecf8ff7aed",
   "historical_note": "Historical KWN 189 criteria / 22 phases tracked in Constant_app are a separate ledger and are not carried over as DONE.",
   "totals": {
     "stages": 9,
     "DONE": 0,
-    "W_TRAKCIE": 4,
-    "PLANOWANE": 5
+    "W_TRAKCIE": 5,
+    "PLANOWANE": 4
   },
   "phases": [
     {
@@ -18,7 +17,8 @@
       "status": "W_TRAKCIE",
       "evidence": [
         "PR #1: offline FFmpeg + whisper.cpp adapter",
-        "PR #3: WER/CER text-only harness"
+        "PR #3: WER/CER text-only harness",
+        "PR #7: code for actual local whisper.cpp vs faster-whisper CPU comparison on same audio (CI mocks only)"
       ],
       "blockers": [
         "Real local PL/EN ASR benchmarks on legal OBS clips",
@@ -45,7 +45,8 @@
       "id": "VN-02",
       "status": "W_TRAKCIE",
       "evidence": [
-        "PR #3: verbatim source-linked basic notes, independent edits and Markdown, CLI/GUI"
+        "PR #3: verbatim source-linked basic notes, independent edits and Markdown, CLI/GUI",
+        "PR #6: versioned note regeneration with edits preservation and safe source-bound history"
       ],
       "blockers": [
         "Human assessment on real lectures",
@@ -75,11 +76,15 @@
     },
     {
       "id": "VN-05",
-      "status": "PLANOWANE",
-      "evidence": [],
+      "status": "W_TRAKCIE",
+      "evidence": [
+        "PR #8: FFprobe/FFmpeg import MP3/M4A/FLAC/OGG/OPUS/MOV, common transcription pipeline",
+        "GitHub Actions 42295088894: 66 Linux and 53 Windows source tests PASS, actual audio codecs on Linux"
+      ],
       "blockers": [
-        "Audio file formats and Windows loopback",
-        "Consent and multiple-device controls"
+        "Physical Windows microphone and loopback capture tests",
+        "Separate mic+system audio selection/mixing with consent",
+        "Device unplug/restart recovery scenarios"
       ]
     },
     {
@@ -140,11 +145,52 @@
         "fail": 0
       },
       "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42293909211",
+      "scope": "VN-02 versioned notes and GUI",
+      "linux": {
+        "pass": 56,
+        "fail": 0
+      },
+      "windows": {
+        "pass": 46,
+        "fail": 0
+      },
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42294237450",
+      "scope": "VN-00 dual-engine local benchmark harness mocked",
+      "linux": {
+        "pass": 63,
+        "fail": 0
+      },
+      "windows": {
+        "pass": 53,
+        "fail": 0
+      },
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42295088894",
+      "scope": "VN-05 real synthetic FFmpeg audio codec decoding + pipeline fake ASR",
+      "linux": {
+        "pass": 66,
+        "fail": 0
+      },
+      "windows": {
+        "pass": 53,
+        "fail": 0
+      },
+      "real_asr": false
     }
   ],
   "notes": [
     "CI is not physical Windows acceptance or actual speech model benchmarking.",
     "No recorded user media, private transcripts or ASR model files were uploaded.",
-    "Do not change Constant_app/Netlify as part of VN-00..VN-06."
-  ]
+    "Do not change Constant_app/Netlify as part of VN-00..VN-06.",
+    "Final compressed encoder padding <250ms is explicitly recorded as a warning, not silently attributed to ASR."
+  ],
+  "last_verified_develop_before_pr8": "344e227571ba09802da8a8bea7c50498473dc2e6"
 }
