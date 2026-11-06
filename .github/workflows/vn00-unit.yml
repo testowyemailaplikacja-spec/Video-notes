@@ -1,7 +1,7 @@
-name: Video Notes VN-00 source tests
+name: Video Notes — source, FFmpeg and source-only notes
 on:
   pull_request:
-    branches: [main]
+    branches: [develop, main]
     paths:
       - 'videonotes/**'
       - 'tests/**'
@@ -43,5 +43,5 @@ jobs:
         shell: pwsh
         run: |
           python -m compileall -q videonotes tests
-          python -m unittest tests.test_contracts tests.test_asr -v
+          python -m unittest tests.test_contracts tests.test_asr tests.test_notes tests.test_quality tests.test_notes_cli -v
           python -m videonotes --version
