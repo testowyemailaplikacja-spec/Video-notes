@@ -141,7 +141,7 @@ Użytkownik nagrał wykład lub tutorial w OBS, np. do MP4 albo MKV. Wybiera pli
 
 ### VN-06 — Stabilny program, dystrybucja i utrzymanie (v1.0)
 
-**Cel:** przejście od kolejnych prototypów do powtarzalnych wydań Windows. **Status: PLANOWANE.**
+**Cel:** przejście od kolejnych prototypów do powtarzalnych wydań Windows. **Status: W TRAKCIE (wyłącznie podstawowy backup/restore; instalator, wydanie i sprzętowy odbiór PLANOWANE).**
 
 - [ ] Installer `.exe` lub `.msi`, odinstalowanie, plik wersji, bezpieczne katalogi danych, odzyskiwanie projektów.
 - [ ] **Pełny instalator offline:** wszystkie biblioteki, modele i runtime dostarczone w pakiecie; jeśli Tauri, uwzględnić instalację WebView2 bez sieci na systemach, które tego wymagają.
@@ -260,6 +260,14 @@ Dowody i ograniczenia: `docs/VN00_IMPLEMENTATION.md`; schemat: `docs/CONTRACT_V1
 Dodano generowanie lokalnej notatki ekstrakcyjnej (dobór cytatów na podstawie czasu i powtarzających się słów), niezależną edycję punktów, znaczniki czasu i identyfikatory segmentów, eksport Markdown oraz widok i edytor GUI. Notatka zostaje odrzucona, jeśli źródłowa poprawiona transkrypcja uległa zmianie. **To etap W TRAKCIE**, bez inteligentnego streszczenia, oceny jakości na prawdziwych wykładach, eksportu DOCX/PDF i wersjonowanej regeneracji. Szczegóły: `docs/VN02_NOTES.md`.
 
 Dodatkowo wykonano narzędzie porównania WER/CER na dwóch gotowych TXT, ale bez wykonania prawdziwego ASR, pomiaru czasu i RAM — **VN-00 pozostaje W TRAKCIE** (`docs/ASR_QUALITY_BENCHMARK.md`).
+
+## Stan repozytorium po PR #3 i #4 — 06.11.2026
+
+**Jedynym repo roboczym KWN jest `Video-notes`.** PR #3 (`develop`: `064ebf7625b7895e88fe2e34f59471bab7fa88dc`) dodał lokalne notatki ekstrakcyjne z cytatami/edycją i porównanie WER/CER gotowych TXT. GitHub Actions #42247184304: 37/37 Linux PASS i 27/27 Windows PASS. PR #4 (`develop`: `1d9022450f0792631161090f22ecb95835c88f84`) dodał przenośną kopię bez mediów, SHA-256, bezpieczne odtworzenie i relink; Actions #42248878505: **46/46 Linux PASS i 36/36 Windows PASS**. Weryfikacja Windows obejmuje testy kontraktów i backupu, **nie** realne działanie pełnego ASR, FFmpeg i instalatora na fizycznym urządzeniu.
+
+**Etapy formalne:** VN-00, VN-01, VN-02, VN-06 = W TRAKCIE; VN-03, VN-04, VN-05, VN-07, VN-08 = PLANOWANE. Żaden etap nie otrzymał DONE, ponieważ nie przeszedł wszystkich bramek odbiorowych. Historyczny rejestr KWN (189 kryteriów i 22 etapy) w `Constant_app` nie jest automatycznie równoważny dziewięciu etapom VN. Szczegółowy stan i bramki: `docs/VN_STATUS.json`, `docs/VN_LOCAL_BACKUP.md`, `docs/VN02_NOTES.md`, `docs/ASR_QUALITY_BENCHMARK.md`.
+
+**Dalsze zadania krytyczne:** legalne próbki PL/EN OBS i modele do realnego ASR, rzetelny benchmark whisper.cpp vs faster-whisper wraz z WER/RAM/czasem i licencjami, wersjonowane poprawki notatek z możliwością regeneracji, wygodny instalator Windows offline z potrzebnymi bibliotekami i modelem, testy urządzeń, test pliku 2h, a dopiero potem zbiorcza aktualizacja portalu Wiedora. Główna gałąź `main` Video-notes i host `Constant_app` pozostają bez zmian.
 
 ## G. Pierwsze pięć zadań do wykonania
 
