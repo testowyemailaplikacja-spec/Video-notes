@@ -91,13 +91,15 @@
       "id": "VN-06",
       "status": "W_TRAKCIE",
       "evidence": [
-        "PR #4: project-only backup/restore with archive SHA-256 and path redaction"
+        "PR #4: project-only backup/restore with archive SHA-256 and path redaction",
+        "PR #9: actual Windows runner PyInstaller 6.16 development EXE smoke checks PASS, short-lived .exe + .sha256 artifact, workflow #42296659497"
       ],
       "blockers": [
         "Installer .exe/.msi with model/runtime",
         "Windows installation offline, antivirus, licensing and SBOM",
         "Recovery and long-run performance",
-        "Signed release policy"
+        "Signed release policy",
+        "Internal DEV executable contains no FFmpeg, Whisper CLI or model; full offline installation remains unverified"
       ]
     },
     {
@@ -184,6 +186,14 @@
         "fail": 0
       },
       "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42296659497",
+      "scope": "VN-06 Windows DEV EXE assembled with PyInstaller and executed --version/--help/negative-media smoke",
+      "windows_executable": "PASS",
+      "artifact_name": "VideoNotes-Windows-DEV-NOT-OFFLINE",
+      "real_asr": false,
+      "offline_installer": false
     }
   ],
   "notes": [
