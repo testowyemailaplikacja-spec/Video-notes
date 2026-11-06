@@ -78,6 +78,8 @@ def create_backup(folder: Path, output: Path) -> Path:
         "paths_redacted": True,
     }
     files[MANIFEST] = _json_bytes(manifest)
+    if output.exists():
+        raise VideoNotesError("Plik kopii już istnieje; wybierz inną nazwę, aby nie utracić danych.")
     output.parent.mkdir(parents=True, exist_ok=True)
     filename = None
     try:
