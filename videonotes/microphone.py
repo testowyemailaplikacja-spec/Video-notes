@@ -32,13 +32,25 @@ def _valid_device(device: str) -> str:
     return device
 
 
-def capture_command(ffmpeg: str, device: str, output: Path, *, max_seconds: int | None = None) -> list[str]:
+def capture_command(ffmpeg: str, device: str, output: Path, *, max_seconds: int | None = None,
+                    system_device: str | None = None) -> list[str]:
     """Build a shell-free dshow command; no automatic device selection."""
     _valid_device(device)
+    if system_device is not None:
+        _valid_device(system_device)
+        if system_device == device:
+            raise VideoNotesError("Wybierz dwa różne urządzenia wejściowe do miksu.")
     if max_seconds is not None and (type(max_seconds) is not int or not 1 <= max_seconds <= 24 * 3600):
         raise VideoNotesError("Limit nagrywania musi być liczbą sekund od 1 do 86400.")
     args = [ffmpeg, "-hide_banner", "-loglevel", "error", "-nostats", "-y",
             "-thread_queue_size", "512", "-f", "dshow", "-i", "audio=" + device]
+    if system_device is not None:
+        args.extend(["-thread_queue_size", "512", "-f", "dshow", "-i", "audio=" + system_device,
+                     "-filter_complex",
+                     "[0:a]aresample=async=1:first_pts=0[mic];"
+                     "[1:a]aresample=async=1:first_pts=0[system];"
+                     "[mic][system]amix=inputs=2:duration=longest:normalize=1[aout]",
+                     "-map", "[aout]"])
     if max_seconds is not None:
         args.extend(["-t", str(max_seconds)])
     args.extend(["-vn", "-sn", "-dn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le",
@@ -82,6 +94,7 @@ def recording_status(folder: Path) -> dict:
 
 def record_microphone(device: str, folder: Path, *, consent: bool,
                       ffmpeg: str = "ffmpeg", max_seconds: int | None = None,
+                      system_device: str | None = None, system_consent: bool = False,
                       stop: threading.Event | None = None,
                       process_factory: Callable[..., object] = subprocess.Popen) -> dict:
     """Capture Windows mic; close files on stop, preserving partials on failure.
@@ -94,17 +107,28 @@ def record_microphone(device: str, folder: Path, *, consent: bool,
     if consent is not True:
         raise VideoNotesError("Nagrywanie wymaga świadomej zgody użytkownika.")
     _valid_device(device)
+    if system_device is not None:
+        if system_consent is not True:
+            raise VideoNotesError("Nagrywanie dźwięku systemowego wymaga osobnej zgody.")
+        _valid_device(system_device)
+        if device == system_device:
+            raise VideoNotesError("Mikrofon i źródło dźwięku systemowego muszą być różnymi urządzeniami.")
+    elif system_consent is True:
+        raise VideoNotesError("Podano zgodę na dźwięk systemowy bez wyboru urządzenia.")
     tool = executable(ffmpeg)
     folder = Path(folder).expanduser().resolve()
     if folder.exists():
         raise VideoNotesError("Katalog sesji już istnieje. Wybierz nową ścieżkę, aby nie nadpisać nagrania.")
-    command = capture_command(tool, device, folder / "part-%05d.wav", max_seconds=max_seconds)
+    command = capture_command(tool, device, folder / "part-%05d.wav", max_seconds=max_seconds,
+                              system_device=system_device)
     folder.mkdir(parents=True, mode=0o700)
     report = {"schema": SCHEMA, "session_id": str(uuid.uuid4()),
               "created_at": datetime.now(timezone.utc).isoformat(),
               "status": "recording", "format": "wav-pcm16-mono-16000",
               "segment_seconds": SEGMENT_SECONDS, "user_consented": True,
-              "device_stored": False, "max_seconds": max_seconds}
+              "device_stored": False, "max_seconds": max_seconds,
+              "system_audio_requested": system_device is not None,
+              "system_audio_consented": system_consent is True}
     save_json(folder / "recording.json", report)
     stopped = False
     try:
