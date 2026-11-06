@@ -4,6 +4,7 @@ on:
     branches: [develop, main]
     paths:
       - 'videonotes/**'
+      - 'web/**'
       - 'tests/**'
       - 'pyproject.toml'
       - '.github/workflows/vn00-unit.yml'
@@ -34,6 +35,11 @@ jobs:
           python -m unittest discover -s tests -v
       - name: Confirm CLI responds without remote services
         run: python -m videonotes --version
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test browser transcript contract without npm dependencies
+        run: node --test tests/web-core.test.cjs
   unit-windows:
     name: Python stdlib contracts on Windows (not full Windows acceptance)
     runs-on: windows-latest
@@ -52,3 +58,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m videonotes --version
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test browser transcript contract without npm dependencies
+        run: node --test tests/web-core.test.cjs
