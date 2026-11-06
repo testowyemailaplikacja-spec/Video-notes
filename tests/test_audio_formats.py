@@ -73,6 +73,13 @@ class AudioFormatsTest(unittest.TestCase):
         self.assertGreater(len(outcome["segments"]), 0)
         self.assertEqual(outcome, read_project(project_folder)[1])
         self.assertTrue(all(seg["status"] == "raw" for seg in outcome["segments"]))
+        warnings = outcome.get("warnings", [])
+        # MP3 encoder padding may be counted in container duration while
+        # producing zero final PCM frames. It must be explicit, not silent.
+        if warnings:
+            self.assertEqual(warnings[0]["kind"], "undecodable_final_padding")
+            self.assertLessEqual(warnings[0]["duration_ms"], 250)
+            self.assertEqual(warnings[0]["start_ms"] + warnings[0]["duration_ms"], probe(source)["duration_ms"])
 
     def test_invalid_pdf_extension_rejected_without_decoder_invocation(self):
         pdf = self.base / "bad.pdf"
