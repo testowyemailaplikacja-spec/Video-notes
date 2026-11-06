@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import queue
 import threading
+import uuid
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
@@ -10,6 +11,7 @@ from tkinter import filedialog, messagebox, ttk
 from .errors import VideoNotesError
 from .exports import edit_segment, export_project
 from .media import probe
+from .microphone import record_microphone, list_microphone_devices
 from .notes import generate_basic_notes, read_basic_notes, edit_note_point, export_basic_notes
 from .advanced_notes import export_advanced_outline
 from .note_revisions import regenerate_basic_notes, list_note_versions
@@ -32,8 +34,11 @@ class VideoNotesWindow:
         self.events: queue.Queue[tuple[str, object]] = queue.Queue()
         self.cancel = threading.Event()
         self.active = False
+        self.mic_stop = threading.Event()
+        self.mic_controls: dict = {}
         self._rows: dict[str, dict] = {}
         self._build()
+        self.root.protocol("WM_DELETE_WINDOW", self._on_app_close)
         self.root.after(100, self._drain)
 
     def _build(self) -> None:
@@ -66,6 +71,7 @@ class VideoNotesWindow:
         ttk.Button(commands, text="Otwórz projekt", command=self._load).pack(side="left")
         ttk.Button(outer, text="Notatka podstawowa — wybrane cytaty z transkrypcji", command=self._show_notes).pack(anchor="w", pady=(0, 7))
         ttk.Button(outer, text="Konspekt źródłowy — rozdziały i cytaty (VN-03)", command=self._show_advanced).pack(anchor="w", pady=(0, 7))
+        ttk.Button(outer, text="Nagraj mikrofon — nowa sesja WAV (Windows)", command=self._show_mic_recorder).pack(anchor="w", pady=(0, 7))
         self.status = tk.StringVar(value="Gotowe. Wybierz plik i lokalny model.")
         ttk.Label(outer, textvariable=self.status, wraplength=700).pack(anchor="w", pady=4)
         self.progress = ttk.Progressbar(outer, orient="horizontal", mode="determinate")
@@ -87,6 +93,20 @@ class VideoNotesWindow:
         self.edit_text.pack(fill="both", expand=True)
         ttk.Button(right, text="Zapisz poprawkę i eksport", command=self._save_edit).pack(anchor="e", pady=6)
         ttk.Label(right, text="Oryginalny wynik ASR pozostaje nietknięty.", wraplength=245).pack(anchor="w")
+
+    def _on_app_close(self) -> None:
+        """Do not orphan a live FFmpeg subprocess when the GUI closes."""
+        if self.active:
+            if self.mic_controls and self.mic_controls["window"].winfo_exists():
+                self.mic_stop.set()
+                messagebox.showwarning("Video Notes",
+                    "Polecono zatrzymanie mikrofonu. Zamknij program dopiero po zapisaniu nagrania.")
+            else:
+                self.cancel.set()
+                messagebox.showwarning("Video Notes",
+                    "Polecono przerwanie transkrypcji. Zaczekaj na zapis ostatniego ukończonego fragmentu.")
+            return
+        self.root.destroy()
 
     def _line(self, parent: ttk.LabelFrame, title: str, value: tk.StringVar, callback) -> None:
         row = ttk.Frame(parent)
@@ -153,11 +173,128 @@ class VideoNotesWindow:
                 self.events.put(("error", "Wewnętrzny błąd. Projekt zachowany; sprawdź log testowy przed wznowieniem."))
         threading.Thread(target=worker, name="vn-transcribe", daemon=True).start()
 
+    def _show_mic_recorder(self) -> None:
+        """Manual, consent-gated microphone capture in a separate dialog."""
+        if self.mic_controls and self.mic_controls["window"].winfo_exists():
+            self.mic_controls["window"].lift()
+            return
+        window = tk.Toplevel(self.root)
+        window.title("Video Notes — mikrofon Windows")
+        window.geometry("640x295")
+        panel = ttk.Frame(window, padding=14)
+        panel.pack(fill="both", expand=True)
+        ttk.Label(panel, text="Dźwięk pozostaje lokalny. Wybierz urządzenie i katalog nowych nagrań.",
+                  wraplength=600).pack(anchor="w")
+        device = tk.StringVar()
+        parent = tk.StringVar()
+        status = tk.StringVar(value="Wykryj mikrofony Windows albo wpisz dokładną nazwę DirectShow.")
+        row = ttk.Frame(panel)
+        row.pack(fill="x", pady=8)
+        ttk.Label(row, text="Mikrofon", width=14).pack(side="left")
+        device_box = ttk.Combobox(row, textvariable=device, width=44)
+        device_box.pack(side="left", fill="x", expand=True)
+        def discover() -> None:
+            def work() -> None:
+                try:
+                    self.events.put(("mic_devices", list_microphone_devices()))
+                except VideoNotesError as error:
+                    self.events.put(("mic_devices_error", str(error)))
+            status.set("Odczytywanie lokalnych urządzeń FFmpeg...")
+            threading.Thread(target=work, daemon=True, name="vn-list-mics").start()
+        ttk.Button(row, text="Wykryj", command=discover).pack(side="left", padx=5)
+        pathrow = ttk.Frame(panel)
+        pathrow.pack(fill="x", pady=8)
+        ttk.Label(pathrow, text="Katalog bazowy", width=14).pack(side="left")
+        ttk.Entry(pathrow, textvariable=parent).pack(side="left", fill="x", expand=True)
+        def browse_parent() -> None:
+            chosen = filedialog.askdirectory()
+            if chosen:
+                parent.set(chosen)
+        ttk.Button(pathrow, text="Wybierz", command=browse_parent).pack(side="left", padx=5)
+        ttk.Label(panel, text="Nagrania będą dzielone co 2 godziny. Stop domyka plik WAV.",
+                  wraplength=600).pack(anchor="w")
+        actions = ttk.Frame(panel)
+        actions.pack(fill="x", pady=12)
+        def begin() -> None:
+            if self.active:
+                messagebox.showwarning("Video Notes", "Zakończ inne przetwarzanie przed nagrywaniem.")
+                return
+            selected = device.get().strip()
+            folder = Path(parent.get().strip())
+            if not selected or not parent.get().strip() or not folder.is_dir():
+                messagebox.showwarning("Video Notes", "Wybierz mikrofon oraz istniejący katalog bazowy.")
+                return
+            if not messagebox.askyesno("Potwierdź nagrywanie",
+                    "Czy chcesz rozpocząć lokalne nagrywanie wskazanego mikrofonu?"):
+                return
+            target = folder / ("mic-" + uuid.uuid4().hex[:12])
+            self.mic_stop.clear()
+            self.active = True
+            start.configure(state="disabled")
+            stop.configure(state="normal")
+            self.start_button.configure(state="disabled")
+            self.resume_button.configure(state="disabled")
+            status.set("Trwa nagrywanie. Aby zakończyć, kliknij Zatrzymaj.")
+            def work() -> None:
+                try:
+                    result = record_microphone(selected, target, consent=True, stop=self.mic_stop)
+                    self.events.put(("mic_complete", (target, result)))
+                except VideoNotesError as error:
+                    self.events.put(("mic_failure", str(error)))
+                except Exception:
+                    self.events.put(("mic_failure", "Nieoczekiwany błąd nagrywania. Sprawdź lokalny dziennik sesji."))
+            threading.Thread(target=work, daemon=True, name="vn-mic-capture").start()
+        start = ttk.Button(actions, text="Rozpocznij nagrywanie", command=begin)
+        start.pack(side="left", padx=(0, 10))
+        def request_stop() -> None:
+            self.mic_stop.set()
+            status.set("Kończenie nagrywania i zapisywanie segmentu WAV...")
+        stop = ttk.Button(actions, text="Zatrzymaj", command=request_stop, state="disabled")
+        stop.pack(side="left")
+        ttk.Label(panel, textvariable=status, wraplength=600).pack(anchor="w", pady=4)
+        self.mic_controls = {"window": window, "devices": device_box,
+                             "status": status, "start": start, "stop": stop}
+        def on_close() -> None:
+            if self.active and str(stop["state"]) == "normal":
+                messagebox.showwarning("Video Notes", "Najpierw zatrzymaj nagrywanie i poczekaj na zamknięcie pliku.")
+                return
+            self.mic_controls = {}
+            window.destroy()
+        window.protocol("WM_DELETE_WINDOW", on_close)
+
     def _drain(self) -> None:
         try:
             while True:
                 kind, data = self.events.get_nowait()
-                if kind == "progress":
+                if kind == "mic_devices":
+                    if self.mic_controls and self.mic_controls["window"].winfo_exists():
+                        self.mic_controls["devices"].configure(values=list(data))
+                        self.mic_controls["status"].set(f"Wykryto {len(data)} lokalnych urządzeń audio. Wybierz właściwe.")
+                elif kind == "mic_devices_error":
+                    if self.mic_controls and self.mic_controls["window"].winfo_exists():
+                        self.mic_controls["status"].set(str(data))
+                    messagebox.showwarning("Mikrofony Windows", str(data))
+                elif kind in {"mic_complete", "mic_failure"}:
+                    self.active = False
+                    self.start_button.configure(state="normal")
+                    self.resume_button.configure(state="normal")
+                    if self.mic_controls and self.mic_controls["window"].winfo_exists():
+                        self.mic_controls["start"].configure(state="normal")
+                        self.mic_controls["stop"].configure(state="disabled")
+                    if kind == "mic_complete":
+                        folder, report = data
+                        message = f"Zapisano {len(report['segments'])} części WAV w {folder}."
+                        part = Path(folder) / "part-00000.wav"
+                        if part.is_file():
+                            self.source.set(str(part))
+                        self.status.set(message)
+                    else:
+                        message = str(data)
+                        self.status.set(message)
+                        messagebox.showwarning("Nagrywanie mikrofonu", message)
+                    if self.mic_controls and self.mic_controls["window"].winfo_exists():
+                        self.mic_controls["status"].set(message)
+                elif kind == "progress":
                     done, total = data
                     self.progress["maximum"] = max(total, 1)
                     self.progress["value"] = done

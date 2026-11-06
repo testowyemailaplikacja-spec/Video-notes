@@ -10,7 +10,7 @@ from . import __version__
 from .errors import VideoNotesError
 from .exports import edit_segment, export_project
 from .media import probe
-from .microphone import record_microphone, recording_status
+from .microphone import record_microphone, recording_status, list_microphone_devices
 from .notes import generate_basic_notes, edit_note_point, export_basic_notes
 from .advanced_notes import export_advanced_outline
 from .note_revisions import regenerate_basic_notes, list_note_versions, restore_note_version
@@ -104,6 +104,8 @@ def parser() -> argparse.ArgumentParser:
     relink.add_argument("--model", type=Path, required=True)
     relink.add_argument("--whisper-cli", required=True)
     relink.add_argument("--ffprobe", default="ffprobe")
+    devices = sub.add_parser("record-devices", help="Wypisz lokalne urządzenia mikrofonowe Windows")
+    devices.add_argument("--ffmpeg", default="ffmpeg")
     mic = sub.add_parser("record-mic", help="Nagraj lokalny mikrofon Windows jako WAV")
     mic.add_argument("--device", required=True, help="Dokładna nazwa urządzenia DirectShow")
     mic.add_argument("--output", required=True, type=Path, help="Nowy katalog nagrania; istniejące są chronione")
@@ -207,6 +209,8 @@ def main(argv: list[str] | None = None) -> int:
         elif args.action == "relink":
             relink_backup(args.project, args.source, args.model, whisper_cli=args.whisper_cli, ffprobe=args.ffprobe)
             print("Potwierdzono SHA-256 nagrania i modelu; projekt jest podłączony lokalnie.")
+        elif args.action == "record-devices":
+            print(json.dumps(list_microphone_devices(args.ffmpeg), ensure_ascii=False, indent=2))
         elif args.action == "record-mic":
             if args.max_minutes is not None and not 1 <= args.max_minutes <= 1440:
                 raise VideoNotesError("Limit nagrywania musi wynosić 1–1440 minut.")

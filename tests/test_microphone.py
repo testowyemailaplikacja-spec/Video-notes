@@ -13,7 +13,7 @@ from unittest import mock
 from videonotes.cli import main
 from videonotes.errors import VideoNotesError
 from videonotes.microphone import (SEGMENT_SECONDS, capture_command,
-                                   inspect_wav_segments, record_microphone, recording_status)
+                                   inspect_wav_segments, record_microphone, recording_status, list_microphone_devices)
 
 
 class FakeFFmpeg:
@@ -106,6 +106,31 @@ class MicrophoneTest(unittest.TestCase):
         with contextlib.redirect_stdout(output):
             self.assertEqual(main(["record-status", str(self.folder)]), 0)
         self.assertEqual(json.loads(output.getvalue())["status"], "finished")
+
+
+    def test_enumerate_microphones_from_ffmpeg_without_capture(self):
+        output = ('[dshow @ 0x10] DirectShow video devices\n'
+                  '[dshow @ 0x10]  "Camera"\n'
+                  '[dshow @ 0x10] DirectShow audio devices\n'
+                  '[dshow @ 0x10]  "Mic (USB)"\n'
+                  '[dshow @ 0x10]     Alternative name "@device_pnp_abc"\n'
+                  '[dshow @ 0x10]  "Stereo Mix"\n'
+                  '[dshow @ 0x10]  "Mic (USB)"\n')
+        result = mock.Mock(stderr=output, returncode=1)
+        with mock.patch("videonotes.microphone.sys.platform", "win32"), \
+             mock.patch("videonotes.microphone.executable", return_value="ffmpeg"), \
+             mock.patch("videonotes.microphone.subprocess.run", return_value=result) as runner:
+            self.assertEqual(list_microphone_devices(), ["Mic (USB)", "Stereo Mix"])
+            self.assertEqual(runner.call_args.args[0][:2], ["ffmpeg", "-hide_banner"])
+            capture = io.StringIO()
+            with contextlib.redirect_stdout(capture):
+                self.assertEqual(main(["record-devices"]), 0)
+            self.assertEqual(json.loads(capture.getvalue()), ["Mic (USB)", "Stereo Mix"])
+        with mock.patch("videonotes.microphone.sys.platform", "win32"), \
+             mock.patch("videonotes.microphone.executable", return_value="ffmpeg"), \
+             mock.patch("videonotes.microphone.subprocess.run", return_value=mock.Mock(stderr="", returncode=1)):
+            with self.assertRaises(VideoNotesError):
+                list_microphone_devices()
 
 
 if __name__ == "__main__":

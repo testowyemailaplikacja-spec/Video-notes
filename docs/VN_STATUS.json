@@ -8,8 +8,8 @@
   "totals": {
     "stages": 9,
     "DONE": 0,
-    "W_TRAKCIE": 5,
-    "PLANOWANE": 4
+    "W_TRAKCIE": 7,
+    "PLANOWANE": 2
   },
   "phases": [
     {
@@ -57,21 +57,28 @@
     },
     {
       "id": "VN-03",
-      "status": "PLANOWANE",
-      "evidence": [],
+      "status": "W_TRAKCIE",
+      "evidence": [
+        "PR #10: versioned extractive source-linked outline, Markdown/JSON, CLI/GUI, passed Linux and Windows source CI, dev EXE CI"
+      ],
       "blockers": [
-        "Source-linked multi-level notes",
-        "Long-document synthesis",
-        "Separate slide/OCR acceptance"
+        "Real lectures/tutorials/CCNA human acceptance",
+        "Semantic headings, definitions and long-document synthesis",
+        "DOCX/PDF exports and separate slide/OCR acceptance"
       ]
     },
     {
       "id": "VN-04",
-      "status": "PLANOWANE",
-      "evidence": [],
+      "status": "W_TRAKCIE",
+      "evidence": [
+        "PR #11: consent-gated FFmpeg/DirectShow Windows microphone recorder, segmented WAV, crash journal; Linux/Windows mock tests and development EXE CI PASS",
+        "Device discovery and GUI controls in next PR, pending CI"
+      ],
       "blockers": [
-        "Physical microphone permission, capture, pause/resume",
-        "Windows device and crash recovery tests"
+        "Physical Windows microphone permission and recording",
+        "Actual 2h session, pause/resume, device disconnect, disk full and crash-recovery tests",
+        "User acceptance of device picker and Start/Stop GUI",
+        "Installer bundling FFmpeg and offline model"
       ]
     },
     {
@@ -194,6 +201,16 @@
       "artifact_name": "VideoNotes-Windows-DEV-NOT-OFFLINE",
       "real_asr": false,
       "offline_installer": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42301724520",
+      "scope": "VN-03 deterministic outline source-level tests; Windows+Linux PASS",
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42302509070",
+      "scope": "VN-04 microphone FFmpeg mock source tests; Windows+Linux PASS (not physical capture)",
+      "real_asr": false
     }
   ],
   "notes": [
