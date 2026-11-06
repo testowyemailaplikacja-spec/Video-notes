@@ -87,10 +87,10 @@ Użytkownik nagrał wykład lub tutorial w OBS, np. do MP4 albo MKV. Wybiera pli
 
 ### VN-02 — Podstawowe notatki z transkrypcji (v0.2)
 
-**Cel:** zmiana tekstu na krótką, czytelną notatkę bez konieczności ręcznego porządkowania całości. **Status: PLANOWANE.**
+**Cel:** zmiana tekstu na krótką, czytelną notatkę bez konieczności ręcznego porządkowania całości. **Status: W TRAKCIE (prototyp ekstrakcyjny; nie jest to pełne semantyczne opracowanie ani odbiór VN-02).**
 
-- [ ] Dodać odrębne polecenie „Utwórz notatkę podstawową” po zakończeniu transkrypcji.
-- [ ] Lokalny mechanizm opracowania (lekki model, jeśli ma sens; alternatywa regułowa dla słabszych komputerów), bez płatnego API.
+- [x] Dodać odrębne polecenie „Utwórz notatkę podstawową” po zakończeniu transkrypcji (CLI i GUI; wymaga pełnych checkpointów).
+- [x] Lokalny mechanizm ekstrakcyjny jako alternatywa regułowa bez płatnego API; semantyczne streszczenie/model nadal poza obecnym zakresem i nie jest zaliczone.
 - [ ] Wygenerować tytuł, nagłówki tematyczne, najważniejsze punkty i krótkie podsumowanie. Nie tworzyć fikcyjnych faktów, nazwisk, cytatów ani źródeł.
 - [ ] Zachować odnośniki do fragmentów transkrypcji; umożliwić kliknięcie i korektę przez użytkownika.
 - [ ] Osobne widoki „Transkrypcja” i „Notatka”, wycofanie/ponowne wygenerowanie, ręczna edycja.
@@ -254,6 +254,12 @@ Każde zadanie musi posiadać: zakres, zależności, listę kryteriów akceptacj
 W tym repo przygotowano źródłowy prototyp: kontrakty i lokalny zapis atomowy, wykrywanie ścieżek przez FFprobe, dzielenie nagrania FFmpeg, adapter lokalnego `whisper-cli`, CLI i wstępny interfejs Tkinter, eksporty TXT/SRT/VTT/JSON oraz poprawki bez modyfikowania surowego wyniku. Test lokalny Linux/Python/FFmpeg na syntetycznych WAV/MKV: **19/19 PASS**. Silnik rozpoznawania mowy był w teście atrapą, nie rzeczywistym modelem. Żaden z etapów VN-00/VN-01 nie jest formalnie zamknięty; potrzeba pomiaru prawdziwego ASR, benchmarku dwóch silników i pełnego Windows offline. VN-02…VN-08 bez zmian; repo Wiedora bez zmian.
 
 Dowody i ograniczenia: `docs/VN00_IMPLEMENTATION.md`; schemat: `docs/CONTRACT_V1.md`.
+
+## Postęp implementacji VN-02 — 06.11.2026
+
+Dodano generowanie lokalnej notatki ekstrakcyjnej (dobór cytatów na podstawie czasu i powtarzających się słów), niezależną edycję punktów, znaczniki czasu i identyfikatory segmentów, eksport Markdown oraz widok i edytor GUI. Notatka zostaje odrzucona, jeśli źródłowa poprawiona transkrypcja uległa zmianie. **To etap W TRAKCIE**, bez inteligentnego streszczenia, oceny jakości na prawdziwych wykładach, eksportu DOCX/PDF i wersjonowanej regeneracji. Szczegóły: `docs/VN02_NOTES.md`.
+
+Dodatkowo wykonano narzędzie porównania WER/CER na dwóch gotowych TXT, ale bez wykonania prawdziwego ASR, pomiaru czasu i RAM — **VN-00 pozostaje W TRAKCIE** (`docs/ASR_QUALITY_BENCHMARK.md`).
 
 ## G. Pierwsze pięć zadań do wykonania
 
