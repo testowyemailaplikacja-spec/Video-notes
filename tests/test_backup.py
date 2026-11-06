@@ -129,8 +129,8 @@ class BackupTest(unittest.TestCase):
             with patch("videonotes.backup.probe", return_value={"duration_ms": 120_000, "audio_streams": [{"index": 0}]}):
                 relink_backup(restored, source, model, whisper_cli="whisper-cli")
             updated, _, _ = read_project(restored)
-            self.assertEqual(updated["source"]["path"], str(source))
-            self.assertEqual(updated["processing"]["model_path"], str(model))
+            self.assertEqual(Path(updated["source"]["path"]).resolve(), source.resolve())
+            self.assertEqual(Path(updated["processing"]["model_path"]).resolve(), model.resolve())
             wrong = root / "wrong.bin"
             wrong.write_bytes(b"wrong")
             with patch("videonotes.backup.probe", return_value={"duration_ms": 120_000, "audio_streams": [{"index": 0}]}):
