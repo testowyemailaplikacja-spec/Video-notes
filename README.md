@@ -85,3 +85,7 @@ Kopia lokalna zawiera transkrypcję i notatki, ale **nie nagranie, model ani bin
 ### Historia i odbudowa notatek
 
 Po późniejszej poprawce transkrypcji można wykonać `python -m videonotes notes-regenerate moje-notatki`, sprawdzić wcześniejsze wersje komendą `notes-history` i przywrócić zgodną wersję przez `notes-restore --revision <ID>`. Ręczne uwagi do nadal istniejących segmentów są zachowywane; zmiany do usuniętych segmentów pozostają w lokalnej historii. Funkcja dostępna jest także w GUI. [Dokładne zasady](docs/VN02_HISTORY.md).
+
+## Rzeczywisty benchmark dwóch lokalnych silników (narzędzie VN-00)
+
+Po zainstalowaniu lokalnych modeli `whisper.cpp` oraz `faster-whisper` można uruchomić `python -m videonotes benchmark-real` na tym samym fragmencie OBS. Otrzymasz WER/CER, czas obliczeń i — gdy dostępny jest opcjonalny `psutil` — RAM. Wykorzystuje realne procesy silników, nie tylko dwa gotowe pliki TXT. Pełna instrukcja: [REAL_ASR_LAB.md](docs/REAL_ASR_LAB.md). **Sam kod i testy z atrapami nie są dowodem rzeczywistej jakości rozpoznawania polskiej mowy.**
