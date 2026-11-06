@@ -181,12 +181,14 @@ class VideoNotesWindow:
             return
         window = tk.Toplevel(self.root)
         window.title("Video Notes — mikrofon Windows")
-        window.geometry("640x295")
+        window.geometry("700x380")
         panel = ttk.Frame(window, padding=14)
         panel.pack(fill="both", expand=True)
         ttk.Label(panel, text="Dźwięk pozostaje lokalny. Wybierz urządzenie i katalog nowych nagrań.",
                   wraplength=600).pack(anchor="w")
         device = tk.StringVar()
+        system_device = tk.StringVar()
+        system_agreed = tk.BooleanVar(value=False)
         parent = tk.StringVar()
         status = tk.StringVar(value="Wykryj mikrofony Windows albo wpisz dokładną nazwę DirectShow.")
         row = ttk.Frame(panel)
@@ -203,6 +205,14 @@ class VideoNotesWindow:
             status.set("Odczytywanie lokalnych urządzeń FFmpeg...")
             threading.Thread(target=work, daemon=True, name="vn-list-mics").start()
         ttk.Button(row, text="Wykryj", command=discover).pack(side="left", padx=5)
+        second = ttk.Frame(panel)
+        second.pack(fill="x", pady=4)
+        ttk.Label(second, text="System audio", width=14).pack(side="left")
+        system_box = ttk.Combobox(second, textvariable=system_device, width=44)
+        system_box.pack(side="left", fill="x", expand=True)
+        ttk.Label(second, text="Opcjonalne wejście loopback", wraplength=170).pack(side="left", padx=5)
+        ttk.Checkbutton(panel, text="Wyrażam osobną zgodę na nagrywanie dźwięku komputera",
+                        variable=system_agreed).pack(anchor="w")
         pathrow = ttk.Frame(panel)
         pathrow.pack(fill="x", pady=8)
         ttk.Label(pathrow, text="Katalog bazowy", width=14).pack(side="left")
@@ -228,6 +238,13 @@ class VideoNotesWindow:
             if not messagebox.askyesno("Potwierdź nagrywanie",
                     "Czy chcesz rozpocząć lokalne nagrywanie wskazanego mikrofonu?"):
                 return
+            selected_system = system_device.get().strip()
+            if selected_system and not system_agreed.get():
+                messagebox.showwarning("Dźwięk systemowy", "Zaznacz osobną zgodę na nagrywanie komputera.")
+                return
+            if selected_system and selected_system == selected:
+                messagebox.showwarning("Dźwięk systemowy", "Wybierz dwa różne urządzenia.")
+                return
             target = folder / ("mic-" + uuid.uuid4().hex[:12])
             self.mic_stop.clear()
             self.active = True
@@ -238,7 +255,9 @@ class VideoNotesWindow:
             status.set("Trwa nagrywanie. Aby zakończyć, kliknij Zatrzymaj.")
             def work() -> None:
                 try:
-                    result = record_microphone(selected, target, consent=True, stop=self.mic_stop)
+                    result = record_microphone(selected, target, consent=True, stop=self.mic_stop,
+                                               system_device=selected_system or None,
+                                               system_consent=bool(selected_system and system_agreed.get()))
                     self.events.put(("mic_complete", (target, result)))
                 except VideoNotesError as error:
                     self.events.put(("mic_failure", str(error)))
@@ -254,6 +273,7 @@ class VideoNotesWindow:
         stop.pack(side="left")
         ttk.Label(panel, textvariable=status, wraplength=600).pack(anchor="w", pady=4)
         self.mic_controls = {"window": window, "devices": device_box,
+                             "system_devices": system_box,
                              "status": status, "start": start, "stop": stop}
         def on_close() -> None:
             if self.active and str(stop["state"]) == "normal":
@@ -270,6 +290,7 @@ class VideoNotesWindow:
                 if kind == "mic_devices":
                     if self.mic_controls and self.mic_controls["window"].winfo_exists():
                         self.mic_controls["devices"].configure(values=list(data))
+                        self.mic_controls["system_devices"].configure(values=[""] + list(data))
                         self.mic_controls["status"].set(f"Wykryto {len(data)} lokalnych urządzeń audio. Wybierz właściwe.")
                 elif kind == "mic_devices_error":
                     if self.mic_controls and self.mic_controls["window"].winfo_exists():
