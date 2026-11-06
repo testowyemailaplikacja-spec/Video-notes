@@ -1,5 +1,7 @@
 # Zasady pracy w repozytorium Video Notes
 
+> **DECYZJA WŁAŚCICIELA 06.11.2026 — TO JEST WŁAŚCIWE REPOZYTORIUM KWN (Konwerter Notatek).** `testowyemailaplikacja-spec/Video-notes` to jedyne repozytorium robocze do rozwoju, testów funkcjonalnych i dokumentacji KWN/Video Notes. Nazwa repo nie oznacza innego projektu. `testowyemailaplikacja-spec/Constant_app` i Netlify służą do przyszłych, zbiorczych integracji przetestowanych pakietów; przy VN-00–VN-06 nie zmieniać hosta ani deploymentów. Nie mylić Konwertera **Notatek** z osobnym Konwerterem **Plików** (PDF/DOCX). Pozostałe zespoły Wiedory mogą testować tylko granice integracji, nie wewnętrzne funkcje KWN.
+
 1. **Video Notes to samodzielna aplikacja transkrypcji i opracowywania notatek.** Wzorcem jest `apps/notatki/` Wiedora. **Konwerter plików to osobny projekt**, nie realizujemy jego funkcji w Video Notes.
 2. Hierarchia: aktualne polecenie użytkownika → ten plik → `docs/PLAN_ROZWOJU_VIDEO_NOTES.md` → rzeczywisty kod/testy.
 3. `reference/wiedora-notatki/` zawiera **wyłącznie migawkę źródeł do analizy**; nie traktuj jej jako działającego programu Windows. Nowy silnik i UI implementuj poza `reference/`.
