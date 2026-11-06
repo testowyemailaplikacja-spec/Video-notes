@@ -1,7 +1,7 @@
 # VIDEO NOTES — PLAN ROZWOJU SAMODZIELNEGO PROGRAMU
 
-**Wersja planu:** 1.2 · **Data:** 2026-11-02 · **Repo:** `testowyemailaplikacja-spec/Video-notes`  
-**Status ogólny:** PLANOWANE. Żaden etap implementacyjny nie jest oznaczony jako ukończony.  
+**Wersja planu:** 1.3 · **Data:** 2026-11-06 · **Repo:** `testowyemailaplikacja-spec/Video-notes`  
+**Status ogólny:** W TRAKCIE (VN-00/VN-01). Żaden etap implementacyjny nie jest oznaczony jako ukończony; benchmark prawdziwego ASR i odbiór Windows są otwarte.  
 **Zakres bieżący:** osobny program Windows. Najpierw OBS → transkrypcja → notatki podstawowe → zaawansowane → mikrofon na żywo → dalsze źródła.  
 **Poza bieżącą implementacją:** przebudowa Wiedora / Constant_app, płatne API, usługi w chmurze, aplikacja mobilna.
 
@@ -52,7 +52,7 @@ Użytkownik nagrał wykład lub tutorial w OBS, np. do MP4 albo MKV. Wybiera pli
 
 ### VN-00 — Fundamenty i wybór technologii
 
-**Cel:** udowodnić na prawdziwym pliku OBS, że lokalny proces działa w akceptowalnej jakości, oraz ustalić stabilne granice modułów. **Status: PLANOWANE.**
+**Cel:** udowodnić na prawdziwym pliku OBS, że lokalny proces działa w akceptowalnej jakości, oraz ustalić stabilne granice modułów. **Status: W TRAKCIE, BEZ ODBIORU — 06.11.2026.**
 
 **Zadania:**
 - [ ] Zainicjalizować projekt, zasadę pracy na gałęziach, `.gitignore`, wersjonowanie, licencję projektu (decyzja właściciela), standard pull requestów i raportów.
@@ -68,7 +68,7 @@ Użytkownik nagrał wykład lub tutorial w OBS, np. do MP4 albo MKV. Wybiera pli
 
 ### VN-01 — OBS → podstawowa transkrypcja (MVP, v0.1)
 
-**Cel:** działający program do konwersji nagrań z OBS w transkrypcję, bez mechanizmu generowania notatek. **Status: PLANOWANE.**
+**Cel:** działający program do konwersji nagrań z OBS w transkrypcję, bez mechanizmu generowania notatek. **Status: W TRAKCIE, BEZ ODBIORU — 06.11.2026.**
 
 **Funkcje:**
 - [ ] Import przez wybór i przeciągnięcie pliku: MP4, MKV, WebM; później MOV i pozostałe kodeki po badaniu zgodności. Czytelne informacje, gdy kodek jest nieobsługiwany.
@@ -248,6 +248,12 @@ Każde zadanie musi posiadać: zakres, zależności, listę kryteriów akceptacj
 | Zbyt rozbudowany zakres MVP | VN-01 obejmuje tylko transkrypcję; notatki, mikrofon i inne źródła są osobnymi fazami |
 | Ryzyko naruszenia prywatności przy mikrofonie/system audio | Wymagana widoczna zgoda i wskaźnik nagrywania, żadnych ukrytych nagrań |
 | Kolidowanie z Wiedora | Pełna niezależność repo do VN-06; osobna zgoda, test i wydanie integracji w VN-07 |
+
+## Postęp implementacji 06.11.2026
+
+W tym repo przygotowano źródłowy prototyp: kontrakty i lokalny zapis atomowy, wykrywanie ścieżek przez FFprobe, dzielenie nagrania FFmpeg, adapter lokalnego `whisper-cli`, CLI i wstępny interfejs Tkinter, eksporty TXT/SRT/VTT/JSON oraz poprawki bez modyfikowania surowego wyniku. Test lokalny Linux/Python/FFmpeg na syntetycznych WAV/MKV: **19/19 PASS**. Silnik rozpoznawania mowy był w teście atrapą, nie rzeczywistym modelem. Żaden z etapów VN-00/VN-01 nie jest formalnie zamknięty; potrzeba pomiaru prawdziwego ASR, benchmarku dwóch silników i pełnego Windows offline. VN-02…VN-08 bez zmian; repo Wiedora bez zmian.
+
+Dowody i ograniczenia: `docs/VN00_IMPLEMENTATION.md`; schemat: `docs/CONTRACT_V1.md`.
 
 ## G. Pierwsze pięć zadań do wykonania
 
