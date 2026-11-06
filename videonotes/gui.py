@@ -42,7 +42,7 @@ class VideoNotesWindow:
         ttk.Label(outer, text="Nagrania i transkrypcje pozostają na tym komputerze. Żadne pliki nie są wysyłane do chmury.", wraplength=700).pack(anchor="w", pady=(0, 12))
         config = ttk.LabelFrame(outer, text="Źródło i lokalny model", padding=10)
         config.pack(fill="x")
-        self._line(config, "Nagranie OBS", self.source, self._browse_source)
+        self._line(config, "Nagranie lub audio", self.source, self._browse_source)
         self._line(config, "Katalog projektu", self.project, self._browse_project)
         self._line(config, "Model Whisper .bin", self.model, lambda: self._select_file(self.model, [("Model bin", "*.bin"), ("Wszystkie", "*.*")]))
         self._line(config, "whisper-cli (.exe)", self.engine, lambda: self._select_file(self.engine, [("Program", "*.exe"), ("Wszystkie", "*.*")]))
@@ -99,7 +99,7 @@ class VideoNotesWindow:
             var.set(filename)
 
     def _browse_source(self) -> None:
-        self._select_file(self.source, [("OBS / audio", "*.mp4 *.mkv *.webm *.wav"), ("Wszystkie", "*.*")])
+        self._select_file(self.source, [("OBS / audio", "*.mp4 *.mkv *.webm *.mov *.wav *.mp3 *.m4a *.flac *.ogg *.opus"), ("Wszystkie", "*.*")])
         if self.source.get():
             self._inspect()
 
