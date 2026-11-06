@@ -95,3 +95,9 @@ Po zainstalowaniu lokalnych modeli `whisper.cpp` oraz `faster-whisper` można ur
 Transkrypcję można uruchamiać również z plików WAV, MP3, M4A, FLAC, OGG i OPUS, nie tylko z filmów OBS. Dekodowanie odbywa się lokalnie przez FFmpeg i korzysta z tych samych checkpointów i eksportów. Obsługa zależy od zainstalowanych kodeków FFmpeg. Nagrywanie dźwięku systemowego i urządzeń jest nadal osobnym, nieukończonym zadaniem. [Opis i testy](docs/VN05_AUDIO_IMPORT.md).
 
 **Bieżące wyniki regresji PR #8:** [66 testów Linux i 53 Windows PASS](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42295088894). To testy kodu, a nie odbiór fizycznego urządzenia ani realnej dokładności ASR.
+
+## Wersja wykonywalna Windows (test developerski)
+
+GitHub Actions buduje `VideoNotes-DEV.exe` i uruchamia testy podstawowego CLI na Windows. Artefakt jest oznaczony **DEV-NOT-OFFLINE**, nie zawiera FFmpeg ani modeli Whisper i nie jest jeszcze pełnym instalatorem. [Szczegóły i bramki wydania](docs/VN06_WINDOWS_DEV_BUILD.md).
+
+**Przetestowany artefakt Windows DEV:** [GitHub Actions #42296659497](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42296659497), wynik SUCCESS. Do pobrania jest tymczasowy ZIP z `VideoNotes-DEV.exe` i SHA-256, ale **bez modelu ASR i FFmpeg**; nie jest to wydanie stabilne.

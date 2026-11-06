@@ -105,7 +105,19 @@ def _progress(done: int, total: int) -> None:
     print(f"Zapisane fragmenty: {done}/{total}", file=sys.stderr, flush=True)
 
 
+def _configure_console_unicode() -> None:
+    """Avoid Windows legacy cp1252 crashes when CLI prints Polish text."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (OSError, ValueError):
+                pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _configure_console_unicode()
     args = parser().parse_args(argv)
     try:
         if args.action == "inspect":
