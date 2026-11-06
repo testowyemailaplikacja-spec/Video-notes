@@ -1,0 +1,150 @@
+{
+  "schema": "videonotes-progress-v1",
+  "updated_date": "2026-11-06",
+  "owner_repo": "testowyemailaplikacja-spec/Video-notes",
+  "integration_policy": "Develop KWN/Video-notes only. Constant_app and Netlify get only later, independently accepted larger batches.",
+  "develop_after_pr4": "1d9022450f0792631161090f22ecb95835c88f84",
+  "main_unchanged": "4da53b3bff580e07a16218e5f7017cecf8ff7aed",
+  "historical_note": "Historical KWN 189 criteria / 22 phases tracked in Constant_app are a separate ledger and are not carried over as DONE.",
+  "totals": {
+    "stages": 9,
+    "DONE": 0,
+    "W_TRAKCIE": 4,
+    "PLANOWANE": 5
+  },
+  "phases": [
+    {
+      "id": "VN-00",
+      "status": "W_TRAKCIE",
+      "evidence": [
+        "PR #1: offline FFmpeg + whisper.cpp adapter",
+        "PR #3: WER/CER text-only harness"
+      ],
+      "blockers": [
+        "Real local PL/EN ASR benchmarks on legal OBS clips",
+        "Time/RAM measurements of whisper.cpp and faster-whisper",
+        "Model and license decision",
+        "Physical Windows offline test"
+      ]
+    },
+    {
+      "id": "VN-01",
+      "status": "W_TRAKCIE",
+      "evidence": [
+        "PR #1: OBS import, CLI, checkpoints, resume and exports",
+        "PR #4: local portable project backup and integrity-checked relink"
+      ],
+      "blockers": [
+        "Real Whisper model end-to-end transcript of MP4/MKV",
+        "2h recording memory/performance",
+        "Windows offline end-to-end and interruption testing",
+        "Complete installer"
+      ]
+    },
+    {
+      "id": "VN-02",
+      "status": "W_TRAKCIE",
+      "evidence": [
+        "PR #3: verbatim source-linked basic notes, independent edits and Markdown, CLI/GUI"
+      ],
+      "blockers": [
+        "Human assessment on real lectures",
+        "Topic/summary generation beyond extractive snippets",
+        "Regenerate/undo with versioned manual edits",
+        "Export DOCX/PDF if approved"
+      ]
+    },
+    {
+      "id": "VN-03",
+      "status": "PLANOWANE",
+      "evidence": [],
+      "blockers": [
+        "Source-linked multi-level notes",
+        "Long-document synthesis",
+        "Separate slide/OCR acceptance"
+      ]
+    },
+    {
+      "id": "VN-04",
+      "status": "PLANOWANE",
+      "evidence": [],
+      "blockers": [
+        "Physical microphone permission, capture, pause/resume",
+        "Windows device and crash recovery tests"
+      ]
+    },
+    {
+      "id": "VN-05",
+      "status": "PLANOWANE",
+      "evidence": [],
+      "blockers": [
+        "Audio file formats and Windows loopback",
+        "Consent and multiple-device controls"
+      ]
+    },
+    {
+      "id": "VN-06",
+      "status": "W_TRAKCIE",
+      "evidence": [
+        "PR #4: project-only backup/restore with archive SHA-256 and path redaction"
+      ],
+      "blockers": [
+        "Installer .exe/.msi with model/runtime",
+        "Windows installation offline, antivirus, licensing and SBOM",
+        "Recovery and long-run performance",
+        "Signed release policy"
+      ]
+    },
+    {
+      "id": "VN-07",
+      "status": "PLANOWANE",
+      "evidence": [],
+      "blockers": [
+        "Functional web adapter",
+        "Wiedora isolated integration tests",
+        "Separate batched authorization and Netlify publication"
+      ]
+    },
+    {
+      "id": "VN-08",
+      "status": "PLANOWANE",
+      "evidence": [],
+      "blockers": [
+        "Mobile compatibility and optional future scope"
+      ]
+    }
+  ],
+  "tests": [
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42247184304",
+      "scope": "VN-02+WER/CER code",
+      "linux": {
+        "pass": 37,
+        "fail": 0
+      },
+      "windows": {
+        "pass": 27,
+        "fail": 0
+      },
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42248878505",
+      "scope": "Portable project backup, all Linux tests and selected Windows tests",
+      "linux": {
+        "pass": 46,
+        "fail": 0
+      },
+      "windows": {
+        "pass": 36,
+        "fail": 0
+      },
+      "real_asr": false
+    }
+  ],
+  "notes": [
+    "CI is not physical Windows acceptance or actual speech model benchmarking.",
+    "No recorded user media, private transcripts or ASR model files were uploaded.",
+    "Do not change Constant_app/Netlify as part of VN-00..VN-06."
+  ]
+}
