@@ -99,3 +99,5 @@ Transkrypcję można uruchamiać również z plików WAV, MP3, M4A, FLAC, OGG i 
 ## Wersja wykonywalna Windows (test developerski)
 
 GitHub Actions buduje `VideoNotes-DEV.exe` i uruchamia testy podstawowego CLI na Windows. Artefakt jest oznaczony **DEV-NOT-OFFLINE**, nie zawiera FFmpeg ani modeli Whisper i nie jest jeszcze pełnym instalatorem. [Szczegóły i bramki wydania](docs/VN06_WINDOWS_DEV_BUILD.md).
+
+**Przetestowany artefakt Windows DEV:** [GitHub Actions #42296659497](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42296659497), wynik SUCCESS. Do pobrania jest tymczasowy ZIP z `VideoNotes-DEV.exe` i SHA-256, ale **bez modelu ASR i FFmpeg**; nie jest to wydanie stabilne.
