@@ -245,6 +245,7 @@ class VideoNotesWindow:
             if selected_system and selected_system == selected:
                 messagebox.showwarning("Dźwięk systemowy", "Wybierz dwa różne urządzenia.")
                 return
+            system_consent = bool(selected_system and system_agreed.get())
             target = folder / ("mic-" + uuid.uuid4().hex[:12])
             self.mic_stop.clear()
             self.active = True
@@ -257,7 +258,7 @@ class VideoNotesWindow:
                 try:
                     result = record_microphone(selected, target, consent=True, stop=self.mic_stop,
                                                system_device=selected_system or None,
-                                               system_consent=bool(selected_system and system_agreed.get()))
+                                               system_consent=system_consent)
                     self.events.put(("mic_complete", (target, result)))
                 except VideoNotesError as error:
                     self.events.put(("mic_failure", str(error)))
