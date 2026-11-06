@@ -10,6 +10,8 @@ from . import __version__
 from .errors import VideoNotesError
 from .exports import edit_segment, export_project
 from .media import probe
+from .notes import generate_basic_notes, edit_note_point, export_basic_notes
+from .quality import compare_text_files
 from .pipeline import create_project, transcribe_project
 from .storage import read_project
 
@@ -43,6 +45,20 @@ def parser() -> argparse.ArgumentParser:
     edit.add_argument("--text", required=True)
     status = sub.add_parser("status", help="Pokaż postęp i identyfikatory segmentów")
     status.add_argument("project", type=Path)
+    notes = sub.add_parser("notes", help="Utwórz źródłowe, ekstrakcyjne notatki podstawowe (VN-02)")
+    notes.add_argument("project", type=Path)
+    notes.add_argument("--window-minutes", type=int, default=5)
+    notes.add_argument("--points", type=int, default=6)
+    note_edit = sub.add_parser("notes-edit", help="Popraw punkt notatki bez modyfikacji cytatu źródłowego")
+    note_edit.add_argument("project", type=Path)
+    note_edit.add_argument("--point", required=True)
+    note_edit.add_argument("--text", required=True)
+    note_export = sub.add_parser("notes-export", help="Zapisz lokalny notes-basic.md")
+    note_export.add_argument("project", type=Path)
+    benchmark = sub.add_parser("benchmark", help="Porównaj WER/CER gotowych plików TXT, bez nagrywania lub wysyłki danych")
+    benchmark.add_argument("--reference", required=True, type=Path)
+    benchmark.add_argument("--candidate", required=True, action="append", help="etykieta=plik.txt; wymaga prawdziwych wyników ASR")
+    benchmark.add_argument("--output", type=Path)
     sub.add_parser("gui", help="Uruchom prosty interfejs Windows/Tkinter")
     return cmd
 
@@ -79,6 +95,25 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"project_id": project["id"], "completed_chunks": len(transcript["completed_chunks"]),
                               "total_chunks": total, "segment_count": len(transcript["segments"]),
                               "edited_segments": len(edits["edits"]), "segments": transcript["segments"]}, ensure_ascii=False, indent=2))
+        elif args.action == "notes":
+            note = generate_basic_notes(args.project, window_minutes=args.window_minutes, points_per_section=args.points)
+            result = export_basic_notes(args.project)
+            print(f"Utworzono {len(note['sections'])} sekcji z cytatami: {result}")
+        elif args.action == "notes-edit":
+            edit_note_point(args.project, args.point, args.text)
+            print(f"Zaktualizowano {export_basic_notes(args.project)}")
+        elif args.action == "notes-export":
+            print(export_basic_notes(args.project))
+        elif args.action == "benchmark":
+            candidates = {}
+            for item in args.candidate:
+                if "=" not in item:
+                    raise VideoNotesError("Użyj --candidate etykieta=plik.txt")
+                label, filename = item.split("=", 1)
+                if not filename or label in candidates:
+                    raise VideoNotesError("Pusta ścieżka lub powielona etykieta benchmarku.")
+                candidates[label] = Path(filename)
+            print(json.dumps(compare_text_files(args.reference, candidates, output=args.output), ensure_ascii=False, indent=2))
         elif args.action == "gui":
             from .gui import launch
             launch()
