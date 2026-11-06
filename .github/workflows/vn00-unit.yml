@@ -20,10 +20,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Install local FFmpeg tooling
+      - name: Verify local FFmpeg tooling (bounded install only if absent)
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y ffmpeg
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            timeout 120s sudo apt-get update -qq
+            timeout 120s sudo apt-get install -y ffmpeg
+          fi
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
       - name: Run all tests
         run: |
           python -m compileall -q videonotes tests
