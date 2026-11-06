@@ -19,3 +19,7 @@ python -m PyInstaller --clean --noconfirm --onefile --console --name VideoNotes-
 Do ukończenia VN-06 nadal potrzebne są: instalacja bez Pythona i internetu na czystym Windows, redystrybucja dozwolonego prawnie modelu i FFmpeg, kompletne uruchomienie ASR/GUI, testy dużych plików OBS, testy prywatności, licencje, SBOM, odzyskiwanie po błędach i ewentualnie podpis cyfrowy. **Żaden publiczny release ani zmiana Netlify nie są uruchamiane w tym workflow.**
 
 Testy samego wykonywalnego narzędzia nie zastępują odbioru urządzenia użytkownika; do czasu prawdziwych testów sprzętowych VN-06 pozostaje W TRAKCIE.
+
+## Dowód działania z CI (06.11.2026)
+
+[GitHub Actions #42296659497](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42296659497) zakończony **SUCCESS**. Rzeczywiście zbudowano i uruchomiono testowy plik EXE na runnerze Windows, zaliczając testy CLI. Wygenerowano artefakt `VideoNotes-Windows-DEV-NOT-OFFLINE` o rozmiarze około 11,7 MB (ZIP zawiera EXE, jego SHA-256 i README). Artefakt jest tymczasowy, dostępny w GitHub Actions do 13 listopada 2026 r. Nie jest to podpisany ani kompletny instalator offline; model i FFmpeg nadal nie są w nim dołączone.
