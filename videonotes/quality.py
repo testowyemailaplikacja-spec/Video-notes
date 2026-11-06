@@ -24,16 +24,38 @@ def _tokens(value: str) -> list[str]:
 
 
 def _distance(a: Sequence[str], b: Sequence[str]) -> int:
+    """Exact Levenshtein distance using Myers bit-vector algorithm.
+
+    Python integers hold arbitrary bitsets, so both 5-minute transcripts and
+    their character-level comparisons remain feasible without quadratic RAM.
+    """
+    if not a:
+        return len(b)
+    if not b:
+        return len(a)
     if len(b) > len(a):
         a, b = b, a
-    previous = list(range(len(b) + 1))
-    for i, left in enumerate(a, 1):
-        current = [i]
-        for j, right in enumerate(b, 1):
-            current.append(min(current[-1] + 1, previous[j] + 1, previous[j - 1] + (left != right)))
-        previous = current
-    return previous[-1]
-
+    patterns: dict[str, int] = {}
+    for index, token in enumerate(b):
+        patterns[token] = patterns.get(token, 0) | (1 << index)
+    positive, negative = ~0, 0
+    score = len(b)
+    highest = 1 << (len(b) - 1)
+    for token in a:
+        equal = patterns.get(token, 0)
+        possible = equal | negative
+        horizontal = (((equal & positive) + positive) ^ positive) | equal
+        plus = negative | ~(horizontal | positive)
+        minus = positive & horizontal
+        if plus & highest:
+            score += 1
+        if minus & highest:
+            score -= 1
+        plus = (plus << 1) | 1
+        minus <<= 1
+        positive = minus | ~(possible | plus)
+        negative = plus & possible
+    return score
 
 def error_rates(reference: str, candidate: str) -> dict:
     """WER and CER excluding whitespace and punctuation, Unicode NFC."""
