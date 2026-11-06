@@ -38,6 +38,7 @@ class VideoNotesWindow:
         self.mic_controls: dict = {}
         self._rows: dict[str, dict] = {}
         self._build()
+        self.root.protocol("WM_DELETE_WINDOW", self._on_app_close)
         self.root.after(100, self._drain)
 
     def _build(self) -> None:
@@ -92,6 +93,20 @@ class VideoNotesWindow:
         self.edit_text.pack(fill="both", expand=True)
         ttk.Button(right, text="Zapisz poprawkę i eksport", command=self._save_edit).pack(anchor="e", pady=6)
         ttk.Label(right, text="Oryginalny wynik ASR pozostaje nietknięty.", wraplength=245).pack(anchor="w")
+
+    def _on_app_close(self) -> None:
+        """Do not orphan a live FFmpeg subprocess when the GUI closes."""
+        if self.active:
+            if self.mic_controls and self.mic_controls["window"].winfo_exists():
+                self.mic_stop.set()
+                messagebox.showwarning("Video Notes",
+                    "Polecono zatrzymanie mikrofonu. Zamknij program dopiero po zapisaniu nagrania.")
+            else:
+                self.cancel.set()
+                messagebox.showwarning("Video Notes",
+                    "Polecono przerwanie transkrypcji. Zaczekaj na zapis ostatniego ukończonego fragmentu.")
+            return
+        self.root.destroy()
 
     def _line(self, parent: ttk.LabelFrame, title: str, value: tk.StringVar, callback) -> None:
         row = ttk.Frame(parent)
