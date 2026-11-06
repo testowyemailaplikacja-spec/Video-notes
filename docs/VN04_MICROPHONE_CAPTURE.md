@@ -2,6 +2,16 @@
 
 Data: 2026-11-06. W tym repo, bez zmian w Wiedora/Constant_app i Netlify.
 
+## Interfejs programu i wykrywanie urządzeń
+
+W GUI wybierz przycisk „Nagraj mikrofon — nowa sesja WAV (Windows)”, kliknij „Wykryj”, wskaż urządzenie i katalog bazowy, a następnie potwierdź rozpoczęcie. Program tworzy unikalny podkatalog i nagrywa poza głównym wątkiem GUI. „Zatrzymaj” zamyka plik WAV; panel pokazuje status i liczbę części. Po zakończeniu pierwszy WAV jest gotowy do wyboru jako źródło transkrypcji. UI nie wystartuje równolegle z przetwarzaniem innego projektu.
+
+W trybie CLI lista urządzeń jest dostępna bez rozpoczęcia nagrywania:
+
+    python -m videonotes record-devices
+
+Lista jest odczytywana lokalnie z FFmpeg/DirectShow; przed udostępnieniem urządzeń Windows musi pozwalać na dostęp do mikrofonu. Nazwa urządzenia może się zmienić po aktualizacji sterownika lub odłączeniu. Automatyczne testy korzystają z atrap danych, a nie z realnych urządzeń.
+
 ## Pierwsze uruchomienie
 
 Program wymaga FFmpeg z obsługą DirectShow dostępnego lokalnie oraz urządzenia mikrofonowego ze zgodą nadaną w Windows. Najpierw sprawdź nazwę urządzenia w ustawieniach systemu lub narzędziach FFmpeg. Uruchomienie:
@@ -24,6 +34,6 @@ Stan needs_review oznacza awarię procesu lub pliku. Nie wolno go bez sprawdzeni
 
 ## Otwarte bramki
 
-Jest to pierwsza implementacja backendu mikrofonu i dziennika nagrania, nie odebrana obsługa Windows. Konieczne: test prawdziwego mikrofonu z uprawnieniami systemowymi, rozłączaniem urządzeń, 2-godzinnym nagraniem, wyczerpaniem miejsca, wznowieniem po restarcie, UX GUI z wyborem urządzenia i start/stop, podglądem stanu i akceptacją użytkownika. Nie ma jeszcze nagrywania dźwięku systemowego ani miksowania mikrofonu z dźwiękiem komputera. Program FFmpeg oraz model ASR nie są spakowane w instalatorze.
+Jest to pierwsza implementacja backendu mikrofonu i dziennika nagrania, nie odebrana obsługa Windows. Konieczne: test prawdziwego mikrofonu z uprawnieniami systemowymi, rozłączaniem urządzeń, 2-godzinnym nagraniem, wyczerpaniem miejsca, wznowieniem po restarcie, fizyczny odbiór interfejsu Windows, prawdziwy wybór urządzenia i stabilność GUI przy długich nagraniach. Nie ma jeszcze nagrywania dźwięku systemowego ani miksowania mikrofonu z dźwiękiem komputera. Program FFmpeg oraz model ASR nie są spakowane w instalatorze.
 
 Do automatycznych testów dołączono testy atrap procesu: tests/test_microphone.py. Atrapa NIE potwierdza dostępu do fizycznego urządzenia.
