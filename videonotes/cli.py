@@ -111,6 +111,8 @@ def parser() -> argparse.ArgumentParser:
     mic.add_argument("--device", required=True, help="Dokładna nazwa urządzenia DirectShow")
     mic.add_argument("--output", required=True, type=Path, help="Nowy katalog nagrania; istniejące są chronione")
     mic.add_argument("--consent", required=True, action="store_true", help="Potwierdź świadome włączenie mikrofonu")
+    mic.add_argument("--system-device", help="Opcjonalne urządzenie dźwięku systemowego/loopback DirectShow")
+    mic.add_argument("--consent-system", action="store_true", help="Osobna zgoda na nagrywanie dźwięku systemowego")
     mic.add_argument("--max-minutes", type=int, help="Opcjonalny limit 1–1440 minut")
     mic.add_argument("--ffmpeg", default="ffmpeg")
     mic_status = sub.add_parser("record-status", help="Sprawdź lokalne pliki nagrania i dziennik sesji")
@@ -220,7 +222,8 @@ def main(argv: list[str] | None = None) -> int:
             if args.max_minutes is not None and not 1 <= args.max_minutes <= 1440:
                 raise VideoNotesError("Limit nagrywania musi wynosić 1–1440 minut.")
             result = record_microphone(args.device, args.output, consent=args.consent,
-                                       ffmpeg=args.ffmpeg, max_seconds=args.max_minutes * 60 if args.max_minutes is not None else None)
+                                       ffmpeg=args.ffmpeg, max_seconds=args.max_minutes * 60 if args.max_minutes is not None else None,
+                                       system_device=args.system_device, system_consent=args.consent_system)
             print(json.dumps(result, ensure_ascii=False, indent=2))
         elif args.action == "record-status":
             print(json.dumps(recording_status(args.folder), ensure_ascii=False, indent=2))
