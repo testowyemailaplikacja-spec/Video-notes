@@ -12,7 +12,8 @@
   function reject(message) { throw new Error(message); }
   function plainObject(value) {
     return value !== null && typeof value === "object" &&
-      !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype;
+      !Array.isArray(value) && (Object.getPrototypeOf(value) === Object.prototype ||
+      Object.getPrototypeOf(value) === null);
   }
   function validText(value, size) {
     return typeof value === "string" && value.length <= size && !value.includes("\u0000");
