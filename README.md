@@ -68,6 +68,10 @@ python -m videonotes benchmark --reference prawdziwy_tekst.txt --candidate whisp
 
 Program porównuje lokalne pliki TXT, wylicza WER/CER i zapisuje **wyłącznie skróty SHA-256 i liczby**, bez tekstów nagrań. **Nie uruchamia** żadnego silnika ASR, nie dowodzi jego jakości, nie mierzy RAM/czasu i nie wysyła plików. Aby zamknąć VN-00, należy wykonać prawdziwy, kontrolowany eksperyment obu silników. Instrukcja: [ASR_QUALITY_BENCHMARK.md](docs/ASR_QUALITY_BENCHMARK.md).
 
+## Stan potwierdzony po najnowszych integracjach (06.11.2026)
+
+Kod **PR #3 i #4** jest w `develop`; `main` pozostaje bez zmian. Testy [CI #42248878505](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42248878505): **46/46 PASS Linux, 36/36 PASS Windows** (Windows obejmuje kontrakty, notatki i archiwum, nie całe urządzenie i ASR). Nie wykonano jeszcze pełnego benchmarku prawdziwego modelu Whisper ani testu kompletnego instalatora Windows. **Żaden etap nie jest formalnie DONE.** Status 9 etapów: [VN_STATUS.json](docs/VN_STATUS.json) — 4 W TRAKCIE, 5 PLANOWANE. Nie przenosimy tego postępu automatycznie do historycznego rejestru 189 kryteriów w głównym repo Wiedory.
+
 ## Przenośna kopia projektu (VN-01/VN-06, wersja rozwojowa)
 
 ```bash
