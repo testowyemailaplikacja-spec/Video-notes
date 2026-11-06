@@ -88,10 +88,26 @@ def transcribe_project(folder: Path, *, ffmpeg: str = "ffmpeg", ffprobe: str = "
                 raise VideoNotesError("Przerwano na żądanie. Zakończone fragmenty zapisano; użyj resume.")
             start = chunk * chunk_ms
             size = min(chunk_ms, project["source"]["duration_ms"] - start)
+            padding_warning = None
             with tempfile.TemporaryDirectory(prefix=".vn-chunk-", dir=folder) as temporary:
                 wav = Path(temporary) / "audio.wav"
-                extract_chunk(source, project["source"]["stream_index"], start_ms=start, duration_ms=size, destination=wav, ffmpeg=ffmpeg)
-                recognized = engine.transcribe(wav, language=processing["language"], offset_ms=start, duration_ms=size)
+                try:
+                    extract_chunk(source, project["source"]["stream_index"], start_ms=start, duration_ms=size, destination=wav, ffmpeg=ffmpeg)
+                except VideoNotesError as error:
+                    # Some compressed codecs report the encoder padding as media
+                    # duration even though there are no decodable PCM frames.
+                    # Only the tiny FINAL tail may be checkpointed, and it must
+                    # remain explicitly visible for later manual review.
+                    if (chunk == total - 1 and size <= 250 and
+                        source.suffix.lower() in {".mp3", ".m4a", ".ogg", ".opus", ".aac"} and
+                        str(error).startswith("Fragment audio jest pusty")):
+                        recognized = []
+                        padding_warning = {"kind": "undecodable_final_padding",
+                                           "start_ms": start, "duration_ms": size}
+                    else:
+                        raise
+                else:
+                    recognized = engine.transcribe(wav, language=processing["language"], offset_ms=start, duration_ms=size)
             if not isinstance(recognized, list):
                 raise VideoNotesError("Silnik ASR zwrócił nieprawidłowe segmenty.")
             new_segments = []
@@ -101,9 +117,14 @@ def transcribe_project(folder: Path, *, ffmpeg: str = "ffmpeg", ffprobe: str = "
                 new_segments.append({"id": f"c{chunk:07d}-s{index:05d}", "chunk_index": chunk,
                                      "start_ms": seg.get("start_ms"), "end_ms": seg.get("end_ms"),
                                      "text": seg.get("text"), "status": "raw"})
+            warnings = list(transcript.get("warnings", []))
+            if padding_warning is not None:
+                warnings.append(padding_warning)
             candidate = {"schema": transcript["schema"], "project_id": transcript["project_id"],
                          "completed_chunks": transcript["completed_chunks"] + [chunk],
                          "segments": transcript["segments"] + new_segments}
+            if warnings:
+                candidate["warnings"] = warnings
             validate_transcript(candidate, project)
             save_json(folder / "transcript.json", candidate)
             transcript = candidate
