@@ -126,11 +126,16 @@ def run_real_benchmark(source: Path, reference: Path, *, cpp_executable: str,
         ]
         stats = {}
         for label, command, expected in commands:
-            measurements = process_runner(command)
+            # Identify the failing engine without ever including stderr/stdout,
+            # user transcripts or absolute local paths in public log messages.
+            try:
+                measurements = process_runner(command)
+            except VideoNotesError as error:
+                raise VideoNotesError(f"Lokalny silnik {label} nie ukończył benchmarku.") from error
             if not isinstance(measurements, dict) or not isinstance(measurements.get("wall_seconds"), (int, float)):
-                raise VideoNotesError("Nieprawidłowe metryki procesu benchmarku.")
+                raise VideoNotesError(f"Nieprawidłowe metryki procesu {label}.")
             if not expected.is_file():
-                raise VideoNotesError("Silnik ASR nie zapisał wynikowej transkrypcji TXT.")
+                raise VideoNotesError(f"Silnik {label} nie zapisał wynikowej transkrypcji TXT.")
             stats[label] = measurements
         comparison = compare_text_files(reference, {label: file for label, _, file in commands})
     report = {
