@@ -5,10 +5,12 @@ and does not assert redistribution rights or successful hardware ASR.
 """
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import os
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 
@@ -125,6 +127,41 @@ def verify_internal_bundle(folder: Path) -> dict:
             "license_verified": False, "signature_verified": False, "hardware_tested": False}
 
 
+def _publish_bundle_no_replace(staging: Path, output: Path) -> None:
+    """Atomically publish a complete directory, never replacing another writer.
+
+    Windows rename fails if the destination already exists. Linux requires
+    renameat2(RENAME_NOREPLACE): a plain os.rename can *replace an empty folder*
+    created after a prior existence check. Unsupported platforms fail closed.
+    """
+    if os.name == "nt":
+        try:
+            os.rename(staging, output)
+        except FileExistsError as error:
+            raise VideoNotesError("Katalog docelowy powstał równolegle; nie nadpisuję go.") from error
+        return
+    if sys.platform.startswith("linux"):
+        import ctypes
+
+        libc = ctypes.CDLL(None, use_errno=True)
+        operation = getattr(libc, "renameat2", None)
+        if operation is None:
+            raise VideoNotesError("System nie obsługuje atomowej publikacji katalogu bez nadpisywania.")
+        operation.argtypes = [ctypes.c_int, ctypes.c_char_p,
+                              ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+        operation.restype = ctypes.c_int
+        at_fdcwd = -100
+        rename_noreplace = 1
+        if operation(at_fdcwd, os.fsencode(staging),
+                     at_fdcwd, os.fsencode(output), rename_noreplace) == 0:
+            return
+        code = ctypes.get_errno()
+        if code in {errno.EEXIST, errno.ENOTEMPTY}:
+            raise VideoNotesError("Katalog docelowy powstał równolegle; nie nadpisuję go.")
+        raise VideoNotesError("Nie można bezpiecznie opublikować pakietu bez nadpisywania.") from OSError(code, os.strerror(code))
+    raise VideoNotesError("Bezpieczna publikacja katalogu jest dostępna tylko na Windows i Linux.")
+
+
 def create_internal_bundle(*, app: Path, ffmpeg: Path, ffprobe: Path, whisper: Path,
                            model: Path, output: Path, internal_only: bool = False) -> dict:
     """Build a fully LOCAL directory layout without overwriting prior output.
@@ -176,9 +213,9 @@ def create_internal_bundle(*, app: Path, ffmpeg: Path, ffprobe: Path, whisper: P
             encoding="utf-8",
         )
         verify_internal_bundle(staging)
-        if output.exists():
-            raise VideoNotesError("Katalog docelowy powstał równolegle. Pakiet nie zostanie nadpisany.")
-        os.rename(staging, output)
+        # The final existence check alone is racy on POSIX. Publish with a
+        # no-replace operation even when a competing writer wins at the last instant.
+        _publish_bundle_no_replace(staging, output)
         return {"output": str(output), "schema": SCHEMA, "file_count": len(checksums),
                 "distribution": "internal-only", "license_verified": False,
                 "hardware_tested": False}
