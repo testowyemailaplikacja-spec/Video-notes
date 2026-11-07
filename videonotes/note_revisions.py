@@ -17,6 +17,7 @@ from pathlib import Path
 from .contracts import MAX_TEXT_LENGTH
 from .errors import VideoNotesError
 from .notes import EDITS_SCHEMA, SCHEMA, _hash, _select, _source
+from .pipeline import _process_state
 from .storage import load_json, read_project, save_json
 
 VERSION_SCHEMA = "videonotes-note-revision-v1"
@@ -25,6 +26,64 @@ ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
 HASH_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 TRANSACTION_SCHEMA = "videonotes-note-transaction-v1"
 TRANSACTION_FILE = ".notes-transaction.json"
+LOCK_PATTERN = re.compile(rb"pid=([1-9][0-9]{0,9})\r?\n")
+
+
+def _write_notes_lock_pid(descriptor: int) -> None:
+    """Make a newly acquired lock independently inspectable after a crash."""
+    with os.fdopen(descriptor, "w", encoding="ascii") as writer:
+        writer.write(f"pid={os.getpid()}\n")
+        writer.flush()
+        os.fsync(writer.fileno())
+
+
+def notes_lock_status(folder: Path) -> dict:
+    """Inspect local notes lock without signalling or terminating any process."""
+    lock = Path(folder) / ".notes.lock"
+    if not lock.exists() and not lock.is_symlink():
+        return {"state": "missing"}
+    if lock.is_symlink() or not lock.is_file():
+        return {"state": "invalid"}
+    try:
+        if lock.stat().st_size > 80:
+            return {"state": "invalid"}
+        match = LOCK_PATTERN.fullmatch(lock.read_bytes())
+    except OSError:
+        return {"state": "unknown"}
+    if match is None:
+        return {"state": "invalid"}
+    pid = int(match.group(1))
+    return {"state": _process_state(pid), "pid": pid}
+
+
+def recover_stale_notes_lock(folder: Path, *, confirm: bool = False) -> dict:
+    """Explicitly remove only a verified dead-process lock, not the journal."""
+    if confirm is not True:
+        raise VideoNotesError("Odzyskanie blokady notatek wymaga jawnego --confirm.")
+    folder = Path(folder).expanduser().resolve()
+    read_project(folder)
+    lock = folder / ".notes.lock"
+    try:
+        before = lock.lstat()
+        payload = lock.read_bytes()
+    except OSError as error:
+        raise VideoNotesError("Nie znaleziono blokady notatek.") from error
+    status = notes_lock_status(folder)
+    if status["state"] != "stale":
+        raise VideoNotesError("Blokada notatek nie pochodzi z potwierdzonego martwego procesu.")
+    try:
+        after = lock.lstat()
+        if (before.st_ino != after.st_ino or before.st_dev != after.st_dev or
+                before.st_mtime_ns != after.st_mtime_ns or before.st_size != after.st_size or
+                payload != lock.read_bytes()):
+            raise VideoNotesError("Blokada notatek zmieniła się podczas kontroli.")
+    except OSError as error:
+        raise VideoNotesError("Nie można zweryfikować blokady notatek.") from error
+    if notes_lock_status(folder) != status:
+        raise VideoNotesError("Stan procesu zmienił się; nie usuwam blokady notatek.")
+    lock.unlink()
+    return {"recovered": True, "previous_pid": status["pid"]}
+
 
 
 def _valid_pair(notes: object, changes: object, project_id: str) -> dict[str, str]:
@@ -232,7 +291,7 @@ def recover_interrupted_note_update(folder: Path, *, confirm: bool = False) -> d
             "Blokada notatek jest aktywna lub pozostała po awarii. Sprawdź proces przed jej ręcznym usunięciem."
         ) from error
     try:
-        os.close(descriptor)
+        _write_notes_lock_pid(descriptor)
         intent = load_json(path)
         required = {"schema", "project_id", "snapshot_revision",
                     "old_notes_sha256", "old_edits_sha256",
@@ -300,7 +359,7 @@ def regenerate_basic_notes(folder: Path, *, window_minutes: int = 5, points_per_
     except FileExistsError as error:
         raise VideoNotesError("Trwa inna operacja na notatkach.") from error
     try:
-        os.close(descriptor)
+        _write_notes_lock_pid(descriptor)
         # Once the guard is held, verify files did not change since reading them.
         if load_json(folder / "notes.json") != old_notes or load_json(folder / "notes-edits.json") != old_edits:
             raise VideoNotesError("Notatki zmieniono równocześnie. Spróbuj ponownie.")
@@ -339,7 +398,7 @@ def restore_note_version(folder: Path, revision: str) -> str:
     except FileExistsError as error:
         raise VideoNotesError("Trwa inna operacja na notatkach.") from error
     try:
-        os.close(descriptor)
+        _write_notes_lock_pid(descriptor)
         if load_json(folder / "notes.json") != old_notes or load_json(folder / "notes-edits.json") != old_edits:
             raise VideoNotesError("Notatki zmieniono równocześnie.")
         _transaction_guard(folder)
