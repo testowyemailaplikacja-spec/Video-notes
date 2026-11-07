@@ -14,6 +14,7 @@ from tests.test_notes import fixture
 from videonotes.backup import create_backup, restore_backup, relink_backup
 from videonotes.errors import VideoNotesError
 from videonotes.notes import generate_basic_notes, edit_note_point, read_basic_notes
+from videonotes.note_revisions import list_note_versions, regenerate_basic_notes, restore_note_version
 from videonotes.storage import read_project, save_json
 
 
@@ -177,6 +178,72 @@ class BackupTest(unittest.TestCase):
                     create_backup(project, target)
             self.assertFalse(target.exists())
             self.assertEqual(list(root.glob(".vn-backup-*")), [])
+
+
+    def test_backup_roundtrip_preserves_undo_history_and_manual_edits(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            project = root / "project"
+            fixture(project)
+            generated = generate_basic_notes(project, window_minutes=1, points_per_section=2)
+            point = generated["sections"][0]["points"][0]["id"]
+            edit_note_point(project, point, "Ważna własna poprawka")
+            revision = regenerate_basic_notes(project, window_minutes=2, points_per_section=2)
+            self.assertTrue(revision["changed"])
+            archive = create_backup(project, root / "history.vnproj")
+            with zipfile.ZipFile(archive) as z:
+                self.assertIn("notes-history/" + revision["revision"] + ".json", z.namelist())
+            restored = restore_backup(archive, root / "restored")
+            versions = list_note_versions(restored)
+            self.assertEqual(len(versions), 1)
+            self.assertEqual(versions[0]["revision"], revision["revision"])
+            restore_note_version(restored, revision["revision"])
+            notes, changes = read_basic_notes(restored)
+            self.assertEqual(len(notes["sections"]), 2)
+            self.assertEqual(changes["edits"][point], "Ważna własna poprawka")
+
+    def test_corrupt_history_rejected_even_when_outer_manifest_is_recomputed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            project = root / "project"
+            fixture(project)
+            generate_basic_notes(project)
+            result = regenerate_basic_notes(project, window_minutes=2)
+            clean = create_backup(project, root / "clean.vnproj")
+            with zipfile.ZipFile(clean) as z:
+                content = {name: z.read(name) for name in z.namelist()}
+            key = "notes-history/" + result["revision"] + ".json"
+            revision = json.loads(content[key])
+            revision["notes"]["title"] = "Fałszywe dane"
+            content[key] = (json.dumps(revision, ensure_ascii=False) + "\n").encode("utf-8")
+            manifest = json.loads(content["archive-manifest.json"])
+            manifest["files"][key]["sha256"] = hashlib.sha256(content[key]).hexdigest()
+            manifest["files"][key]["size"] = len(content[key])
+            content["archive-manifest.json"] = (json.dumps(manifest) + "\n").encode("utf-8")
+            corrupted = root / "corrupted.vnproj"
+            with zipfile.ZipFile(corrupted, "w") as z:
+                for name, body in content.items():
+                    z.writestr(name, body)
+            with self.assertRaisesRegex(VideoNotesError, "SHA-256"):
+                restore_backup(corrupted, root / "target")
+            self.assertFalse((root / "target").exists())
+
+    def test_unknown_nested_history_paths_fail_before_restore(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            project = root / "project"
+            fixture(project)
+            archive = create_backup(project, root / "clean.vnproj")
+            with zipfile.ZipFile(archive) as z:
+                data = {name: z.read(name) for name in z.namelist()}
+            evil = root / "path.vnproj"
+            with zipfile.ZipFile(evil, "w") as z:
+                for name, body in data.items():
+                    z.writestr(name, body)
+                z.writestr("notes-history/../../escape.json", "bad")
+            with self.assertRaises(VideoNotesError):
+                restore_backup(evil, root / "target")
+            self.assertFalse((root / "target").exists())
 
 
 if __name__ == "__main__":

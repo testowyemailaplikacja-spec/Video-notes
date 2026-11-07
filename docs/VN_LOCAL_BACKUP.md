@@ -20,7 +20,7 @@ Potem można użyć `resume`. Bez ponownego podłączenia źródła i modelu arc
 
 ## Co zawiera plik
 
-Archiwum ZIP ma sztywną, zamkniętą listę wpisów: `project.json`, `transcript.json`, `edits.json`, opcjonalne `notes.json` i `notes-edits.json`, oraz `archive-manifest.json` z hashami SHA-256 i rozmiarami. Metadane komputera w `project.json` (bezwzględna ścieżka nagrania, modelu i programu) są redagowane. Zapis jest atomowy, nie nadpisuje poprzedniej kopii.
+Archiwum ZIP ma sztywną, zamkniętą listę wpisów: `project.json`, `transcript.json`, `edits.json`, opcjonalne `notes.json` i `notes-edits.json`, opcjonalną historię `notes-history/<identyfikator>.json` oraz `archive-manifest.json` z hashami SHA-256 i rozmiarami. Metadane komputera w `project.json` (bezwzględna ścieżka nagrania, modelu i programu) są redagowane. Zapis jest atomowy, nie nadpisuje poprzedniej kopii.
 
 Ważne: **w kopii znajdują się teksty transkrypcji i notatek**, które mogą zawierać dane osobowe. Traktuj ją jak prywatny plik, najlepiej przechowuj na zaszyfrowanym dysku. Program nie wysyła kopii do chmury.
 
@@ -28,7 +28,7 @@ Ważne: **w kopii znajdują się teksty transkrypcji i notatek**, które mogą z
 
 ## Kontrole bezpieczeństwa
 
-- Odczyt tylko znanych nazw plików. Wpisy `../`, podkatalogi, pliki obce, duplikaty i symlinki są niedozwolone.
+- Odczyt tylko znanych nazw plików. Wpisy `../`, nieznane podkatalogi, pliki obce, duplikaty i symlinki są niedozwolone. Wyjątkiem są wyłącznie snapshoty `notes-history/[32 znaki hex].json`, sprawdzane dodatkowo względem sum i schematów wersji.
 - Limit 64 MiB na wpis ZIP, 128 MiB sumarycznie i jawna weryfikacja SHA-256 każdej zawartości po dekompresji.
 - Schemat `project.json` i `transcript.json` jest walidowany, a cytaty notatek są weryfikowane względem źródła. Uszkodzone archiwum nie tworzy częściowo ukończonego katalogu.
 - Przywracanie wymaga nieistniejącego katalogu i zapisuje cały projekt atomowo. Nie nadpisuje istniejących projektów, eksportów ani cudzych danych.
@@ -41,3 +41,9 @@ Do zamknięcia etapów nadal wymagane są: testy uszkodzenia dysku/zasilania, ek
 ## Uzupełnienie bezpieczeństwa 07.11.2026
 
 Gotowa kopia jest publikowana atomowo z unikalnego pliku tymczasowego przy użyciu lokalnego dowiązania twardego, które **nie może nadpisać** pliku utworzonego równocześnie przez inny proces. Na systemie plików bez obsługi tej operacji program odmawia utworzenia archiwum, usuwa plik tymczasowy i prosi o inny dysk; nie zastępuje tego nieatomową kopią. Dodano regresję symulującą wyścig zapisu i brak obsługi systemu plików. Nie oznacza to przetestowania awarii zasilania ani fizycznych zewnętrznych nośników.
+
+## Historia cofania zmian (07.11.2026)
+
+Przenośna kopia obejmuje również do 1000 istniejących snapshotów notatek z `notes-history/`. Każdy wpis przechodzi walidację nazwy, sum SHA-256 własnej migawki, identyfikatora projektu i manifestu ZIP. Weryfikacja wykonywana jest ponownie przed zakończeniem odtwarzania. Archiwa utworzone wcześniej bez historii nadal są obsługiwane.
+
+Po przywróceniu można sprawdzić zachowane wersje i cofać je tylko wtedy, gdy ich odnośniki źródłowe pozostają zgodne z aktualną transkrypcją. Wersje historyczne mogą zawierać prywatne teksty, więc zaszyfrowane miejsce przechowywania jest nadal zalecane. Realny test uszkodzenia nośnika i odłączenia zasilania pozostaje NOT_RUN.

@@ -10,6 +10,7 @@ import copy
 import hashlib
 import json
 import os
+import re
 import stat
 import tempfile
 import zipfile
@@ -19,6 +20,7 @@ from .contracts import sha256_file, validate_edits, validate_project, validate_t
 from .errors import VideoNotesError
 from .media import probe
 from .notes import read_basic_notes
+from .note_revisions import ID_PATTERN, MAX_HISTORY, _load_snapshot, _valid_pair
 from .storage import atomic_write, read_project, save_json
 
 SCHEMA = "videonotes-portable-backup-v1"
@@ -26,6 +28,7 @@ MANIFEST = "archive-manifest.json"
 REQUIRED = ("project.json", "transcript.json", "edits.json")
 OPTIONAL = ("notes.json", "notes-edits.json")
 ALLOWED = frozenset(REQUIRED + OPTIONAL + (MANIFEST,))
+HISTORY_ENTRY = re.compile(r"notes-history/[0-9a-f]{32}\.json\Z")
 MAX_ITEM_BYTES = 64 * 1024 * 1024
 MAX_TOTAL_BYTES = 128 * 1024 * 1024
 
@@ -67,6 +70,23 @@ def create_backup(folder: Path, output: Path) -> Path:
     if has_notes:
         for name in OPTIONAL:
             files[name] = _read_source_json(folder, name)
+    # History is user data: an undo action must survive portable backup/restore.
+    history = folder / "notes-history"
+    if history.is_symlink() or (history.exists() and not history.is_dir()):
+        raise VideoNotesError("Historia notatek ma nieprawidłowy katalog.")
+    if history.is_dir():
+        if not has_notes:
+            raise VideoNotesError("Historia notatek bez bieżącej notatki nie może zostać zarchiwizowana.")
+        entries = list(history.iterdir())
+        if len(entries) > MAX_HISTORY:
+            raise VideoNotesError("Historia notatek przekracza dopuszczalny limit.")
+        for item in entries:
+            if (item.is_symlink() or not item.is_file() or item.suffix != ".json" or
+                    not ID_PATTERN.fullmatch(item.stem)):
+                raise VideoNotesError("Historia zawiera nieznany lub niebezpieczny plik.")
+            previous, changes = _load_snapshot(folder, item.stem)
+            _valid_pair(previous, changes, project["id"])
+            files["notes-history/" + item.name] = _read_source_json(history, item.name)
     if sum(map(len, files.values())) > MAX_TOTAL_BYTES:
         raise VideoNotesError("Projekt przekracza limit przenośnej kopii.")
     manifest = {
@@ -118,12 +138,16 @@ def _verified_entries(archive: Path) -> dict[str, bytes]:
         with zipfile.ZipFile(archive, "r") as z:
             members = z.infolist()
             names = [info.filename for info in members]
-            if len(names) > len(ALLOWED) or len(set(names)) != len(names):
+            if len(names) > len(ALLOWED) + MAX_HISTORY or len(set(names)) != len(names):
                 raise VideoNotesError("Archiwum zawiera nadmiarowe lub powtórzone pliki.")
-            if not set(REQUIRED + (MANIFEST,)).issubset(names) or not set(names).issubset(ALLOWED):
+            historical = [name for name in names if HISTORY_ENTRY.fullmatch(name)]
+            if (not set(REQUIRED + (MANIFEST,)).issubset(names) or
+                    any(name not in ALLOWED and not HISTORY_ENTRY.fullmatch(name) for name in names)):
                 raise VideoNotesError("Archiwum zawiera nieznane lub brakujące ścieżki.")
             if ("notes.json" in names) != ("notes-edits.json" in names):
                 raise VideoNotesError("Brakuje pliku poprawek notatki.")
+            if historical and "notes.json" not in names:
+                raise VideoNotesError("Historia notatek wymaga bieżącej notatki.")
             payloads: dict[str, bytes] = {}
             total = 0
             for item in members:
@@ -172,7 +196,11 @@ def restore_backup(archive: Path, destination: Path) -> Path:
         for name, body in files.items():
             atomic_write(temp / name, body)
         if "notes.json" in files:
-            read_basic_notes(temp)  # checks quote IDs and source hash
+            read_basic_notes(temp)  # checks current quote IDs and source hash
+        for name in files:
+            if HISTORY_ENTRY.fullmatch(name):
+                previous, changes = _load_snapshot(temp, Path(name).stem)
+                _valid_pair(previous, changes, project["id"])
         os.replace(temp, folder)
     finally:
         if temp.exists():
