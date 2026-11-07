@@ -59,6 +59,8 @@ def _fingerprint(value: object) -> str:
 
 def _write_snapshot(folder: Path, notes: dict, changes: dict) -> str:
     history = _history_folder(folder)
+    if history.is_symlink():
+        raise VideoNotesError("Historia notatek nie może być dowiązaniem symbolicznym.")
     history.mkdir(parents=True, exist_ok=True)
     if len(list(history.glob("*.json"))) >= MAX_HISTORY:
         raise VideoNotesError("Osiągnięto limit historii; przenieś kopie przed dalszą regeneracją.")
@@ -75,10 +77,13 @@ def _write_snapshot(folder: Path, notes: dict, changes: dict) -> str:
     return revision
 
 
-def _load_snapshot(folder: Path, revision: str) -> tuple[dict, dict]:
+def _load_snapshot(folder: Path, revision: str) -> tuple[dict, dict, str]:
     if not isinstance(revision, str) or not ID_PATTERN.fullmatch(revision):
         raise VideoNotesError("Nieprawidłowy identyfikator wersji.")
-    path = _history_folder(folder) / (revision + ".json")
+    history = _history_folder(folder)
+    if history.is_symlink():
+        raise VideoNotesError("Historia notatek nie może być dowiązaniem symbolicznym.")
+    path = history / (revision + ".json")
     if path.is_symlink():
         raise VideoNotesError("Historia zawiera niedozwolone dowiązanie.")
     item = load_json(path)
@@ -89,11 +94,20 @@ def _load_snapshot(folder: Path, revision: str) -> tuple[dict, dict]:
         raise VideoNotesError("Nieprawidłowa zawartość historii.")
     if item.get("notes_sha256") != _fingerprint(notes) or item.get("edits_sha256") != _fingerprint(edits):
         raise VideoNotesError("Kontrola SHA-256 wersji notatki nie powiodła się.")
-    return notes, edits
+    created_at = item.get("created_at")
+    try:
+        timestamp = datetime.fromisoformat(created_at) if isinstance(created_at, str) else None
+    except ValueError:
+        timestamp = None
+    if timestamp is None or timestamp.tzinfo is None:
+        raise VideoNotesError("Historia notatek ma niepoprawną datę wersji.")
+    return notes, edits, created_at
 
 
 def list_note_versions(folder: Path) -> list[dict]:
     history = _history_folder(Path(folder))
+    if history.is_symlink():
+        raise VideoNotesError("Historia notatek nie może być dowiązaniem symbolicznym.")
     if not history.exists():
         return []
     names = sorted(history.glob("*.json"))
@@ -101,10 +115,11 @@ def list_note_versions(folder: Path) -> list[dict]:
         raise VideoNotesError("Katalog historii przekracza limit.")
     items = []
     for path in names:
-        notes, edits = _load_snapshot(folder, path.stem)
+        notes, edits, created_at = _load_snapshot(folder, path.stem)
         items.append({"revision": path.stem, "project_id": notes["project_id"],
-                      "manual_edits": len(edits["edits"]), "source_sha256": notes.get("source_sha256")})
-    return items
+                      "created_at": created_at, "manual_edits": len(edits["edits"]),
+                      "source_sha256": notes.get("source_sha256")})
+    return sorted(items, key=lambda item: (datetime.fromisoformat(item["created_at"]), item["revision"]), reverse=True)
 
 
 def _checked_source(folder: Path) -> tuple[dict, list[dict]]:
@@ -190,7 +205,7 @@ def restore_note_version(folder: Path, revision: str) -> str:
     project, source = _checked_source(folder)
     old_notes, old_edits = load_json(folder / "notes.json"), load_json(folder / "notes-edits.json")
     _valid_pair(old_notes, old_edits, project["id"])
-    prior_notes, prior_edits = _load_snapshot(folder, revision)
+    prior_notes, prior_edits, _created_at = _load_snapshot(folder, revision)
     _valid_pair(prior_notes, prior_edits, project["id"])
     if prior_notes.get("source_sha256") != _hash(source):
         raise VideoNotesError("Stara wersja nie odpowiada bieżącej transkrypcji. Nie można bezpiecznie przywrócić.")
