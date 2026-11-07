@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import os
 from collections import Counter
 from pathlib import Path
 
@@ -72,6 +73,8 @@ def generate_basic_notes(folder: Path, *, window_minutes: int = 5, points_per_se
     if not (1 <= window_minutes <= 60 and 2 <= points_per_section <= 20):
         raise VideoNotesError("Nieprawidłowy zakres sekcji lub liczba punktów.")
     folder = Path(folder)
+    if (folder / ".notes-transaction.json").exists() or (folder / ".notes-transaction.json").is_symlink():
+        raise VideoNotesError("Przerwana aktualizacja notatki: najpierw użyj notes-recover --confirm.")
     project, transcript, corrections = read_project(folder)
     chunk = project["processing"]["chunk_ms"]
     expected = (project["source"]["duration_ms"] + chunk - 1) // chunk
@@ -115,6 +118,8 @@ def generate_basic_notes(folder: Path, *, window_minutes: int = 5, points_per_se
 
 def read_basic_notes(folder: Path) -> tuple[dict, dict]:
     folder = Path(folder)
+    if (folder / ".notes-transaction.json").exists() or (folder / ".notes-transaction.json").is_symlink():
+        raise VideoNotesError("Przerwana aktualizacja notatki: najpierw użyj notes-recover --confirm.")
     project, transcript, corrections = read_project(folder)
     notes, edits = load_json(folder / "notes.json"), load_json(folder / "notes-edits.json")
     if not isinstance(notes, dict) or notes.get("schema") != SCHEMA or notes.get("project_id") != project["id"]:
@@ -148,13 +153,28 @@ def read_basic_notes(folder: Path) -> tuple[dict, dict]:
 
 
 def edit_note_point(folder: Path, point_id: str, new_text: str) -> None:
-    notes, changes = read_basic_notes(folder)
+    """Serialize manual edits with version regeneration/restore.
+
+    Revalidate under the shared notes lock: an edit must never silently land
+    between the two files of a revision or overwrite a concurrent edit.
+    """
     if not isinstance(new_text, str) or len(new_text) > 10_000 or "\x00" in new_text:
         raise VideoNotesError("Nieprawidłowy tekst poprawki.")
-    if not any(point["id"] == point_id for section in notes["sections"] for point in section["points"]):
-        raise VideoNotesError("Nie znaleziono punktu do edycji.")
-    changes["edits"][point_id] = new_text
-    save_json(Path(folder) / "notes-edits.json", changes)
+    folder = Path(folder)
+    lock = folder / ".notes.lock"
+    try:
+        descriptor = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError as error:
+        raise VideoNotesError("Inna operacja na notatkach jest w toku; nie nadpisuję edycji.") from error
+    try:
+        os.close(descriptor)
+        notes, changes = read_basic_notes(folder)
+        if not any(point["id"] == point_id for section in notes["sections"] for point in section["points"]):
+            raise VideoNotesError("Nie znaleziono punktu do edycji.")
+        changes["edits"][point_id] = new_text
+        save_json(folder / "notes-edits.json", changes)
+    finally:
+        lock.unlink(missing_ok=True)
 
 
 def render_basic_markdown(folder: Path) -> str:
