@@ -95,6 +95,26 @@ class LocalASRLabTest(unittest.TestCase):
             with self.subTest(case=options), self.assertRaises(VideoNotesError):
                 run_real_benchmark(self.source, self.reference, **defaults)
 
+    @patch("videonotes.asr_lab.executable", return_value="/tmp/stub-whisper-cli")
+    @patch("videonotes.asr_lab.probe")
+    @patch("videonotes.asr_lab.extract_chunk")
+    def test_benchmark_error_identifies_engine_but_not_spoken_text(self, extract, probe, executable):
+        probe.return_value = {
+            "source": str(self.source), "duration_ms": 3000,
+            "audio_streams": [{"index": 1, "codec": "pcm", "language": "pl", "channels": 1}],
+        }
+        extract.side_effect = lambda path, track, *, start_ms, duration_ms, destination, ffmpeg: destination.write_bytes(self.source.read_bytes())
+        def private_failure(command):
+            raise VideoNotesError("SECRET: a real transcript from the user")
+        with self.assertRaisesRegex(VideoNotesError, "whisper_cpp") as received:
+            run_real_benchmark(
+                self.source, self.reference, cpp_executable="whisper-cli",
+                cpp_model=self.model, faster_model_dir=self.model_dir,
+                stream=1, process_runner=private_failure,
+            )
+        self.assertNotIn("SECRET", str(received.exception))
+        self.assertNotIn("transcript from the user", str(received.exception))
+
     def test_subprocess_runner_hides_stdout_and_stderr_even_on_error(self):
         with self.assertRaisesRegex(VideoNotesError, "błędem") as received:
             _run_process([sys.executable, "-c", "import sys;print('SECRET RECORDING');print('private model',file=sys.stderr);sys.exit(2)"])
