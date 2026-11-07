@@ -9,6 +9,7 @@
   var matches = [];
   var selected = null;
   var page = 0;
+  var sourceRevision = 0;
   var get = function (id) { return document.getElementById(id); };
   var elements = {
     source: get("source-file"), status: get("status"), search: get("search"),
@@ -23,7 +24,16 @@
   function current(item) {
     return Object.prototype.hasOwnProperty.call(edits, item.id) ? edits[item.id] : item.text;
   }
+  function hasPendingEdit() {
+    return Boolean(doc && selected !== null &&
+      elements.text.value !== current(doc.segments[selected]));
+  }
+  function hasUnsavedWork() {
+    return Boolean(Object.keys(edits).length || hasPendingEdit());
+  }
   function setSelected(index) {
+    if (index !== selected && hasPendingEdit() &&
+        !window.confirm("W edytorze jest niezachowana poprawka. Odrzucić ją i przejść do innej wypowiedzi?")) return;
     if (!doc) return;
     var item = doc.segments[index];
     if (!item) return;
@@ -80,6 +90,11 @@
     page = 0;
     renderList();
   }
+  window.addEventListener("beforeunload", function (event) {
+    if (!hasUnsavedWork()) return;
+    event.preventDefault();
+    event.returnValue = "";
+  });
   elements.previous.addEventListener("click", function () {
     if (page > 0) { page -= 1; renderList(); }
   });
@@ -104,10 +119,17 @@
   elements.source.addEventListener("change", async function (event) {
     var file = event.target.files && event.target.files[0];
     if (!file) return;
+    var revision = ++sourceRevision;
+    if (hasUnsavedWork() &&
+        !window.confirm("Masz niezapisane poprawki. Otwarcie nowego pliku je usunie. Kontynuować?")) {
+      elements.source.value = "";
+      return;
+    }
     try {
       if (file.size > core.MAX_BYTES) throw new Error("Wybrany JSON przekracza limit 20 MB.");
       var content = await file.text();
       var loaded = core.parseExport(content);
+      if (revision !== sourceRevision) return; // Older slow file read must not replace newer import.
       doc = loaded;
       edits = Object.create(null);
       selected = null;
@@ -127,9 +149,9 @@
         " segmentów · " + (loaded.complete ? "transkrypcja ukończona" : "transkrypcja niepełna") +
         ". Dane nie zostały wysłane do serwera.", false);
     } catch (error) {
-      message("Nie można otworzyć pliku: " + error.message, true);
+      if (revision === sourceRevision) message("Nie można otworzyć pliku: " + error.message, true);
     } finally {
-      elements.source.value = "";
+      if (revision === sourceRevision) elements.source.value = "";
     }
   });
   document.querySelectorAll("button[data-export]").forEach(function (button) {

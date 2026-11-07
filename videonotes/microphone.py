@@ -92,6 +92,33 @@ def recording_status(folder: Path) -> dict:
             "status": info["status"], "segments": inspect_wav_segments(folder)}
 
 
+def _stop_ffmpeg(proc: object) -> int:
+    """Request clean WAV finalize; bound wait and reap a stuck recorder."""
+    if proc.stdin:
+        try:
+            proc.stdin.write(b"q\n")
+            proc.stdin.flush()
+        except (OSError, ValueError):
+            # Broken stdin must not leave a recording running unattended.
+            pass
+    try:
+        return proc.wait(timeout=15)
+    except subprocess.TimeoutExpired as error:
+        try:
+            proc.terminate()
+        except OSError:
+            pass
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            try:
+                proc.kill()
+            except OSError:
+                pass
+            proc.wait(timeout=5)
+        raise VideoNotesError("FFmpeg nie zakończył nagrywania po poleceniu stop. Pliki zachowano.") from error
+
+
 def record_microphone(device: str, folder: Path, *, consent: bool,
                       ffmpeg: str = "ffmpeg", max_seconds: int | None = None,
                       system_device: str | None = None, system_consent: bool = False,
@@ -140,31 +167,19 @@ def record_microphone(device: str, folder: Path, *, consent: bool,
                     returncode = proc.wait()
                 except KeyboardInterrupt:
                     stopped = True
-                    if proc.stdin:
-                        proc.stdin.write(b"q\n")
-                        proc.stdin.flush()
-                    returncode = proc.wait(timeout=15)
+                    returncode = _stop_ffmpeg(proc)
             else:
                 while proc.poll() is None:
                     if stop.wait(0.2):
                         stopped = True
-                        if proc.stdin:
-                            proc.stdin.write(b"q\n")
-                            proc.stdin.flush()
                         break
-                try:
-                    returncode = proc.wait(timeout=15 if stopped else None)
-                except subprocess.TimeoutExpired as error:
-                    proc.terminate()
-                    try:
-                        proc.wait(timeout=5)
-                    except subprocess.TimeoutExpired:
-                        proc.kill()
-                        proc.wait(timeout=5)
-                    raise VideoNotesError("FFmpeg nie zakończył nagrywania po poleceniu stop. Pliki zachowano.") from error
+                returncode = _stop_ffmpeg(proc) if stopped else proc.wait()
         finally:
             if proc.stdin:
-                proc.stdin.close()
+                try:
+                    proc.stdin.close()
+                except (OSError, ValueError):
+                    pass
         parts = inspect_wav_segments(folder)
         if returncode != 0 or not parts:
             raise VideoNotesError("FFmpeg nie ukończył nagrywania lub brak poprawnego WAV. Pliki zachowano.")
