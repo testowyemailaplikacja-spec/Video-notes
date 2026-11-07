@@ -64,6 +64,35 @@ def _check_resume_source(project: dict, *, ffprobe: str) -> Path:
     return path
 
 
+def _process_state(pid: int) -> str:
+    """Existence check that NEVER signals or terminates a Windows process."""
+    if os.name == "nt":
+        # On Windows os.kill(pid, 0) can call TerminateProcess: never use it.
+        import ctypes
+        from ctypes import wintypes
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        open_process = kernel.OpenProcess
+        open_process.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        open_process.restype = wintypes.HANDLE
+        close_handle = kernel.CloseHandle
+        close_handle.argtypes = [wintypes.HANDLE]
+        close_handle.restype = wintypes.BOOL
+        handle = open_process(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if handle:
+            close_handle(handle)
+            return "active"
+        error_code = ctypes.get_last_error()
+        return "stale" if error_code in {87, 1168} else "unknown"
+    try:
+        os.kill(pid, 0)  # POSIX check for existence; signal 0 does not terminate.
+    except ProcessLookupError:
+        return "stale"
+    except PermissionError:
+        return "unknown"
+    except OSError as error:
+        return "stale" if error.errno == errno.ESRCH else "unknown"
+    return "active"
+
 def transcription_lock_status(folder: Path) -> dict:
     """Inspect an interrupted run without changing the project or signaling its process."""
     lock = Path(folder) / ".processing.lock"
@@ -80,15 +109,7 @@ def transcription_lock_status(folder: Path) -> dict:
     if match is None:
         return {"state": "invalid"}
     pid = int(match.group(1))
-    try:
-        os.kill(pid, 0)  # Existence check only; never terminate a process.
-    except ProcessLookupError:
-        return {"state": "stale", "pid": pid}
-    except PermissionError:
-        return {"state": "unknown", "pid": pid}
-    except OSError as error:
-        return {"state": "stale" if error.errno == errno.ESRCH else "unknown", "pid": pid}
-    return {"state": "active", "pid": pid}
+    return {"state": _process_state(pid), "pid": pid}
 
 
 def recover_stale_transcription_lock(folder: Path, *, confirm: bool = False) -> dict:
