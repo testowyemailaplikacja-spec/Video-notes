@@ -6,6 +6,7 @@ The OOXML package deliberately contains no external relationships, macros or med
 from __future__ import annotations
 
 from io import BytesIO
+from threading import Lock
 from xml.etree import ElementTree as ET
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
@@ -17,6 +18,7 @@ CT = "http://schemas.openxmlformats.org/package/2006/content-types"
 XML_SPACE = "{http://www.w3.org/XML/1998/namespace}space"
 
 ET.register_namespace("w", W)
+_XML_LOCK = Lock()
 
 _LABELS = {
     "wypowiedz": "cytat źródłowy",
@@ -32,7 +34,16 @@ def _w(parent: ET.Element, tag: str, **attrs: str) -> ET.Element:
 
 
 def _xml(element: ET.Element) -> bytes:
-    return ET.tostring(element, encoding="utf-8", xml_declaration=True)
+    # OOXML package parsers (including LibreOffice Writer) require these two
+    # package roots serialized with a DEFAULT namespace, not ns0: prefixes.
+    # Registering namespaces mutates ElementTree's process-global registry;
+    # serialize our DOCX XML under one lock to keep concurrent exports stable.
+    with _XML_LOCK:
+        if element.tag == "{" + CT + "}Types":
+            ET.register_namespace("", CT)
+        elif element.tag == "{" + PKG + "}Relationships":
+            ET.register_namespace("", PKG)
+        return ET.tostring(element, encoding="utf-8", xml_declaration=True)
 
 
 def _safe_text(text: str) -> str:
