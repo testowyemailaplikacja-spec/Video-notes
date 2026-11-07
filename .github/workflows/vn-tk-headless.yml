@@ -1,0 +1,32 @@
+name: Video Notes — real Tk widgets under isolated Xvfb
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - 'videonotes/gui.py'
+      - 'videonotes/note_revisions.py'
+      - 'scripts/gui_headless_test.py'
+      - '.github/workflows/vn-tk-headless.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  gui-tk-xvfb:
+    name: Real Tk GUI note restore, drafts, crash recovery (Linux Xvfb)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install isolated system Tk and virtual display for GUI exercise
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 240s sudo apt-get update -qq
+          timeout 240s sudo apt-get install -y --no-install-recommends python3-tk xvfb xauth
+          /usr/bin/python3 --version
+          /usr/bin/python3 -c "import tkinter; print('Local Tk available')"
+      - name: Exercise real note editor window, history restore, crash recovery and draft guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 120s xvfb-run -a /usr/bin/python3 -m scripts.gui_headless_test
