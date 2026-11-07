@@ -7,6 +7,8 @@ on:
       - 'videonotes/notes.py'
       - 'videonotes/advanced_notes.py'
       - 'tests/test_office_docx.py'
+      - 'tests/test_pdf_export.py'
+      - 'videonotes/pdf_export.py'
       - '.github/workflows/vn-docx-libreoffice.yml'
   workflow_dispatch:
 permissions:
