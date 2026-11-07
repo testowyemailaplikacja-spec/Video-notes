@@ -129,7 +129,8 @@
         "PR #16: browser warning on unsaved edit/reimport/unload and stale import rejection; Node Linux/Windows tests PASS",
         "PR #20: safe restore from imported transcript, per-format reduced-memory export and previously omitted web-controller tests in Linux/Windows CI PASS",
         "PR #21: WebVTT markup escape and cue-boundary protection; Linux/Windows CI and DEV EXE PASS",
-        "PR #24: block browser export with uncommitted draft, re-confirm edits made during asynchronous file import; Linux/Windows controller CI PASS"
+        "PR #24: block browser export with uncommitted draft, re-confirm edits made during asynchronous file import; Linux/Windows controller CI PASS",
+        "PR #30: headless real Chromium file:// import/edit/TXT export and deny-replace smoke on GitHub Ubuntu runner PASS, without npm/network; Windows/Edge/Firefox/a11y still open"
       ],
       "blockers": [
         "Real desktop browser acceptance Chrome/Edge/Firefox and accessibility testing",
@@ -349,6 +350,14 @@
       "scope": "PR #28 Linux/Windows synthetic 2h+ checkpoint state-machine test, no real audio/ASR",
       "source_linux_windows": "PASS",
       "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42379566243",
+      "scope": "PR #30 Linux/Windows source and actual Chromium file:// end-to-end browser smoke (Linux). Browser test covers synthetic JSON import, edit, blocked draft export, saved local TXT, denied reimport and zero HTTP(S) resource entries.",
+      "source_linux_windows": "PASS",
+      "chromium_headless_linux": "PASS",
+      "physical_windows_browser": false,
+      "real_asr": false
     }
   ],
   "notes": [
@@ -362,7 +371,8 @@
     "DOCS sync for PR #20-22 retains 0/9 DONE; model quality, offline installer, hardware microphone and web host acceptance are still NOT_RUN.",
     "PR #24–#28 merged to develop on 2026-11-07 after applicable Linux/Windows source CI and Windows development EXE checks passed; none proved physical Windows or ASR model acceptance.",
     "PR #27 safety: Windows PID liveness is checked with OpenProcess, never os.kill(pid,0); user must explicitly confirm stale-lock cleanup.",
-    "PR #28 synthetic 2h+ checkpoint test does not satisfy HW-01 or ASR-05; physical long-run time/RAM and microphone tests still NOT_RUN."
+    "PR #28 synthetic 2h+ checkpoint test does not satisfy HW-01 or ASR-05; physical long-run time/RAM and microphone tests still NOT_RUN.",
+    "Real headless Chromium on Ubuntu PASS in PR #30 does not close WEB-01 (Windows Chrome/Edge/Firefox) or WEB-02 (large JSON, a11y), nor VN-07 host beta gate."
   ],
   "last_verified_develop_before_pr8": "344e227571ba09802da8a8bea7c50498473dc2e6"
 }
