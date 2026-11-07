@@ -130,10 +130,13 @@ def read_basic_notes(folder: Path) -> tuple[dict, dict]:
         if not isinstance(section, dict) or not isinstance(section.get("points"), list) or not isinstance(section.get("heading"), str):
             raise VideoNotesError("Nieprawidłowa sekcja notatki.")
         for point in section["points"]:
-            if not isinstance(point, dict) or not isinstance(point.get("id"), str):
-                raise VideoNotesError("Nieprawidłowy punkt notatki.")
-            original = sources.get(point.get("segment_id"))
-            if not original or point["id"] in ids or point.get("text") != original["text"] or point.get("start_ms") != original["start_ms"]:
+            if (not isinstance(point, dict) or not isinstance(point.get("id"), str) or
+                    not isinstance(point.get("segment_id"), str) or
+                    point["id"] != "quote-" + point["segment_id"] or
+                    type(point.get("start_ms")) is not int):
+                raise VideoNotesError("Nieprawidłowy identyfikator lub czas cytatu w notatce.")
+            original = sources.get(point["segment_id"])
+            if not original or point["id"] in ids or point.get("text") != original["text"] or point["start_ms"] != original["start_ms"]:
                 raise VideoNotesError("Punkt notatki nie odpowiada transkrypcji.")
             ids.add(point["id"])
     overrides = edits.get("edits")

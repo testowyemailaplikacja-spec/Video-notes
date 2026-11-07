@@ -115,6 +115,23 @@ class BasicNotesTest(unittest.TestCase):
             with self.assertRaisesRegex(VideoNotesError, "nie odpowiada"):
                 read_basic_notes(root)
 
+    def test_mismatched_quote_id_and_boolean_time_refused(self):
+        for violation in ("id", "timestamp"):
+            with self.subTest(violation=violation), tempfile.TemporaryDirectory() as folder:
+                root = Path(folder)
+                fixture(root)
+                note = generate_basic_notes(root)
+                point = note["sections"][0]["points"][0]
+                if violation == "id":
+                    point["id"] = "quote-forged"
+                else:
+                    point["start_ms"] = False
+                save_json(root / "notes.json", note)
+                with self.assertRaises(VideoNotesError):
+                    read_basic_notes(root)
+                with self.assertRaises(VideoNotesError):
+                    export_basic_notes_docx(root)
+
     def test_untrusted_markdown_is_rendered_as_text(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

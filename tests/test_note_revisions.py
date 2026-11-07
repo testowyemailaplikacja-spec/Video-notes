@@ -4,11 +4,12 @@ import copy
 import json
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 from tests.test_notes import fixture
 from videonotes.errors import VideoNotesError
-from videonotes.note_revisions import (list_note_versions, regenerate_basic_notes,
+from videonotes.note_revisions import (_load_snapshot, list_note_versions, regenerate_basic_notes,
                                        restore_note_version)
 from videonotes.notes import (generate_basic_notes, edit_note_point, read_basic_notes,
                               render_basic_markdown)
@@ -54,6 +55,56 @@ class NotesVersionTest(unittest.TestCase):
         self.assertEqual(read_basic_notes(self.folder)[1]["edits"][self.point], "Ręczna poprawka 1")
         self.assertNotEqual(undo_snapshot, a["revision"])
         self.assertEqual(len(list_note_versions(self.folder)), 2)
+
+    def test_snapshot_reader_keeps_two_item_api_for_backup(self):
+        result = regenerate_basic_notes(self.folder, window_minutes=2)
+        original_notes, original_edits = _load_snapshot(self.folder, result["revision"])
+        self.assertEqual(original_notes["project_id"], self.notes["project_id"])
+        self.assertEqual(original_edits["edits"], {})
+        metadata = _load_snapshot(self.folder, result["revision"], include_created_at=True)
+        self.assertEqual(len(metadata), 3)
+        self.assertEqual(metadata[:2], (original_notes, original_edits))
+
+    def test_history_has_created_at_and_is_ordered_newest_first(self):
+        first = regenerate_basic_notes(self.folder, window_minutes=2, points_per_section=2)
+        second = regenerate_basic_notes(self.folder, window_minutes=1, points_per_section=2)
+        self.assertTrue(first["changed"] and second["changed"])
+        versions = list_note_versions(self.folder)
+        self.assertEqual([item["revision"] for item in versions],
+                         [second["revision"], first["revision"]])
+        for version in versions:
+            moment = datetime.fromisoformat(version["created_at"])
+            self.assertIsNotNone(moment.tzinfo)
+            self.assertEqual(moment.utcoffset().total_seconds(), 0)
+            self.assertEqual(version["manual_edits"], 0)
+
+    def test_history_symlink_directory_refused_before_snapshots_or_restore(self):
+        outside = self.folder / "other-directory"
+        outside.mkdir()
+        link = self.folder / "notes-history"
+        try:
+            link.symlink_to(outside, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.skipTest("Konto testowe nie obsługuje symlinków")
+        with self.assertRaisesRegex(VideoNotesError, "dowiązaniem"):
+            list_note_versions(self.folder)
+        with self.assertRaisesRegex(VideoNotesError, "dowiązaniem"):
+            regenerate_basic_notes(self.folder, window_minutes=2)
+        self.assertEqual(list(outside.iterdir()), [])
+        self.assertFalse((self.folder / ".notes.lock").exists())
+
+    def test_tampered_history_timestamp_refused_without_overwrite(self):
+        result = regenerate_basic_notes(self.folder, window_minutes=2)
+        history_file = self.folder / "notes-history" / (result["revision"] + ".json")
+        snapshot = json.loads(history_file.read_text("utf-8"))
+        snapshot["created_at"] = "this-is-not-a-time"
+        save_json(history_file, snapshot)
+        before = (self.folder / "notes.json").read_bytes()
+        with self.assertRaisesRegex(VideoNotesError, "datę"):
+            list_note_versions(self.folder)
+        with self.assertRaisesRegex(VideoNotesError, "datę"):
+            restore_note_version(self.folder, result["revision"])
+        self.assertEqual((self.folder / "notes.json").read_bytes(), before)
 
     def test_stale_version_cannot_be_restored_over_new_transcription(self):
         old = regenerate_basic_notes(self.folder, window_minutes=2)

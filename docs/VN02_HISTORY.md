@@ -25,3 +25,11 @@ Całość jest lokalna, bez modeli językowych, chmury, konta i nagrań w repozy
 ## Otwarte
 
 Brak pełnego semantycznego streszczania, testów na prawdziwych wykładach, kontroli jakości przez człowieka oraz instalatora Windows. Historię należy objąć docelową polityką retencji i ograniczeniem rozmiaru (obecnie 1000 wersji).
+
+## Historia i przywracanie przez okno programu (07.11.2026)
+
+W oknie „Notatka podstawowa” przycisk **Historia i przywracanie wersji** pokazuje lokalne snapshoty od najnowszego, z datą UTC, liczbą ręcznych poprawek i pełnym identyfikatorem. Użytkownik wybiera konkretną wersję i oddzielnie potwierdza przywrócenie. Program korzysta z istniejącej, sprawdzającej zgodność cytatów funkcji restore; przed przywróceniem aktualna notatka oraz jej poprawki są kopiowane do historii. Nie można przywrócić notatki ze źródła, które od czasu zapisania wersji zostało zmienione.
+
+Edytor chroni również **niezapisany tekst**: przejście do innego punktu pyta o świadome odrzucenie szkicu (odmowa zachowuje tekst i poprzedni wybór), a przywracanie, regeneracja, eksport DOCX i zamknięcie okna nie porzucają szkicu bez zgody. Nowy backend historii wykrywa nieprawidłowe daty snapshotów i dowiązania symboliczne katalogu historii. Walidacja odwołania cytatu wymaga teraz identyfikatora `quote-<segment_id>` i całkowitego znacznika czasu, nie wartości logicznej.
+
+Testy automatyczne obejmują kolejność i datę snapshotów, ich manipulację i dowiązania, zgodność ID cytatów oraz wcześniejsze scenariusze restore/undo. **Pełny test interakcji z oknem na fizycznym Windows nadal jest potrzebny**; sam build Windows EXE i testy backendu nie dowodzą działania klikania ani odporności na zaniki zasilania w trakcie przywracania. VN-02 pozostaje W_TRAKCIE.
