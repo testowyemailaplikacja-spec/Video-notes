@@ -15,6 +15,7 @@ from .media import probe
 from .microphone import record_microphone, list_microphone_devices
 from .notes import generate_basic_notes, read_basic_notes, edit_note_point, export_basic_notes, export_basic_notes_docx
 from .advanced_notes import export_advanced_outline
+from .pdf_export import export_basic_notes_pdf
 from .note_revisions import regenerate_basic_notes, list_note_versions, restore_note_version, recover_interrupted_note_update
 from .pipeline import create_project, transcribe_project
 from .storage import read_project
@@ -399,6 +400,14 @@ class VideoNotesWindow:
         content.insert("1.0", markdown.read_text(encoding="utf-8"))
         content.configure(state="disabled")
         self.status.set(f"Zapisano lokalnie: {markdown.name} i {structured.name}.")
+        def export_pdf() -> None:
+            try:
+                targets = export_advanced_outline(Path(self.project.get()), include_pdf=True)
+                self.status.set("PDF zapisano lokalnie: " + str(targets[-1]))
+            except VideoNotesError as error:
+                messagebox.showerror("Konspekt PDF", str(error))
+        ttk.Button(body, text="Eksportuj PDF (wymaga lokalnego LibreOffice)",
+                   command=export_pdf).pack(anchor="e", pady=(6, 0))
 
     def _show_notes(self) -> None:
         """Display and edit source-cited, offline basic notes."""
@@ -544,6 +553,16 @@ class VideoNotesWindow:
             except VideoNotesError as error:
                 messagebox.showerror("Eksport DOCX", str(error))
         ttk.Button(right, text="Eksportuj DOCX (offline)", command=export_docx).pack(anchor="e", pady=4)
+        def export_pdf() -> None:
+            if has_unsaved_draft():
+                messagebox.showwarning("Eksport PDF", "Najpierw zapisz poprawkę w edytorze.")
+                return
+            try:
+                path = export_basic_notes_pdf(folder)
+                status.set("Zapisano lokalny PDF: " + str(path))
+            except VideoNotesError as error:
+                messagebox.showerror("Eksport PDF", str(error))
+        ttk.Button(right, text="Eksportuj PDF (LibreOffice)", command=export_pdf).pack(anchor="e", pady=4)
         def regenerate() -> None:
             if has_unsaved_draft():
                 messagebox.showwarning("Odbudowa", "Najpierw zapisz niezapisaną poprawkę.")
