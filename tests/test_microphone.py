@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import subprocess
 import tempfile
 import threading
 import unittest
@@ -169,6 +170,65 @@ class MicrophoneTest(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(VideoNotesError):
                 self._record(system_device=value, system_consent=True)
             self.assertFalse(self.folder.exists())
+
+
+    def test_stuck_recorder_is_terminated_then_killed_with_recording_preserved(self):
+        class HangingFFmpeg(FakeFFmpeg):
+            instance = None
+
+            def __init__(self, args, **kwargs):
+                super().__init__(args, **kwargs)
+                self.terminated = False
+                self.killed = False
+                self.__class__.instance = self
+
+            def wait(self, timeout=None):
+                if timeout in (15, 5) and not self.killed:
+                    raise subprocess.TimeoutExpired(cmd="ffmpeg", timeout=timeout)
+                return 0
+
+            def terminate(self):
+                self.terminated = True
+
+            def kill(self):
+                self.killed = True
+
+        stopping = threading.Event()
+        stopping.set()
+        with self.assertRaisesRegex(VideoNotesError, "nie zakończył nagrywania"):
+            self._record(stop=stopping, process_factory=HangingFFmpeg)
+        self.assertTrue(HangingFFmpeg.instance.terminated)
+        self.assertTrue(HangingFFmpeg.instance.killed)
+        self.assertEqual(recording_status(self.folder)["status"], "needs_review")
+        self.assertEqual(len(recording_status(self.folder)["segments"]), 1)
+
+    def test_broken_stdin_does_not_leave_capture_without_status(self):
+        class BrokenStdin(io.BytesIO):
+            def write(self, data):
+                raise BrokenPipeError("ffmpeg stdin already closed")
+
+        class BrokenPipeFFmpeg(FakeFFmpeg):
+            def __init__(self, args, **kwargs):
+                super().__init__(args, **kwargs)
+                self.stdin = BrokenStdin()
+
+        stopping = threading.Event()
+        stopping.set()
+        result = self._record(stop=stopping, process_factory=BrokenPipeFFmpeg)
+        self.assertEqual(result["status"], "finished")
+        self.assertEqual(len(result["segments"]), 1)
+
+    def test_keyboard_interrupt_uses_same_bounded_stop_handshake(self):
+        class InterruptFFmpeg(FakeFFmpeg):
+            def wait(self, timeout=None):
+                if timeout is None:
+                    raise KeyboardInterrupt()
+                return 0
+
+        result = self._record(process_factory=InterruptFFmpeg)
+        self.assertEqual(result["status"], "finished")
+        journal = json.loads((self.folder / "recording.json").read_text("utf-8"))
+        self.assertTrue(journal["stopped_by_user"])
 
 if __name__ == "__main__":
     unittest.main()
