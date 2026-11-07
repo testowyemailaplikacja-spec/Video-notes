@@ -17,7 +17,7 @@ from .note_revisions import regenerate_basic_notes, list_note_versions, restore_
 from .quality import compare_text_files
 from .asr_lab import run_real_benchmark
 from .backup import create_backup, restore_backup, relink_backup
-from .bundle import create_internal_bundle
+from .bundle import create_internal_bundle, verify_internal_bundle
 from .pipeline import create_project, transcribe_project
 from .storage import read_project
 
@@ -121,6 +121,8 @@ def parser() -> argparse.ArgumentParser:
     for flag in ("app", "ffmpeg", "ffprobe", "whisper", "model", "output"):
         bundle.add_argument("--" + flag, required=True, type=Path)
     bundle.add_argument("--internal-only", required=True, action="store_true", help="Potwierdź, że nie rozpowszechniasz niezweryfikowanego pakietu")
+    check_bundle = sub.add_parser("bundle-verify", help="Sprawdź lokalne SHA-256 przed uruchomieniem prywatnego pakietu Windows")
+    check_bundle.add_argument("folder", type=Path)
     sub.add_parser("gui", help="Uruchom prosty interfejs Windows/Tkinter")
     return cmd
 
@@ -232,6 +234,8 @@ def main(argv: list[str] | None = None) -> int:
                                             whisper=args.whisper, model=args.model, output=args.output,
                                             internal_only=args.internal_only)
             print(json.dumps(report, ensure_ascii=False, indent=2))
+        elif args.action == "bundle-verify":
+            print(json.dumps(verify_internal_bundle(args.folder), ensure_ascii=False, indent=2))
         elif args.action == "gui":
             from .gui import launch
             launch()
