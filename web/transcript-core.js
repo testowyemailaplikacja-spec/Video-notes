@@ -90,6 +90,11 @@
       }).filter(function (item) { return Boolean(item.text.trim()); })
     };
   }
+  // Keep one segment in one subtitle cue, while TXT and JSON remain verbatim.
+  function cueText(value, vtt) {
+    var line = value.replace(/[\r\n\v\f\u001c-\u001e\u0085\u2028\u2029]+/g, " ").trim();
+    return vtt ? line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : line;
+  }
   // Build only the requested format; avoid allocating three extra large files per download.
   function renderExport(model, edits, filename) {
     var doc = corrected(model, edits || Object.create(null));
@@ -100,14 +105,14 @@
     if (filename === "transcript.srt") {
       var srt = doc.segments.map(function (s, i) {
         return String(i + 1) + "\n" + clock(s.start_ms, false) + " --> " +
-          clock(s.end_ms, false) + "\n" + s.text;
+          clock(s.end_ms, false) + "\n" + cueText(s.text, false);
       }).join("\n\n");
       return srt + (srt ? "\n" : "");
     }
     if (filename === "transcript.vtt") {
       var vtt = doc.segments.map(function (s) {
         return clock(s.start_ms, true) + " --> " + clock(s.end_ms, true) +
-          "\n" + s.text;
+          "\n" + cueText(s.text, true);
       }).join("\n\n");
       return "WEBVTT\n\n" + vtt + (doc.segments.length ? "\n" : "");
     }

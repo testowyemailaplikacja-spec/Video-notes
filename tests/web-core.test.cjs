@@ -103,3 +103,18 @@ test("single-format export matches legacy all-format adapter", () => {
   assert.equal(JSON.parse(core.renderExport(doc, edits, "transcript.json")).segments[1].text, edits["c0000000-s00001"]);
   assert.equal(doc.segments[1].text, "Protokół DHCP nadaje adres IP.");
 });
+
+test("subtitle exports flatten injected cue separators and escape WebVTT markup", () => {
+  const doc = fixture();
+  const edits = Object.create(null);
+  const original = "Pierwszy wiersz\n\n00:01:00,000 --> 00:02:00,000\n<v Jan> A & B";
+  edits["c0000000-s00000"] = original;
+  const srt = core.renderExport(doc, edits, "transcript.srt");
+  const vtt = core.renderExport(doc, edits, "transcript.vtt");
+  assert.equal(srt.split("\n\n").length, doc.segments.length);
+  assert.match(srt, /Pierwszy wiersz 00:01:00,000 --> 00:02:00,000 <v Jan> A & B/);
+  assert.doesNotMatch(vtt, /<v Jan>/);
+  assert.match(vtt, /&lt;v Jan&gt; A &amp; B/);
+  assert.equal(JSON.parse(core.renderExport(doc, edits, "transcript.json")).segments[0].text, original);
+  assert.ok(core.renderExport(doc, edits, "transcript.txt").includes(original));
+});

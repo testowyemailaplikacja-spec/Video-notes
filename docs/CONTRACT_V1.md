@@ -19,3 +19,7 @@ Obowiązują wersje `videonotes-project-v1`, `videonotes-transcript-v1`, `videon
 Wykrycie zmiany SHA-256 pliku lub modelu zatrzymuje wznowienie. Obliczenie SHA-256 wielogigabajtowego filmu wymaga czasu, ale działa ze stałą pamięcią. FFmpeg i whisper.cpp są uruchamiane bez powłoki systemowej; ich potencjalnie prywatne logi nie są przekazywane na stdout.
 
 **Otwarte:** przenośny backup, relokacja pliku źródłowego, migracje v1→v2, odzyskiwanie starego pliku blokady po awarii, instalator Windows i końcowy kontrakt WWW. Nie oznaczać ich DONE na podstawie samego schematu.
+
+## Integralność eksportu napisów — 07.11.2026
+
+W SRT i VTT każdy segment pozostaje jednym cue: wielowierszowe poprawki są łączone w pojedynczy wiersz przez spacje, aby tekst nie wstrzykiwał pozornych znaczników czasu i nowych bloków napisów. W VTT znaki `&`, `<`, `>` są kodowane jako tekst, aby nie interpretować wpisanej transkrypcji jako składni WebVTT. Eksporty TXT/JSON zachowują oryginalne znaki nowej linii i tekst użytkownika. Testy syntetyczne obejmują oba eksportery (Python i WWW); nie zastępują testu rzeczywistych odtwarzaczy napisów.

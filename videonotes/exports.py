@@ -15,6 +15,18 @@ def _clock(ms: int, *, vtt: bool = False) -> str:
     return f"{hours:02d}:{minutes:02d}:{seconds:02d}{'.' if vtt else ','}{milli:03d}"
 
 
+def _cue_text(text: str, *, vtt: bool = False) -> str:
+    """Keep one transcript segment within one subtitle cue.
+
+    TXT/JSON remain verbatim; subtitle payloads cannot introduce fake cues
+    through embedded line breaks. WebVTT markup is escaped as literal text.
+    """
+    line = " ".join(part for part in text.splitlines() if part).strip()
+    if vtt:
+        line = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    return line
+
+
 def edit_segment(folder: Path, segment_id: str, updated: str) -> None:
     project, transcript, edits = read_project(folder)
     if segment_id not in {segment["id"] for segment in transcript["segments"]}:
@@ -33,8 +45,8 @@ def render_exports(folder: Path) -> dict[str, bytes]:
         if corrected:
             segments.append({"id": item["id"], "start_ms": item["start_ms"], "end_ms": item["end_ms"], "text": corrected})
     txt = "\n".join(s["text"] for s in segments) + ("\n" if segments else "")
-    srt = "\n\n".join(f"{i}\n{_clock(s['start_ms'])} --> {_clock(s['end_ms'])}\n{s['text']}" for i, s in enumerate(segments, 1))
-    vtt = "WEBVTT\n\n" + "\n\n".join(f"{_clock(s['start_ms'], vtt=True)} --> {_clock(s['end_ms'], vtt=True)}\n{s['text']}" for s in segments)
+    srt = "\n\n".join(f"{i}\n{_clock(s['start_ms'])} --> {_clock(s['end_ms'])}\n{_cue_text(s['text'])}" for i, s in enumerate(segments, 1))
+    vtt = "WEBVTT\n\n" + "\n\n".join(f"{_clock(s['start_ms'], vtt=True)} --> {_clock(s['end_ms'], vtt=True)}\n{_cue_text(s['text'], vtt=True)}" for s in segments)
     if srt:
         srt += "\n"
     if segments:

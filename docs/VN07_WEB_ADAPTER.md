@@ -36,3 +36,7 @@ Testy są dodane do GitHub Actions Linux/Windows. Potwierdzają walidację kontr
 * Eksport tworzy tylko żądany format TXT/SRT/VTT/JSON, aby nie zużywać pamięci na pozostałe trzy wyniki. API `renderExports` pozostaje dla kompatybilności.
 * CI Linux i Windows uruchamia także `tests/web-controller.test.cjs`: testy niezapisanych zmian, wyścigów importu, przywracania tekstu.
 * Testy są symulacją DOM, nie odbiorem Chrome/Edge/Firefox, dostępności ani integracji hosta; VN-07 nadal W_TRAKCIE.
+
+## Integralność eksportu napisów — 07.11.2026
+
+W SRT i VTT każdy segment pozostaje jednym cue: wielowierszowe poprawki są łączone w pojedynczy wiersz przez spacje, aby tekst nie wstrzykiwał pozornych znaczników czasu i nowych bloków napisów. W VTT znaki `&`, `<`, `>` są kodowane jako tekst, aby nie interpretować wpisanej transkrypcji jako składni WebVTT. Eksporty TXT/JSON zachowują oryginalne znaki nowej linii i tekst użytkownika. Testy syntetyczne obejmują oba eksportery (Python i WWW); nie zastępują testu rzeczywistych odtwarzaczy napisów.
