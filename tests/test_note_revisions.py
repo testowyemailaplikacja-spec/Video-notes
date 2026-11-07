@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -12,7 +13,8 @@ from tests.test_notes import fixture
 from videonotes.errors import VideoNotesError
 from videonotes.note_revisions import (_begin_transaction, _load_snapshot, list_note_versions,
                                        regenerate_basic_notes, restore_note_version,
-                                       recover_interrupted_note_update)
+                                       recover_interrupted_note_update, notes_lock_status,
+                                       recover_stale_notes_lock)
 from videonotes.notes import (generate_basic_notes, edit_note_point, read_basic_notes,
                               render_basic_markdown)
 from videonotes.storage import read_project, save_json
@@ -292,6 +294,69 @@ class NotesVersionTest(unittest.TestCase):
         self.assertEqual((self.folder / "notes-edits.json").read_bytes(), before[1])
         self.assertEqual(read_basic_notes(self.folder)[1]["edits"][self.point],
                          "Późniejsza poprawka, inna niż w zapisanej wersji")
+
+    def test_note_lock_is_pid_based_and_owner_is_alive_while_editing(self):
+        seen = []
+        real_save = save_json
+        def check_lock(path, payload):
+            if Path(path).name == "notes-edits.json":
+                seen.append(notes_lock_status(self.folder))
+            return real_save(path, payload)
+        with patch("videonotes.notes.save_json", side_effect=check_lock):
+            edit_note_point(self.folder, self.point, "Nie utracić edycji")
+        self.assertEqual(len(seen), 1)
+        self.assertEqual(seen[0], {"state": "active", "pid": os.getpid()})
+        self.assertEqual(notes_lock_status(self.folder), {"state": "missing"})
+
+    def test_confirmed_dead_pid_note_lock_can_be_recovered_without_data_loss(self):
+        lock = self.folder / ".notes.lock"
+        lock.write_bytes(b"pid=987654321\r\n")
+        initial = ((self.folder / "notes.json").read_bytes(),
+                   (self.folder / "notes-edits.json").read_bytes())
+        with patch("videonotes.note_revisions._process_state", return_value="stale"):
+            self.assertEqual(notes_lock_status(self.folder),
+                             {"state": "stale", "pid": 987654321})
+            with self.assertRaisesRegex(VideoNotesError, "--confirm"):
+                recover_stale_notes_lock(self.folder)
+            self.assertTrue(lock.exists())
+            result = recover_stale_notes_lock(self.folder, confirm=True)
+        self.assertEqual(result["previous_pid"], 987654321)
+        self.assertTrue(result["recovered"])
+        self.assertFalse(lock.exists())
+        self.assertEqual((self.folder / "notes.json").read_bytes(), initial[0])
+        self.assertEqual((self.folder / "notes-edits.json").read_bytes(), initial[1])
+
+    def test_notes_lock_active_unknown_or_replaced_not_deleted(self):
+        lock = self.folder / ".notes.lock"
+        lock.write_bytes(b"pid=987654321\n")
+        with patch("videonotes.note_revisions._process_state", return_value="active"):
+            self.assertEqual(notes_lock_status(self.folder)["state"], "active")
+            with self.assertRaisesRegex(VideoNotesError, "martwego"):
+                recover_stale_notes_lock(self.folder, confirm=True)
+        self.assertTrue(lock.exists())
+        with patch("videonotes.note_revisions._process_state", side_effect=["stale", "active"]):
+            with self.assertRaisesRegex(VideoNotesError, "Stan procesu"):
+                recover_stale_notes_lock(self.folder, confirm=True)
+        self.assertTrue(lock.exists())
+        lock.write_bytes(b"legacy empty lock is not independently verifiable")
+        self.assertEqual(notes_lock_status(self.folder)["state"], "invalid")
+        with self.assertRaises(VideoNotesError):
+            recover_stale_notes_lock(self.folder, confirm=True)
+        self.assertTrue(lock.exists())
+
+    def test_symlinked_notes_lock_is_not_followed_or_removed(self):
+        outside = self.folder / "do-not-touch.txt"
+        outside.write_text("Prywatne dane", encoding="utf-8")
+        lock = self.folder / ".notes.lock"
+        try:
+            lock.symlink_to(outside)
+        except (NotImplementedError, OSError):
+            self.skipTest("Symlinks unavailable to this account")
+        self.assertEqual(notes_lock_status(self.folder)["state"], "invalid")
+        with self.assertRaises(VideoNotesError):
+            recover_stale_notes_lock(self.folder, confirm=True)
+        self.assertTrue(lock.is_symlink())
+        self.assertEqual(outside.read_text("utf-8"), "Prywatne dane")
 
     def test_concurrent_lock_prevents_overwriting_history(self):
         (self.folder / ".notes.lock").write_text("other writer", encoding="utf-8")

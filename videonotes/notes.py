@@ -167,7 +167,10 @@ def edit_note_point(folder: Path, point_id: str, new_text: str) -> None:
     except FileExistsError as error:
         raise VideoNotesError("Inna operacja na notatkach jest w toku; nie nadpisuję edycji.") from error
     try:
-        os.close(descriptor)
+        with os.fdopen(descriptor, "w", encoding="ascii") as writer:
+            writer.write(f"pid={os.getpid()}\n")
+            writer.flush()
+            os.fsync(writer.fileno())
         notes, changes = read_basic_notes(folder)
         if not any(point["id"] == point_id for section in notes["sections"] for point in section["points"]):
             raise VideoNotesError("Nie znaleziono punktu do edycji.")

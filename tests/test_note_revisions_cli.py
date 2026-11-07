@@ -60,6 +60,29 @@ class NoteRevisionCliTest(unittest.TestCase):
             self.assertFalse((folder / ".notes-transaction.json").exists())
             self.assertNotEqual((folder / "notes.json").read_bytes(), original)
 
+    def test_notes_lock_cli_recovery_is_opt_in_and_pid_guarded(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            fixture(folder)
+            lock = folder / ".notes.lock"
+            lock.write_bytes(b"pid=987654321\r\n")
+            with patch("videonotes.note_revisions._process_state", return_value="stale"):
+                with contextlib.redirect_stdout(io.StringIO()) as output:
+                    self.assertEqual(main(["notes-lock-status", str(folder)]), 0)
+                self.assertEqual(json.loads(output.getvalue()), {"state": "stale", "pid": 987654321})
+                with contextlib.redirect_stderr(io.StringIO()) as output:
+                    self.assertEqual(main(["notes-lock-recover", str(folder)]), 2)
+                self.assertIn("--confirm", output.getvalue())
+                self.assertTrue(lock.exists())
+                with contextlib.redirect_stdout(io.StringIO()) as output:
+                    self.assertEqual(main(["notes-lock-recover", str(folder), "--confirm"]), 0)
+                self.assertEqual(json.loads(output.getvalue()), {"recovered": True, "previous_pid": 987654321})
+                self.assertFalse(lock.exists())
+                with contextlib.redirect_stdout(io.StringIO()) as output:
+                    self.assertEqual(main(["notes-lock-status", str(folder)]), 0)
+                self.assertEqual(json.loads(output.getvalue()), {"state": "missing"})
+
     def test_reject_directory_traversal_at_cli(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder = Path(tmp)
