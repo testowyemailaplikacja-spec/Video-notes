@@ -3,10 +3,11 @@ from __future__ import annotations
 
 import json
 import re
+from collections import Counter
 from pathlib import Path
 
 from .errors import VideoNotesError
-from .notes import _hash, _select, _source
+from .notes import STOPWORDS, _hash, _select, _source
 from .storage import atomic_write, read_project
 
 SCHEMA = "videonotes-source-outline-v1"
@@ -36,6 +37,41 @@ def _category(text: str) -> str:
     if DEFINITION.search(text):
         return "mozliwa_definicja"
     return "wypowiedz"
+
+
+
+def _topic_heading(citations: list[dict], number: int) -> str:
+    """Use only literal words found in the selected citations as topic hints.
+
+    Repeated terms across distinct source segments outrank the opening excerpt;
+    this is not semantic summarization or fact verification. Strip punctuation
+    from the *heading only* to avoid promoting untrusted text to Markdown markup.
+    """
+    if not citations:
+        return f"Zagadnienie {number}"
+    counts: Counter[str] = Counter()
+    first_spelling: dict[str, str] = {}
+    for citation in citations:
+        seen = set()
+        for word in re.findall(r"[^\\W_]+", citation["text"], re.UNICODE):
+            normalized = word.casefold()
+            if len(word) < 3 or normalized in STOPWORDS or len(word) > 40:
+                continue
+            first_spelling.setdefault(normalized, word)
+            seen.add(normalized)
+        counts.update(seen)
+    repeated = [term for term, count in counts.items() if count >= 2]
+    if repeated:
+        ranked = sorted(repeated, key=lambda term: (-counts[term], list(first_spelling).index(term)))
+    else:
+        ranked = list(first_spelling)
+    fragments = []
+    for term in ranked:
+        item = first_spelling[term]
+        if len(" ".join(fragments + [item])) > 60 or len(fragments) == 6:
+            break
+        fragments.append(item)
+    return f"Zagadnienie {number} · {' '.join(fragments)}" if fragments else f"Zagadnienie {number}"
 
 
 def build_advanced_outline(folder: Path, *, template: str = "lecture", detail: str = "standard",
@@ -72,7 +108,7 @@ def build_advanced_outline(folder: Path, *, template: str = "lecture", detail: s
                 })
             topics.append({
                 "id": f"topic-{index:06d}-{offset // 4:03d}",
-                "heading": f"Zagadnienie {offset // 4 + 1}",
+                "heading": _topic_heading(citations, offset // 4 + 1),
                 "citations": citations,
             })
         sections.append({
