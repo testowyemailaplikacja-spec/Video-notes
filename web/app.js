@@ -10,6 +10,8 @@
   var selected = null;
   var page = 0;
   var sourceRevision = 0;
+  // Track new edits made while an asynchronous file import is in flight.
+  var editRevision = 0;
   var get = function (id) { return document.getElementById(id); };
   var elements = {
     source: get("source-file"), status: get("status"), search: get("search"),
@@ -104,6 +106,7 @@
     if (page < Math.ceil(matches.length / PAGE_SIZE) - 1) { page += 1; renderList(); }
   });
   elements.search.addEventListener("input", filter);
+  elements.text.addEventListener("input", function () { editRevision += 1; });
   elements.save.addEventListener("click", function () {
     if (!doc || selected === null) return;
     var text = elements.text.value;
@@ -112,6 +115,7 @@
       return;
     }
     var item = doc.segments[selected];
+    editRevision += 1;
     if (text === item.text) delete edits[item.id];
     else edits[item.id] = text;
     matches = core.search(doc, edits, elements.search.value);
@@ -124,6 +128,7 @@
       "W edytorze jest niezapisana poprawka. Odrzucić ją i przywrócić tekst z importowanego pliku?"
     )) return;
     var item = doc.segments[selected];
+    editRevision += 1;
     delete edits[item.id];
     elements.text.value = item.text;
     matches = core.search(doc, edits, elements.search.value);
@@ -134,6 +139,7 @@
     var file = event.target.files && event.target.files[0];
     if (!file) return;
     var revision = ++sourceRevision;
+    var initialEditRevision = editRevision;
     if (hasUnsavedWork() &&
         !window.confirm("Masz niezapisane poprawki. Otwarcie nowego pliku je usunie. Kontynuować?")) {
       elements.source.value = "";
@@ -144,6 +150,13 @@
       var content = await file.text();
       var loaded = core.parseExport(content);
       if (revision !== sourceRevision) return; // Older slow file read must not replace newer import.
+      // A user may edit the open document WHILE the next file is being read.
+      // An earlier confirmation cannot authorize discarding newer changes.
+      if (editRevision !== initialEditRevision && hasUnsavedWork() &&
+          !window.confirm("Podczas wczytywania pliku wprowadzono nowe poprawki. Odrzucić je i otworzyć nowy plik?")) {
+        message("Import anulowany: zachowano poprawki w bieżącej transkrypcji.", false);
+        return;
+      }
       doc = loaded;
       edits = Object.create(null);
       selected = null;
@@ -172,6 +185,10 @@
   document.querySelectorAll("button[data-export]").forEach(function (button) {
     button.addEventListener("click", function () {
       if (!doc) return;
+      if (hasPendingEdit()) {
+        message("Najpierw kliknij „Zachowaj poprawkę” w edytorze. Eksport nie obejmuje niezapisanej treści pola.", true);
+        return;
+      }
       var filename = button.getAttribute("data-export");
       try {
         var payload = core.renderExport(doc, edits, filename);

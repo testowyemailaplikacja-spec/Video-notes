@@ -34,7 +34,12 @@ class Element {
 
 function boot() {
   const elements = Object.create(null);
-  const state = {allow: false, prompts: []};
+  const state = {allow: false, prompts: [], downloads: []};
+  const exportButtons = ["transcript.txt", "transcript.srt", "transcript.vtt", "transcript.json"].map(name => {
+    const button = new Element();
+    button.getAttribute = key => key === "data-export" ? name : null;
+    return button;
+  });
   const win = {
     VideoNotesWebCore: core,
     events: Object.create(null),
@@ -43,11 +48,21 @@ function boot() {
   };
   const doc = {
     getElementById(id) { return elements[id] ||= new Element(); },
-    createElement() { return new Element(); },
-    querySelectorAll() { return []; }
+    createElement() {
+      const node = new Element();
+      node.click = () => { state.downloads.push({filename: node.download, payload: state.payload}); };
+      node.remove = () => {};
+      return node;
+    },
+    querySelectorAll(selector) { return selector === "button[data-export]" ? exportButtons : []; },
+    body: {appendChild() {} }
   };
   const code = fs.readFileSync(path.join(__dirname, "../web/app.js"), "utf8");
-  vm.runInNewContext(code, {window: win, document: doc}, {filename: "web/app.js"});
+  vm.runInNewContext(code, {window: win, document: doc,
+    Blob: class { constructor(parts) {state.payload = parts.join("");} },
+    URL: {createObjectURL: () => "blob:local", revokeObjectURL() {} },
+    setTimeout: fn => fn()
+  }, {filename: "web/app.js"});
   async function importFile(data, read = async () => JSON.stringify(data)) {
     return elements["source-file"].events.change({
       target: {files: [{size: 1024, name: data.project_id, text: read}]}
@@ -57,7 +72,7 @@ function boot() {
     const row = elements["segment-rows"].children[index];
     row.children[1].children[0].events.click();
   }
-  return {elements, state, win, importFile, select};
+  return {elements, state, win, importFile, select, exportButtons};
 }
 
 function unload(ux) {
@@ -140,5 +155,56 @@ test("reset never silently discards unsaved textarea text", async () => {
   ux.state.allow = true;
   ux.elements["reset-edit"].events.click();
   assert.equal(ux.elements["edit-text"].value, "original text 0");
+  assert.equal(unload(ux).prevented, false);
+});
+
+test("export refuses unsaved textarea draft and accepts explicitly saved changes", async () => {
+  const ux = boot();
+  await ux.importFile(source("original", 2));
+  ux.select(0);
+  ux.elements["edit-text"].value = "Uncommitted value";
+  ux.elements["edit-text"].events.input();
+  ux.exportButtons[0].events.click();
+  assert.equal(ux.state.downloads.length, 0);
+  assert.match(ux.elements["status"].textContent, /Najpierw kliknij/);
+  assert.equal(ux.elements["edit-text"].value, "Uncommitted value");
+  ux.elements["save-edit"].events.click();
+  ux.exportButtons[0].events.click();
+  assert.equal(ux.state.downloads.length, 1);
+  assert.equal(ux.state.downloads[0].filename, "transcript.txt");
+  assert.match(ux.state.downloads[0].payload, /Uncommitted value/);
+});
+
+test("changes made while an import is reading require fresh confirmation", async () => {
+  const ux = boot();
+  await ux.importFile(source("original", 2));
+  let resolveNew;
+  const pending = ux.importFile(source("second", 1), () => new Promise(resolve => {resolveNew = resolve;}));
+  ux.select(0);
+  ux.elements["edit-text"].value = "New draft while reading";
+  ux.elements["edit-text"].events.input();
+  resolveNew(JSON.stringify(source("second", 1)));
+  await pending;
+  assert.equal(ux.state.prompts.length, 1);
+  assert.match(ux.state.prompts[0], /Podczas wczytywania/);
+  assert.match(ux.elements["edit-text"].value, /New draft/);
+  assert.match(ux.elements["match-count"].textContent, /^2 z 2/);
+  assert.match(ux.elements["status"].textContent, /Import anulowany/);
+  assert.equal(unload(ux).prevented, true);
+});
+
+test("a newly changed draft can also be explicitly discarded after file loading", async () => {
+  const ux = boot();
+  await ux.importFile(source("original", 2));
+  ux.state.allow = true;
+  let resolveNew;
+  const pending = ux.importFile(source("second", 1), () => new Promise(resolve => {resolveNew = resolve;}));
+  ux.select(0);
+  ux.elements["edit-text"].value = "New draft while reading";
+  ux.elements["edit-text"].events.input();
+  resolveNew(JSON.stringify(source("second", 1)));
+  await pending;
+  assert.equal(ux.state.prompts.length, 1);
+  assert.match(ux.elements["match-count"].textContent, /^1 z 1/);
   assert.equal(unload(ux).prevented, false);
 });
