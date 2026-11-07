@@ -224,6 +224,11 @@ class BasicNotesTest(unittest.TestCase):
                                  {"[Content_Types].xml", "_rels/.rels",
                                   "word/document.xml", "word/styles.xml",
                                   "word/_rels/document.xml.rels"})
+                content_types = archive.read("[Content_Types].xml")
+                package_relationships = archive.read("_rels/.rels")
+                self.assertIn(b'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"', content_types)
+                self.assertIn(b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"', package_relationships)
+                self.assertNotIn(b"ns0:", content_types + package_relationships)
                 xml = archive.read("word/document.xml")
                 tree = ET.fromstring(xml)
                 text = "\n".join(el.text or "" for el in tree.iter() if el.tag.endswith("}t"))
