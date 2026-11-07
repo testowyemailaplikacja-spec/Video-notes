@@ -35,7 +35,8 @@
         "PR #4: local portable project backup and integrity-checked relink",
         "PR #21: SRT/VTT cue boundary hardening for multiline corrections; Python/Node regression and Linux/Windows CI PASS; no real-ASR acceptance",
         "PR #27: conservative explicit dead-PID project lock recovery; safe WinAPI process inspection, CRLF compatibility; Linux/Windows source CI and Windows DEV EXE PASS",
-        "PR #28: synthetic 2h+ session checkpoint/resume/idempotent export (61 chunks, 12-before-cancel); Linux/Windows CI PASS, not real media or ASR"
+        "PR #28: synthetic 2h+ session checkpoint/resume/idempotent export (61 chunks, 12-before-cancel); Linux/Windows CI PASS, not real media or ASR",
+        "PR #43: real FFmpeg/FFprobe OBS-like MP4 and MKV 2-track path via actual local subprocess emitting whisper.cpp-shaped synthetic JSON; global stream selection, checkpoint cancel/resume, human edit and 4 exports; Ubuntu CI 120 tests PASS, Win+browser CI 5/5 PASS. NOT true speech recognition."
       ],
       "blockers": [
         "Real Whisper model end-to-end transcript of MP4/MKV",
@@ -51,13 +52,14 @@
         "PR #3: verbatim source-linked basic notes, independent edits and Markdown, CLI/GUI",
         "PR #6: versioned note regeneration with edits preservation and safe source-bound history",
         "PR #26: optional source-grounded basic notes TXT export with manual corrections, CLI and stale-source refusal; Linux/Windows CI and Windows DEV EXE PASS",
-        "PR #37: interrupted pristine note-edits journal can be safely resumed without overwriting completed notes or nonempty/orphaned user corrections; Linux/Windows source and real-browser CI plus Windows DEV EXE PASS, synthetic tests only."
+        "PR #37: interrupted pristine note-edits journal can be safely resumed without overwriting completed notes or nonempty/orphaned user corrections; Linux/Windows source and real-browser CI plus Windows DEV EXE PASS, synthetic tests only.",
+        "PR #44: opt-in offline notes-basic.docx in CLI/GUI using standard-library OOXML and existing basic-note provenance validation; manual edits and source timestamps, no links/macros; stale-transcript refuses overwriting old export. Linux 123 tests, 5/5 cross-platform source/browser CI and Windows DEV EXE PASS; no Word/LibreOffice physical acceptance."
       ],
       "blockers": [
         "Human assessment on real lectures",
         "Topic/summary generation beyond extractive snippets",
-        "Regenerate/undo with versioned manual edits",
-        "Export DOCX/PDF if approved"
+        "Manual acceptance on real source changes of existing versioned regenerate/undo and restored manual edits (source-only regression already implemented)",
+        "Optional PDF pending separate scope; source-linked DOCX code is implemented but lacks real Word/LibreOffice physical GUI acceptance"
       ]
     },
     {
@@ -81,7 +83,8 @@
       "evidence": [
         "PR #11: consent-gated FFmpeg/DirectShow Windows microphone recorder, segmented WAV, crash journal; Linux/Windows mock tests and development EXE CI PASS",
         "PR #12: device discovery and GUI start/stop integrated into develop, automated Windows/Linux contract tests PASS",
-        "PR #16: bounded FFmpeg stop/terminate/kill and preserved recording journal when recorder stalls, Linux/Windows CI and DEV EXE PASS"
+        "PR #16: bounded FFmpeg stop/terminate/kill and preserved recording journal when recorder stalls, Linux/Windows CI and DEV EXE PASS",
+        "PR #45: after interrupted recording or needs_review journal, read-only record-status reports healthy earlier WAV parts separately from damaged or symlinked parts, never auto-marks finished or modifies audio; finished sessions still strictly validate. Linux 125 tests and 5/5 source/browser CI plus Windows DEV EXE PASS. Not physical microphone crash test."
       ],
       "blockers": [
         "Physical Windows microphone permission and recording",
@@ -472,6 +475,52 @@
       "windows_executable": "PASS",
       "offline_installer": false,
       "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42418596749",
+      "scope": "PR #43 real FFmpeg OBS-like MP4/MKV dual track through real external synthetic CLI process, source regressions Linux 120 tests / 5 jobs PASS; not real ASR",
+      "source_linux_windows": "PASS",
+      "chromium_headless_linux": "PASS",
+      "firefox_headless_linux": "PASS",
+      "windows_chrome_headless": "PASS",
+      "windows_edge_headless": "PASS",
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42418950037",
+      "scope": "PR #44 offline basic DOCX with manual edits and source-provenance validation, Linux 123 tests, source/browser Linux and Windows 5/5 PASS; Word GUI not tested",
+      "source_linux_windows": "PASS",
+      "chromium_headless_linux": "PASS",
+      "firefox_headless_linux": "PASS",
+      "windows_chrome_headless": "PASS",
+      "windows_edge_headless": "PASS",
+      "real_asr": false,
+      "word_gui_tested": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42418949964",
+      "scope": "PR #44 Windows DEV EXE built and smoke-tested; DOCX source-level tests, no actual Word user acceptance",
+      "windows_executable": "PASS",
+      "offline_installer": false,
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42419200898",
+      "scope": "PR #45 non-destructive interrupted microphone WAV report regressions, Linux 125 tests and 5/5 Linux/Windows source/browser CI PASS",
+      "source_linux_windows": "PASS",
+      "chromium_headless_linux": "PASS",
+      "firefox_headless_linux": "PASS",
+      "windows_chrome_headless": "PASS",
+      "windows_edge_headless": "PASS",
+      "physical_microphone_tested": false,
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42419200975",
+      "scope": "PR #45 Windows DEV EXE build and smoke PASS; no physical microphone, no complete offline installer",
+      "windows_executable": "PASS",
+      "offline_installer": false,
+      "real_asr": false
     }
   ],
   "notes": [
@@ -490,7 +539,8 @@
     "PR #32/33 CI verified native headless Chrome and Edge on hosted Windows and Chromium on Linux, plus synthetic 50k browser workflow; WEB-01/WEB-02 remain NOT_RUN in full acceptance matrix without Firefox and physical keyboard/screen-reader testing. VN-07 remains W_TRAKCIE; no Constant_app or Netlify changes.",
     "PR #35 Firefox Linux headless CI passed for real file:// viewer and 50k synthetic input; WEB-01/WEB-02 remain NOT_RUN in full physical and screen-reader acceptance matrix. No Firefox physical Windows test and no host deployment.",
     "PR #37 note-creation interruption recovery with empty journal regressions PASS in Actions 42416723873/42416723714. VN-02 remains W_TRAKCIE without real-lecture semantic/human quality acceptance.",
-    "PR #39/40/41 merged after passing post-head Linux/Windows source, real-browser CI and Windows DEV EXE checks on 2026-11-07. They address export preflight, no-clobber private bundle publication, and literal source-derived topic hints. No complete physical Windows/ASR/human semantics acceptance; 0/9 VN DONE unchanged."
+    "PR #39/40/41 merged after passing post-head Linux/Windows source, real-browser CI and Windows DEV EXE checks on 2026-11-07. They address export preflight, no-clobber private bundle publication, and literal source-derived topic hints. No complete physical Windows/ASR/human semantics acceptance; 0/9 VN DONE unchanged.",
+    "PR #43–45 merged on 2026-11-07 after applicable Linux/Windows source/browser and Windows DEV EXE checks. MP4/MKV real FFmpeg + fake subprocess CLI does not verify true PL/EN ASR; DOCX OOXML tests do not verify Word GUI; recording crash report test is synthetic, not physical device recovery."
   ],
   "last_verified_develop_before_pr8": "344e227571ba09802da8a8bea7c50498473dc2e6"
 }
