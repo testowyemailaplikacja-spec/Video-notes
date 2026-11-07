@@ -90,23 +90,37 @@
       }).filter(function (item) { return Boolean(item.text.trim()); })
     };
   }
+  // Build only the requested format; avoid allocating three extra large files per download.
+  function renderExport(model, edits, filename) {
+    var doc = corrected(model, edits || Object.create(null));
+    if (filename === "transcript.txt") {
+      return doc.segments.map(function (s) { return s.text; }).join("\n") +
+        (doc.segments.length ? "\n" : "");
+    }
+    if (filename === "transcript.srt") {
+      var srt = doc.segments.map(function (s, i) {
+        return String(i + 1) + "\n" + clock(s.start_ms, false) + " --> " +
+          clock(s.end_ms, false) + "\n" + s.text;
+      }).join("\n\n");
+      return srt + (srt ? "\n" : "");
+    }
+    if (filename === "transcript.vtt") {
+      var vtt = doc.segments.map(function (s) {
+        return clock(s.start_ms, true) + " --> " + clock(s.end_ms, true) +
+          "\n" + s.text;
+      }).join("\n\n");
+      return "WEBVTT\n\n" + vtt + (doc.segments.length ? "\n" : "");
+    }
+    if (filename === "transcript.json") return JSON.stringify(doc, null, 2) + "\n";
+    reject("Nieobsługiwany format eksportu.");
+  }
+  // Preserve compatibility for existing programmatic callers.
   function renderExports(model, edits) {
-    var doc = corrected(model, edits || {});
-    var srt = doc.segments.map(function (s, i) {
-      return String(i + 1) + "\n" + clock(s.start_ms, false) + " --> " +
-        clock(s.end_ms, false) + "\n" + s.text;
-    }).join("\n\n");
-    var vtt = "WEBVTT\n\n" + doc.segments.map(function (s) {
-      return clock(s.start_ms, true) + " --> " + clock(s.end_ms, true) +
-        "\n" + s.text;
-    }).join("\n\n");
-    return {
-      "transcript.txt": doc.segments.map(function (s) { return s.text; }).join("\n") +
-        (doc.segments.length ? "\n" : ""),
-      "transcript.srt": srt + (srt ? "\n" : ""),
-      "transcript.vtt": vtt + (doc.segments.length ? "\n" : ""),
-      "transcript.json": JSON.stringify(doc, null, 2) + "\n"
-    };
+    var files = {};
+    ["transcript.txt", "transcript.srt", "transcript.vtt", "transcript.json"].forEach(function (name) {
+      files[name] = renderExport(model, edits, name);
+    });
+    return files;
   }
   function search(model, edits, term) {
     var doc = validateExport(model);
@@ -125,7 +139,8 @@
   var core = {
     SCHEMA: SCHEMA, MAX_BYTES: MAX_BYTES, MAX_TEXT: MAX_TEXT,
     parseExport: parseExport, validateExport: validateExport,
-    clock: clock, corrected: corrected, renderExports: renderExports,
+    clock: clock, corrected: corrected, renderExport: renderExport,
+    renderExports: renderExports,
     search: search
   };
   if (typeof module !== "undefined" && module.exports) module.exports = core;
