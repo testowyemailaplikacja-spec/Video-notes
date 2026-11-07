@@ -97,3 +97,39 @@ jobs:
         run: |
           node --check scripts/browser-smoke.cjs
           node scripts/browser-smoke.cjs
+
+  browser-windows:
+    name: Real Chrome and Edge file:// browser smoke (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Launch local KWN in Chrome and Edge without network dependencies
+        shell: pwsh
+        run: |
+          node --check scripts/browser-smoke.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $candidates = @(
+            @{ Name = "Chrome"; Paths = @(
+              "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
+              "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe"
+            ) },
+            @{ Name = "Edge"; Paths = @(
+              "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
+              "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe"
+            ) }
+          )
+          foreach ($browser in $candidates) {
+            $exe = $browser.Paths | Where-Object { Test-Path $_ } | Select-Object -First 1
+            if (-not $exe) {
+              Write-Error "Preinstalled $($browser.Name) not found"
+              exit 1
+            }
+            Write-Host "Browser smoke: $($browser.Name)"
+            $env:CHROME_BIN = $exe
+            node scripts/browser-smoke.cjs
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
