@@ -254,4 +254,8 @@ async function main() {
     }
   }
 }
-main().catch(error => { process.stderr.write(String(error.stack || error) + "\n"); process.exitCode = 1; });
+// Reuse the same real-browser scenario from Firefox WebDriver without executing CDP.
+module.exports = {browserScenario};
+if (require.main === module) {
+  main().catch(error => { process.stderr.write(String(error.stack || error) + "\n"); process.exitCode = 1; });
+}
