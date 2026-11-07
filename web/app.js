@@ -47,13 +47,14 @@
     elements.text.disabled = false;
     elements.save.disabled = false;
     elements.reset.disabled = false;
-    renderList();
+    renderList(true);
   }
-  function renderList() {
+  function renderList(focusSelected) {
     elements.rows.replaceChildren();
     if (!doc) return;
     var length = matches.length;
     var totalPages = Math.max(1, Math.ceil(length / PAGE_SIZE));
+    var focusTarget = null;
     page = Math.max(0, Math.min(page, totalPages - 1));
     for (var index of matches.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)) {
       var item = doc.segments[index];
@@ -67,6 +68,9 @@
       select.type = "button";
       select.textContent = current(item);
       select.setAttribute("aria-label", "Edytuj segment " + item.id);
+      select.setAttribute("aria-controls", "edit-text");
+      select.setAttribute("aria-pressed", index === selected ? "true" : "false");
+      if (index === selected) focusTarget = select;
       select.addEventListener("click", function (number) {
         return function () { setSelected(number); };
       }(index));
@@ -87,6 +91,8 @@
     elements.page.textContent = "Strona " + String(page + 1) + " / " + String(totalPages);
     elements.previous.disabled = page === 0;
     elements.next.disabled = page + 1 >= totalPages;
+    // Replacing tbody removes the clicked button. Restore keyboard focus after selecting.
+    if (focusSelected && focusTarget && typeof focusTarget.focus === "function") focusTarget.focus();
   }
   function filter() {
     if (!doc) return;
