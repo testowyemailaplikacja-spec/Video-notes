@@ -47,8 +47,9 @@ class MicrophoneTest(unittest.TestCase):
     def _record(self, **kwargs):
         with mock.patch("videonotes.microphone.sys.platform", "win32"), \
              mock.patch("videonotes.microphone.executable", return_value="ffmpeg"):
+            factory = kwargs.pop("process_factory", FakeFFmpeg)
             return record_microphone("Mic (USB)", self.folder, consent=True,
-                                     process_factory=FakeFFmpeg, **kwargs)
+                                     process_factory=factory, **kwargs)
 
     def test_shell_free_command_and_two_hour_segmentation(self):
         cmd = capture_command("ffmpeg", 'Mic "quoted"', self.folder / "part-%05d.wav", max_seconds=3600)
