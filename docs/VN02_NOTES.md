@@ -41,3 +41,15 @@ Domyślne `notes-export` nadal zapisuje tylko `exports/notes-basic.md`. Opcja `-
 ## Wznowienie tworzenia notatki po przerwaniu zapisu (VN-02)
 
 Jeżeli tworzenie notatki zostało przerwane po zapisaniu `notes-edits.json`, lecz przed utworzeniem `notes.json`, ponowne wywołanie `notes` może bezpiecznie dokończyć pierwszą generację **wyłącznie wtedy**, gdy istniejący dziennik ma dokładny schemat `videonotes-note-edits-v1` i pustą listę poprawek. Program nie nadpisuje takiego pliku, ale zapisuje nową notatkę. Jeżeli dziennik zawiera jakiekolwiek dane użytkownika, nieoczekiwane pola lub błędną wersję, generowanie jest blokowane i wymaga ręcznej kontroli. Istniejąca `notes.json` nigdy nie jest automatycznie zastępowana. Jest to testowana obsługa **przerwania pomiędzy dwoma zapisami**, nie dowód odzyskiwania po fizycznej awarii dysku ani zamknięcie całego VN-02.
+
+## Opcjonalny eksport Word DOCX (07.11.2026)
+
+Notatkę podstawową można dodatkowo zapisać jako lokalny dokument Microsoft Word / LibreOffice:
+
+    python -m videonotes notes-export KATALOG_PROJEKTU --docx
+
+W oknie „Notatka podstawowa” dostępny jest przycisk **Eksportuj DOCX (offline)**. Przed eksportem należy zapisać zmianę aktualnie wpisywaną w edytorze. Domyślne `notes-export` pozostaje zgodne z wcześniejszą wersją i tworzy jedynie Markdown; `--txt` nadal jest niezależne.
+
+Program tworzy `exports/notes-basic.docx` z tytułem, sekcjami, cytatami, identyfikatorami i czasami źródłowymi oraz widocznym oznaczeniem ręcznej poprawki. Każdy eksport przechodzi `read_basic_notes`: jeżeli transkrypcja zmieniła się od stworzenia notatki, operacja zostaje odmówiona bez nadpisania wcześniejszego DOCX. Oryginalne `transcript.json`, `notes.json` i poprawki pozostają nietknięte.
+
+Dokument jest składany wyłącznie przez standardową bibliotekę Python; tekst użytkownika jest zapisany jako zwykły tekst OOXML, bez zewnętrznych relacji, makr i pobierania zasobów. Testy automatyczne weryfikują struktury ZIP/XML, niebezpieczny tekst literalny, Unicode, ręczne zmiany i ochronę przed nieaktualnym źródłem. Nie wykonano jeszcze **ręcznego testu otwierania/drukowania w Word i LibreOffice na fizycznym komputerze**. Nie jest to PDF ani semantyczne streszczenie; VN-02 nadal W TRAKCIE.

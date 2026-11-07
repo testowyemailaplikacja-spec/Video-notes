@@ -13,7 +13,7 @@ from .errors import VideoNotesError
 from .exports import edit_segment, export_project
 from .media import probe
 from .microphone import record_microphone, list_microphone_devices
-from .notes import generate_basic_notes, read_basic_notes, edit_note_point, export_basic_notes
+from .notes import generate_basic_notes, read_basic_notes, edit_note_point, export_basic_notes, export_basic_notes_docx
 from .advanced_notes import export_advanced_outline
 from .note_revisions import regenerate_basic_notes, list_note_versions
 from .pipeline import create_project, transcribe_project
@@ -487,6 +487,20 @@ class VideoNotesWindow:
             except VideoNotesError as error:
                 messagebox.showerror("Notatka", str(error))
         ttk.Button(right, text="Zapisz poprawkę i Markdown", command=save_edit).pack(anchor="e", pady=7)
+        def export_docx() -> None:
+            ids = view.selection()
+            if ids:
+                key = ids[0]
+                current = changes["edits"].get(key, content_by_id[key]["text"])
+                if editor.get("1.0", "end-1c") != current:
+                    messagebox.showwarning("Eksport DOCX", "Najpierw zapisz poprawkę w edytorze.")
+                    return
+            try:
+                path = export_basic_notes_docx(folder)
+                status.set("Zapisano lokalny DOCX: " + str(path))
+            except VideoNotesError as error:
+                messagebox.showerror("Eksport DOCX", str(error))
+        ttk.Button(right, text="Eksportuj DOCX (offline)", command=export_docx).pack(anchor="e", pady=4)
         def regenerate() -> None:
             if not messagebox.askyesno(
                 "Odbudowa notatki",

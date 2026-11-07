@@ -3,10 +3,12 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 from videonotes.errors import VideoNotesError
-from videonotes.notes import generate_basic_notes, read_basic_notes, edit_note_point, render_basic_markdown, export_basic_notes, render_basic_text, export_basic_notes_text
+from videonotes.notes import generate_basic_notes, read_basic_notes, edit_note_point, render_basic_markdown, export_basic_notes, render_basic_text, export_basic_notes_text, export_basic_notes_docx
 from videonotes.storage import read_project, save_json
 
 
@@ -186,6 +188,56 @@ class BasicNotesTest(unittest.TestCase):
                     generate_basic_notes(root)
                 self.assertEqual((root / "notes-edits.json").read_bytes(), before)
                 self.assertFalse((root / "notes.json").exists())
+
+
+    def test_offline_basic_docx_contains_source_edits_and_safely_escaped_text(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            fixture(root)
+            original = {name: (root / name).read_bytes() for name in
+                        ("project.json", "transcript.json", "edits.json")}
+            note = generate_basic_notes(root)
+            point = note["sections"][0]["points"][0]["id"]
+            user_text = "<script>nie uruchamiać</script> & Źródło\n# Moja uwaga"
+            edit_note_point(root, point, user_text)
+            result = export_basic_notes_docx(root)
+            self.assertEqual(result, root / "exports/notes-basic.docx")
+            with zipfile.ZipFile(result) as archive:
+                self.assertEqual(set(archive.namelist()),
+                                 {"[Content_Types].xml", "_rels/.rels",
+                                  "word/document.xml", "word/styles.xml",
+                                  "word/_rels/document.xml.rels"})
+                xml = archive.read("word/document.xml")
+                tree = ET.fromstring(xml)
+                text = "\n".join(el.text or "" for el in tree.iter() if el.tag.endswith("}t"))
+                self.assertIn("Notatka podstawowa", text)
+                self.assertIn("c0000000-s00000", text)
+                self.assertIn("poprawka użytkownika", text)
+                self.assertIn("<script>nie uruchamiać</script> & Źródło", text)
+                self.assertIn("# Moja uwaga", text)
+                self.assertIn(b"&lt;script&gt;", xml)
+                self.assertFalse(any(el.tag.endswith("}script") for el in tree.iter()))
+                for name in archive.namelist():
+                    if name.endswith((".rels", ".xml")):
+                        ET.fromstring(archive.read(name))
+                self.assertNotIn(b"TargetMode", archive.read("word/_rels/document.xml.rels"))
+                self.assertNotIn("vbaProject.bin", archive.namelist())
+            for name, data in original.items():
+                self.assertEqual((root / name).read_bytes(), data)
+
+    def test_basic_docx_refuses_stale_source_without_overwriting_previous_export(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            fixture(root)
+            generate_basic_notes(root)
+            original_docx = export_basic_notes_docx(root).read_bytes()
+            edits = {"schema": "videonotes-edits-v1",
+                     "edits": {"c0000000-s00000": "Poprawiona już transkrypcja"}}
+            save_json(root / "edits.json", edits)
+            with self.assertRaisesRegex(VideoNotesError, "zmieniła"):
+                export_basic_notes_docx(root)
+            self.assertEqual((root / "exports/notes-basic.docx").read_bytes(), original_docx)
+
 
 
 if __name__ == "__main__":

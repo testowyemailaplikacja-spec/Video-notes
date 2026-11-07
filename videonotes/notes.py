@@ -182,3 +182,13 @@ def export_basic_notes(folder: Path) -> Path:
     target = Path(folder) / "exports" / "notes-basic.md"
     atomic_write(target, render_basic_markdown(folder).encode("utf-8"))
     return target
+
+
+def export_basic_notes_docx(folder: Path) -> Path:
+    """Export local Word DOCX only after validating citations against source."""
+    notes, changes = read_basic_notes(folder)
+    from .docx_export import render_basic_docx
+    payload = render_basic_docx(notes, changes)
+    target = Path(folder) / "exports" / "notes-basic.docx"
+    atomic_write(target, payload)
+    return target
