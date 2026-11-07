@@ -94,6 +94,33 @@ jobs:
           echo "dcb76c6586fc06cbdac6dd21f14cfd129cc4cdd9dce19bf4ffa62e59cbe6e6d1  $MODEL_DIR/model.bin" | sha256sum -c -
           test -s "$MODEL_DIR/config.json"
           test -s "$MODEL_DIR/tokenizer.json"
+      - name: Diagnose optional CPU inference with synthetic audio only, redacting transcript and paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          try:
+              import faster_whisper
+              from faster_whisper import WhisperModel
+              print("faster-whisper module import: OK")
+              model = WhisperModel(str(Path(os.environ["RUNNER_TEMP"]) / "faster-tiny"),
+                                   device="cpu", compute_type="int8", cpu_threads=4,
+                                   num_workers=1, local_files_only=True)
+              print("faster-whisper model initialization: OK")
+              segments, info = model.transcribe(str(Path(os.environ["RUNNER_TEMP"]) / "pl.wav"),
+                                                language="pl", beam_size=5,
+                                                vad_filter=False, condition_on_previous_text=True)
+              count = sum(1 for part in segments if part.text.strip())
+              print("faster-whisper synthetic PL inference segments:", count)
+              if count < 1:
+                  raise RuntimeError("Empty synthetic TTS result")
+          except Exception as error:
+              print("faster-whisper failed with class", type(error).__name__)
+              # No arbitrary exception messages or transcript text are printed.
+              raise SystemExit(2)
+          PY
       - name: Compare two real local CPU engines on exactly the same PL and EN TTS WAV
         shell: bash
         run: |
