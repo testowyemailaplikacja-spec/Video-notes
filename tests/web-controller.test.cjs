@@ -47,9 +47,11 @@ function boot() {
     confirm(message) { state.prompts.push(message); return state.allow; }
   };
   const doc = {
+    activeElement: null,
     getElementById(id) { return elements[id] ||= new Element(); },
     createElement() {
       const node = new Element();
+      node.focus = () => { doc.activeElement = node; };
       node.click = () => { state.downloads.push({filename: node.download, payload: state.payload}); };
       node.remove = () => {};
       return node;
@@ -72,7 +74,7 @@ function boot() {
     const row = elements["segment-rows"].children[index];
     row.children[1].children[0].events.click();
   }
-  return {elements, state, win, importFile, select, exportButtons};
+  return {elements, state, win, doc, importFile, select, exportButtons};
 }
 
 function unload(ux) {
@@ -207,4 +209,21 @@ test("a newly changed draft can also be explicitly discarded after file loading"
   assert.equal(ux.state.prompts.length, 1);
   assert.match(ux.elements["match-count"].textContent, /^1 z 1/);
   assert.equal(unload(ux).prevented, false);
+});
+
+
+test("segment selection exposes ARIA state and keeps focus after row redraw", async () => {
+  const ux = boot();
+  await ux.importFile(source("keyboard", 2));
+  ux.select(0);
+  const first = ux.elements["segment-rows"].children[0].children[1].children[0];
+  const second = ux.elements["segment-rows"].children[1].children[1].children[0];
+  assert.equal(first["aria-pressed"], "true");
+  assert.equal(first["aria-controls"], "edit-text");
+  assert.equal(second["aria-pressed"], "false");
+  assert.equal(ux.doc.activeElement, first);
+  ux.select(1);
+  const selected = ux.elements["segment-rows"].children[1].children[1].children[0];
+  assert.equal(selected["aria-pressed"], "true");
+  assert.equal(ux.doc.activeElement, selected);
 });

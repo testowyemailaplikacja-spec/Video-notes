@@ -44,6 +44,7 @@
         <div class="segments">
           <div class="table-scroller">
             <table>
+              <caption class="visually-hidden">Lista wypowiedzi transkrypcji. Wybierz wypowiedź, aby poprawić jej treść.</caption>
               <thead>
                 <tr><th scope="col">Czas</th><th scope="col">Wypowiedź</th></tr>
               </thead>
@@ -52,15 +53,15 @@
               </tbody>
             </table>
           </div>
-          <div class="pager">
+          <nav class="pager" aria-label="Strony transkrypcji">
             <button id="previous" disabled>Poprzednia</button>
             <span id="page-number">Strona 0 / 0</span>
             <button id="next" disabled>Następna</button>
-          </div>
+          </nav>
         </div>
-        <aside class="editor">
-          <h2>3. Popraw wypowiedź</h2>
-          <p id="selected-label">Wybierz wiersz transkrypcji.</p>
+        <aside class="editor" aria-labelledby="editor-heading">
+          <h2 id="editor-heading">3. Popraw wypowiedź</h2>
+          <p id="selected-label" aria-live="polite">Wybierz wiersz transkrypcji.</p>
           <label for="edit-text">Treść segmentu</label>
           <textarea id="edit-text" rows="10" disabled spellcheck="true"></textarea>
           <button id="save-edit" class="primary" disabled>Zachowaj poprawkę</button>
