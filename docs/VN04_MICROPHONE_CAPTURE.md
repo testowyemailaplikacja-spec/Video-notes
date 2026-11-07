@@ -37,3 +37,11 @@ Stan needs_review oznacza awarię procesu lub pliku. Nie wolno go bez sprawdzeni
 Jest to pierwsza implementacja backendu mikrofonu i dziennika nagrania, nie odebrana obsługa Windows. Konieczne: test prawdziwego mikrofonu z uprawnieniami systemowymi, rozłączaniem urządzeń, 2-godzinnym nagraniem, wyczerpaniem miejsca, wznowieniem po restarcie, fizyczny odbiór interfejsu Windows, prawdziwy wybór urządzenia i stabilność GUI przy długich nagraniach. Nie ma jeszcze nagrywania dźwięku systemowego ani miksowania mikrofonu z dźwiękiem komputera. Program FFmpeg oraz model ASR nie są spakowane w instalatorze.
 
 Do automatycznych testów dołączono testy atrap procesu: tests/test_microphone.py. Atrapa NIE potwierdza dostępu do fizycznego urządzenia.
+
+## Raport czytelnych części po przerwanym nagrywaniu (07.11.2026)
+
+Jeżeli po awarii nagrywania dziennik ma stan `needs_review` lub `recording`, polecenie `record-status` **nie zatrzymuje całego podglądu na pierwszym uszkodzonym pliku WAV**. Zwraca osobno listę poprawnie odczytanych części w `segments` i nazwy plików wymagających ręcznej kontroli w `unreadable_parts`. Pole `requires_manual_review=true` przypomina, że sesja nie została odebrana i może wciąż być aktywna.
+
+Dokument i nagrania pozostają bez zmian: kontrola nie naprawia, nie usuwa, nie odtwarza brakujących danych, nie zmienia `recording.json` ani nie otwiera dowiązań symbolicznych do plików spoza katalogu. Tylko sesja z dziennikiem `finished` przechodzi nadal **ścisłą walidację wszystkich plików**; uszkodzenie dowolnej części powoduje błąd.
+
+Przykład: przy kompletnym `part-00000.wav` i urwanym `part-00001.wav` stan po awarii pokazuje pierwszy jako możliwy do późniejszego odzysku, a drugi jako wymagający kontroli. Nie dowodzi to możliwości przywrócenia urwanej części ani ukończenia testu awarii fizycznego urządzenia Windows.
