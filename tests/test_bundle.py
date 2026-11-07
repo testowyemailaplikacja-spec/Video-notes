@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from videonotes.bundle import create_internal_bundle, SCHEMA
+from videonotes.bundle import create_internal_bundle, verify_internal_bundle, SCHEMA
 from videonotes.cli import main
 from videonotes.errors import VideoNotesError
 
@@ -50,6 +50,69 @@ class InternalBundleTest(unittest.TestCase):
         self.assertNotIn(str(self.root).encode("utf-8"), launcher)
         self.assertNotIn(str(self.root), json.dumps(manifest))
         self.assertIn("INTERNAL TEST BUILD ONLY", (self.output / "INTERNAL-ONLY.txt").read_text("utf-8"))
+
+
+    def test_verify_success_before_running_offline_bundle(self):
+        self._build()
+        report = verify_internal_bundle(self.output)
+        self.assertTrue(report["verified"])
+        self.assertEqual(report["file_count"], 5)
+        self.assertFalse(report["release_ready"])
+        launcher = (self.output / "START-VIDEO-NOTES.cmd").read_text(encoding="ascii")
+        self.assertIn("bundle-verify", launcher)
+        self.assertIn("if errorlevel 1", launcher)
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(main(["bundle-verify", str(self.output)]), 0)
+        self.assertTrue(json.loads(output.getvalue())["verified"])
+
+    def test_verify_rejects_changed_binary_and_keeps_private_files(self):
+        self._build()
+        model = self.output / "bin/model.bin"
+        model.write_bytes(b"private-different-model")
+        with self.assertRaisesRegex(VideoNotesError, "SHA-256"):
+            verify_internal_bundle(self.output)
+        with contextlib.redirect_stderr(io.StringIO()) as errors:
+            self.assertEqual(main(["bundle-verify", str(self.output)]), 2)
+        self.assertIn("SHA-256", errors.getvalue())
+        self.assertTrue(model.exists())
+
+    def test_verify_rejects_manipulated_launcher_extra_file_and_manifest(self):
+        self._build()
+        launch = self.output / "START-VIDEO-NOTES.cmd"
+        original_launch = launch.read_bytes()
+        launch.write_bytes(original_launch + b"REM altered\r\n")
+        with self.assertRaisesRegex(VideoNotesError, "startowy"):
+            verify_internal_bundle(self.output)
+        launch.write_bytes(original_launch)
+        extra = self.output / "unexpected.txt"
+        extra.write_text("unexpected", encoding="ascii")
+        with self.assertRaisesRegex(VideoNotesError, "dodatkową"):
+            verify_internal_bundle(self.output)
+        extra.unlink()
+
+        manifest_file = self.output / "bundle-manifest.json"
+        original_manifest = manifest_file.read_text(encoding="utf-8")
+        manifest_file.write_text('{"schema":"x","schema":"y"}', encoding="utf-8")
+        with self.assertRaisesRegex(VideoNotesError, "powielone klucze"):
+            verify_internal_bundle(self.output)
+        manifest_file.write_text(original_manifest, encoding="utf-8")
+        manifest = json.loads(original_manifest)
+        manifest["license_verified"] = True
+        manifest_file.write_text(json.dumps(manifest), encoding="utf-8")
+        with self.assertRaisesRegex(VideoNotesError, "prywatnemu pakietowi"):
+            verify_internal_bundle(self.output)
+        manifest_file.write_text(original_manifest, encoding="utf-8")
+        self.assertTrue(verify_internal_bundle(self.output)["verified"])
+
+    def test_verify_rejects_missing_binary_and_large_manifest(self):
+        self._build()
+        (self.output / "bin/ffprobe.exe").unlink()
+        with self.assertRaisesRegex(VideoNotesError, "Brakuje składnika"):
+            verify_internal_bundle(self.output)
+        manifest_file = self.output / "bundle-manifest.json"
+        manifest_file.write_text("x" * 65537, encoding="utf-8")
+        with self.assertRaisesRegex(VideoNotesError, "manifestu"):
+            verify_internal_bundle(self.output)
 
     def test_existing_output_and_missing_license_acknowledgement_refused(self):
         with self.assertRaisesRegex(VideoNotesError, "internal-only"):
