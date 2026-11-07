@@ -4,8 +4,11 @@ import contextlib
 import hashlib
 import io
 import json
+import os
+import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from videonotes.bundle import create_internal_bundle, verify_internal_bundle, SCHEMA
@@ -134,6 +137,32 @@ class InternalBundleTest(unittest.TestCase):
         with self.assertRaisesRegex(VideoNotesError, "osobny"):
             self._build()
         self.assertFalse(self.output.exists())
+
+    @unittest.skipUnless(os.name == "nt" or sys.platform.startswith("linux"),
+                         "Bundle publishing supports Windows and Linux")
+    def test_concurrent_empty_destination_is_not_replaced_or_populated(self):
+        # Simulate another process creating the exact target after the initial
+        # exists() check but just before final directory publication.
+        from videonotes.bundle import _publish_bundle_no_replace
+        original_sources = {name: path.read_bytes() for name, path in self.sources.items()}
+
+        def competing_writer(staging, destination):
+            self.assertFalse(destination.exists())
+            destination.mkdir()
+            with self.assertRaisesRegex(VideoNotesError, "powstał równolegle"):
+                _publish_bundle_no_replace(staging, destination)
+            raise VideoNotesError("Katalog docelowy powstał równolegle; nie nadpisuję go.")
+
+        with patch("videonotes.bundle._publish_bundle_no_replace",
+                   side_effect=competing_writer):
+            with self.assertRaisesRegex(VideoNotesError, "powstał równolegle"):
+                self._build()
+        self.assertTrue(self.output.is_dir())
+        self.assertEqual(list(self.output.iterdir()), [])
+        self.assertFalse(any(p.name.startswith(".vn-bundle-")
+                             for p in self.root.iterdir()))
+        for name, path in self.sources.items():
+            self.assertEqual(path.read_bytes(), original_sources[name])
 
     def test_cli_requires_guard_and_uses_offline_paths(self):
         args = ["bundle-dev"]
