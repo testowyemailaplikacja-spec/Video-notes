@@ -72,3 +72,7 @@ Wszystkie poniższe przebiegi zostały zweryfikowane jako `success` **po odpowie
 | [#22](https://github.com/testowyemailaplikacja-spec/Video-notes/pull/22) | [42376671514](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42376671514) | Budowa i smoke test Windows DEV EXE | PASS |
 
 **Ważne:** te testy syntetyczne nie są fizycznym odbiorem ani testem instalacji offline. Statusy HW-01, ASR-01…06, MIC-01…02, MIX-01…02, WEB-01…02, PKG-01…02, HOST-01 oraz MOB-01 pozostają `NOT_RUN` zgodnie z tabelą. Odbiór rzeczywistego ASR i urządzeń nie może być zastąpiony powodzeniem CI.
+
+## Regresja długiej sesji, bez fałszywego odbioru sprzętu
+
+Test `tests/test_pipeline_long.py` uruchamia **syntetyczny** projekt 2 godziny 1 minuta w 61 fragmentach po maksymalnie 120 sekund, symuluje anulowanie po 12 zapisanych fragmentach, sprawdza wznowienie bez duplikatów, eksport i idempotentność kolejnego resume. Nie tworzy rzeczywistego nagrania 2h, nie uruchamia Whisper/FFmpeg i nie mierzy RAM ani jakości mowy. Jego PASS nie zmienia `ASR-05` i `HW-01` z `NOT_RUN` — potrzebny jest nadal fizyczny eksperyment z legalnym nagraniem i modelem.
