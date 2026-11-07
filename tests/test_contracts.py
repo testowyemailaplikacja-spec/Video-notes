@@ -95,6 +95,25 @@ class ContractTest(unittest.TestCase):
                 read_project(root)
             self.assertEqual((root / "transcript.json").read_text(), "{invalid")
 
+    def test_subtitle_lines_cannot_create_extra_cues_or_webvtt_markup(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            save_json(root / "project.json", demo_project())
+            raw = demo_transcript()
+            save_json(root / "transcript.json", raw)
+            message = "Pierwszy wiersz\n\n00:01:00,000 --> 00:02:00,000\n<v Jan> A & B"
+            edit_segment(root, "c0000000-s00000", message)
+            files = render_exports(root)
+            srt = files["transcript.srt"].decode("utf-8")
+            vtt = files["transcript.vtt"].decode("utf-8")
+            self.assertEqual(srt.count("\n\n"), 1)  # exactly two subtitle cues
+            self.assertIn("Pierwszy wiersz 00:01:00,000 --> 00:02:00,000 <v Jan> A & B", srt)
+            self.assertNotIn("<v Jan>", vtt)
+            self.assertIn("&lt;v Jan&gt; A &amp; B", vtt)
+            self.assertEqual(files["transcript.txt"].decode("utf-8").splitlines()[:4], message.splitlines())
+            self.assertEqual(__import__("json").loads(files["transcript.json"])["segments"][0]["text"], message)
+            self.assertEqual(read_project(root)[1], raw)
+
 
 if __name__ == "__main__":
     unittest.main()
