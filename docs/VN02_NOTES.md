@@ -37,3 +37,7 @@ python -m videonotes notes-export KATALOG_PROJEKTU --txt
 ```
 
 Domyślne `notes-export` nadal zapisuje tylko `exports/notes-basic.md`. Opcja `--txt` zapisuje dodatkowo `exports/notes-basic.txt` z identyfikatorami segmentów, czasami i jawnym oznaczeniem ręcznych poprawek. Oba formaty korzystają z tej samej walidacji zgodności cytatów ze źródłem; zapis TXT nie nadpisuje transkrypcji ani edycji. Nie jest to automatyczne streszczenie semantyczne, ocena jakości rzeczywistych wykładów pozostaje otwarta.
+
+## Wznowienie tworzenia notatki po przerwaniu zapisu (VN-02)
+
+Jeżeli tworzenie notatki zostało przerwane po zapisaniu `notes-edits.json`, lecz przed utworzeniem `notes.json`, ponowne wywołanie `notes` może bezpiecznie dokończyć pierwszą generację **wyłącznie wtedy**, gdy istniejący dziennik ma dokładny schemat `videonotes-note-edits-v1` i pustą listę poprawek. Program nie nadpisuje takiego pliku, ale zapisuje nową notatkę. Jeżeli dziennik zawiera jakiekolwiek dane użytkownika, nieoczekiwane pola lub błędną wersję, generowanie jest blokowane i wymaga ręcznej kontroli. Istniejąca `notes.json` nigdy nie jest automatycznie zastępowana. Jest to testowana obsługa **przerwania pomiędzy dwoma zapisami**, nie dowód odzyskiwania po fizycznej awarii dysku ani zamknięcie całego VN-02.
