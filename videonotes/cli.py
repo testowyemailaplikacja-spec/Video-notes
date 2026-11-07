@@ -18,7 +18,7 @@ from .quality import compare_text_files
 from .asr_lab import run_real_benchmark
 from .backup import create_backup, restore_backup, relink_backup
 from .bundle import create_internal_bundle, verify_internal_bundle
-from .pipeline import create_project, transcribe_project
+from .pipeline import create_project, transcribe_project, transcription_lock_status, recover_stale_transcription_lock
 from .storage import read_project
 
 
@@ -43,6 +43,11 @@ def parser() -> argparse.ArgumentParser:
     resume.add_argument("project", type=Path)
     resume.add_argument("--ffmpeg", default="ffmpeg")
     resume.add_argument("--ffprobe", default="ffprobe")
+    lock_status = sub.add_parser("lock-status", help="Sprawdź, czy blokada transkrypcji jest aktywna, czy osierocona")
+    lock_status.add_argument("project", type=Path)
+    lock_recover = sub.add_parser("lock-recover", help="Usuń tylko potwierdzoną osieroconą blokadę po awarii")
+    lock_recover.add_argument("project", type=Path)
+    lock_recover.add_argument("--confirm", action="store_true", help="Jawnie potwierdź bezpieczne odzyskiwanie")
     exports = sub.add_parser("export", help="Zapisz TXT/SRT/VTT/JSON bez zmiany surowego tekstu")
     exports.add_argument("project", type=Path)
     edit = sub.add_parser("edit", help="Zapisz poprawkę segmentu, zachowując surową transkrypcję")
@@ -160,6 +165,11 @@ def main(argv: list[str] | None = None) -> int:
             transcribe_project(args.project, ffmpeg=args.ffmpeg, ffprobe=args.ffprobe, progress=_progress)
             export_project(args.project)
             print(f"Wznowiono i zapisano: {args.project}")
+        elif args.action == "lock-status":
+            read_project(args.project)
+            print(json.dumps(transcription_lock_status(args.project), ensure_ascii=False))
+        elif args.action == "lock-recover":
+            print(json.dumps(recover_stale_transcription_lock(args.project, confirm=args.confirm), ensure_ascii=False))
         elif args.action == "edit":
             edit_segment(args.project, args.segment, args.text)
             export_project(args.project)
