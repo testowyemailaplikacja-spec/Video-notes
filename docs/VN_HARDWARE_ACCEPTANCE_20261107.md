@@ -91,3 +91,9 @@ Jest to potwierdzony podtest przeglądarkowy, **nie całe WEB-01** (Chrome/Edge/
 - Tabela ma podpis dla czytnika, edytor nazwę regionu, aktywny przycisk `aria-pressed`, a fokus jest przywracany po odrysowaniu listy. To **automatyczny podtest**, nie odbiór przez użytkownika czytnika ekranu.
 
 **Pozostają NOT_RUN:** Firefox na rzeczywistym Windows (`WEB-01`), test ręczny klawiatury i czytnika ekranu na fizycznym Windows oraz pomiary pamięci i responsywności na docelowym sprzęcie (`WEB-02`). Nie zmienia to pełnych statusów tych kryteriów w tabeli ani żadnego statusu etapu VN. Integracja hosta `HOST-01` wciąż wymaga osobnej bramki.
+
+## 9. Rzeczywisty Firefox Linux CI — PR #35 (07.11.2026)
+
+[Actions 42416372511](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42416372511): pięć jobów **PASS**, w tym nowy Firefox w trybie headless na Ubuntu 24.04 z preinstalowanym geckodriver. Nowy test korzysta z W3C WebDriver przez lokalny port, bez zależności npm i z tym samym scenariuszem importu/edycji/eksportu co Chromium, Chrome i Edge. Import i obsługa 50 000 syntetycznych segmentów w Firefoksie w CI: **125 ms** (jedna próbka, bez gwarancji czasu na fizycznym komputerze). Weryfikacja obejmuje fokus, etykiety ARIA i brak żądań sieciowych z lokalnego interfejsu.
+
+**Nie zamyka:** pełnego `WEB-01` na fizycznym Windows w Firefoksie, odbioru dostępności czytnikiem ekranu ani `WEB-02`; nie ma realnej transkrypcji WWW ani publikacji Wiedora. Status VN-07 nadal `W_TRAKCIE`.
