@@ -42,3 +42,9 @@ Na fizycznym komputerze Windows, po skopiowaniu katalogu i odcięciu sieci, uruc
 To testowa, NIEPODPISANA paczka lokalna, a nie instalator .exe/.msi ani wydanie użytkowe. Kod sprawdza SHA-256 skopiowanych danych i ponownie je weryfikuje przed startem, ale nie poświadcza zgodności wersji bibliotek, integralności pochodzenia plików zewnętrznych ani licencji. Z tego powodu manifest jawnie oznacza license_verified=false, signature_verified=false, hardware_tested=false. Nie wolno rozpowszechniać bez dalszej kontroli i praw do redystrybucji.
 
 Automatyczne tests/test_bundle.py korzystają z syntetycznych plików i nie testują rzeczywistego modelu Whisper. Dalsze bramki: prawdziwe ASR PL/EN, instalacja bez sieci na czystym Windows, logi AV/SmartScreen, ocena prawna/licencji, odtwarzanie po błędzie, testy długich nagrań oraz podpisywanie wydania.
+
+## Atomowe opublikowanie kompletnego katalogu bez nadpisania (07.11.2026)
+
+Pakiet jest przygotowywany i weryfikowany w osobnym katalogu tymczasowym. Na Windows jego katalog wynikowy jest publikowany przez systemowe `rename`, które odmawia zastąpienia istniejącego katalogu. Na Linux używane jest `renameat2(RENAME_NOREPLACE)` zamiast zwykłego `os.rename`: to zapobiega przejęciu **pustego katalogu utworzonego przez drugi proces w ostatniej chwili**, już po wcześniejszym sprawdzeniu `exists()`. Gdy wymagany mechanizm nie jest dostępny, operacja kończy się odmową i sprzątnięciem katalogu tymczasowego; na innych platformach składanie pakietu z pełną gwarancją no-clobber nie jest obecnie udostępnione.
+
+Regresja celowo symuluje równoległe utworzenie pustego katalogu docelowego tuż przed publikacją i sprawdza, że pozostaje pusty oraz żaden plik źródłowy nie został naruszony. Jest to ochrona przed kolizją zapisów, **nie** test rzeczywistego instalatora, podpisu ani kompatybilności/licencji FFmpeg i modelu.
