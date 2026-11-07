@@ -55,3 +55,17 @@ Jeśli panel „Notatka podstawowa” wykryje dziennik przerwanej aktualizacji, 
 Do CI dodano osobny test interfejsu w **rzeczywistych widżetach Tkinter** uruchamianych na wirtualnym ekranie Xvfb (`scripts/gui_headless_test.py`, workflow `vn-tk-headless.yml`). Scenariusze testowe: otwieranie i przywrócenie wersji przez przyciski, odmowa i zgoda na odzyskanie przerwanego zapisu, ochrona szkicu przy wyborze innego punktu. Dialogi potwierdzające są zastąpione kontrolowanymi odpowiedziami testowymi; reszta elementów Tk działa w rzeczywistym interpreterze i ekranie wirtualnym.
 
 Nie jest to weryfikacja fizycznego Windows, obsługi czytnika ekranowego ani pełny test ergonomii człowieka. VN-02 pozostaje W_TRAKCIE.
+
+## Bezpieczne zdjęcie osieroconej blokady notatek (08.11.2026)
+
+Wcześniejsze wersje programu tworzyły pusty `.notes.lock`, więc po awarii nie można było niezależnie ustalić właściciela. Nowe blokady edycji, regeneracji, przywracania i odzyskiwania przechowują PID bieżącego procesu w postaci `pid=12345` i są utrwalane. Obecność blokady nie oznacza automatycznie awarii: może chronić aktywne zapisy.
+
+Najpierw zamknij wszystkie kopie programu korzystające z projektu i sprawdź status:
+
+    python -m videonotes notes-lock-status KATALOG_PROJEKTU
+
+Tylko gdy status jest `stale` (zweryfikowano martwy PID), można świadomie usunąć *sam plik blokady*:
+
+    python -m videonotes notes-lock-recover KATALOG_PROJEKTU --confirm
+
+Program ponownie sprawdza PID, zawartość i tożsamość pliku przed usunięciem. Nie usuwa blokad `active`, `unknown`, `invalid`, dowiązań symbolicznych ani dawnych pustych blokad bez informacji o procesie; nie używa destrukcyjnego sygnału Windows. Jeśli istnieje `.notes-transaction.json`, osobnym krokiem jest `notes-recover KATALOG_PROJEKTU --confirm` po sprawdzeniu danych. Nie usuwać ręcznie blokady aktywnego procesu. Wszystkie decyzje odbywają się lokalnie; to nadal nie jest fizyczny test awarii zasilania.
