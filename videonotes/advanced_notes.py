@@ -118,11 +118,16 @@ def render_advanced_markdown(outline: dict) -> str:
 
 
 def export_advanced_outline(folder: Path, *, template: str = "lecture", detail: str = "standard",
-                            section_minutes: int = 10) -> tuple[Path, Path]:
+                            section_minutes: int = 10, include_docx: bool = False) -> tuple[Path, ...]:
     folder = Path(folder)
     outline = build_advanced_outline(folder, template=template, detail=detail, section_minutes=section_minutes)
     markdown = folder / "exports" / "notes-advanced.md"
     structured = folder / "exports" / "notes-advanced.json"
     atomic_write(markdown, render_advanced_markdown(outline).encode("utf-8"))
     atomic_write(structured, (json.dumps(outline, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
+    if include_docx:
+        from .docx_export import render_advanced_docx
+        docx = folder / "exports" / "notes-advanced.docx"
+        atomic_write(docx, render_advanced_docx(outline))
+        return markdown, structured, docx
     return markdown, structured
