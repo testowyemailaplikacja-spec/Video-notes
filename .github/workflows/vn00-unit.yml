@@ -133,3 +133,30 @@ jobs:
             node scripts/browser-smoke.cjs
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
+
+  browser-firefox-linux:
+    name: Real Firefox file:// browser smoke (Linux WebDriver)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Use preinstalled Firefox and geckodriver
+        shell: bash
+        run: |
+          firefox --version
+          if command -v geckodriver >/dev/null; then
+            echo "GECKODRIVER_BIN=$(command -v geckodriver)" >> "$GITHUB_ENV"
+          elif [ -x "$GECKOWEBDRIVER/geckodriver" ]; then
+            echo "GECKODRIVER_BIN=$GECKOWEBDRIVER/geckodriver" >> "$GITHUB_ENV"
+          else
+            echo "No geckodriver on Ubuntu runner" >&2
+            exit 1
+          fi
+      - name: Exercise local KWN import/edit/50k/focus with Firefox WebDriver
+        run: |
+          node --check scripts/browser-smoke.cjs
+          node --check scripts/firefox-smoke.cjs
+          node scripts/firefox-smoke.cjs
