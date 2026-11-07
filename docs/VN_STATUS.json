@@ -65,7 +65,9 @@
       "status": "W_TRAKCIE",
       "evidence": [
         "PR #10: versioned extractive source-linked outline, Markdown/JSON, CLI/GUI, passed Linux and Windows source CI, dev EXE CI",
-        "PR #18: optional offline DOCX source-linked outline, text escaped as OOXML; Linux/Windows source CI and Windows DEV EXE PASS"
+        "PR #18: optional offline DOCX source-linked outline, text escaped as OOXML; Linux/Windows source CI and Windows DEV EXE PASS",
+        "PR #39: pre-render Markdown/JSON/DOCX before replacing prior exports; simulated DOCX failure preserves all existing files and creates no new partial exports; Linux/Windows source+browser CI PASS and Windows DEV EXE PASS, no physical Word/LibreOffice test.",
+        "PR #41: source-word-only topic hints replace generic heading labels, prioritize repeated terms across distinct quotes; untrusted HTML/Markdown stripped from headings but original citations preserved; Linux/Windows source+browser CI and Windows DEV EXE PASS. Not semantic AI."
       ],
       "blockers": [
         "Real lectures/tutorials/CCNA human acceptance",
@@ -112,7 +114,8 @@
         "PR #13: internal-only portable bundle from user-supplied Windows binaries + model, SHA-256 manifest, no distribution approval",
         "PR #17: bundle-verify preflight before GUI and manifest integrity tests; Linux/Windows CI + Windows DEV EXE PASS",
         "PR #22: atomic no-clobber portable backup output, concurrent-name race and unsupported filesystem tests; Linux/Windows CI and DEV EXE PASS",
-        "PR #25: secure portable backup of note-revision history with per-snapshot validation and restore/undo regression; Linux/Windows CI and Windows DEV EXE PASS"
+        "PR #25: secure portable backup of note-revision history with per-snapshot validation and restore/undo regression; Linux/Windows CI and Windows DEV EXE PASS",
+        "PR #40: atomically publish pre-verified internal bundle directory without replacing racing empty destination: Windows rename, Linux renameat2(RENAME_NOREPLACE); race regression, Linux/Windows source+browser CI and Windows DEV EXE PASS; no actual installer or hardware test."
       ],
       "blockers": [
         "Installer .exe/.msi with model/runtime",
@@ -418,6 +421,57 @@
       "windows_executable": "PASS",
       "offline_installer": false,
       "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42417618740",
+      "scope": "PR #39: safe preflight for optional DOCX alongside Markdown/JSON; all five Linux/Windows source and real-browser CI jobs PASS",
+      "source_linux_windows": "PASS",
+      "chromium_headless_linux": "PASS",
+      "firefox_headless_linux": "PASS",
+      "windows_chrome_headless": "PASS",
+      "windows_edge_headless": "PASS",
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42417855851",
+      "scope": "PR #40: no-clobber internal bundle directory publication race and all five Linux/Windows source/browser CI jobs PASS",
+      "source_linux_windows": "PASS",
+      "chromium_headless_linux": "PASS",
+      "firefox_headless_linux": "PASS",
+      "windows_chrome_headless": "PASS",
+      "windows_edge_headless": "PASS",
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42418076484",
+      "scope": "PR #41: source-derived bounded topic hints, no markup in headings, and all five Linux/Windows source/browser CI jobs PASS",
+      "source_linux_windows": "PASS",
+      "chromium_headless_linux": "PASS",
+      "firefox_headless_linux": "PASS",
+      "windows_chrome_headless": "PASS",
+      "windows_edge_headless": "PASS",
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42417618732",
+      "scope": "PR #39 Windows DEV EXE build/smoke PASS (not offline installer)",
+      "windows_executable": "PASS",
+      "offline_installer": false,
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42417856076",
+      "scope": "PR #40 Windows DEV EXE build/smoke PASS (not offline installer)",
+      "windows_executable": "PASS",
+      "offline_installer": false,
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42418076494",
+      "scope": "PR #41 Windows DEV EXE build/smoke PASS (not offline installer)",
+      "windows_executable": "PASS",
+      "offline_installer": false,
+      "real_asr": false
     }
   ],
   "notes": [
@@ -435,7 +489,8 @@
     "Real headless Chromium on Ubuntu PASS in PR #30 does not close WEB-01 (Windows Chrome/Edge/Firefox) or WEB-02 (large JSON, a11y), nor VN-07 host beta gate.",
     "PR #32/33 CI verified native headless Chrome and Edge on hosted Windows and Chromium on Linux, plus synthetic 50k browser workflow; WEB-01/WEB-02 remain NOT_RUN in full acceptance matrix without Firefox and physical keyboard/screen-reader testing. VN-07 remains W_TRAKCIE; no Constant_app or Netlify changes.",
     "PR #35 Firefox Linux headless CI passed for real file:// viewer and 50k synthetic input; WEB-01/WEB-02 remain NOT_RUN in full physical and screen-reader acceptance matrix. No Firefox physical Windows test and no host deployment.",
-    "PR #37 note-creation interruption recovery with empty journal regressions PASS in Actions 42416723873/42416723714. VN-02 remains W_TRAKCIE without real-lecture semantic/human quality acceptance."
+    "PR #37 note-creation interruption recovery with empty journal regressions PASS in Actions 42416723873/42416723714. VN-02 remains W_TRAKCIE without real-lecture semantic/human quality acceptance.",
+    "PR #39/40/41 merged after passing post-head Linux/Windows source, real-browser CI and Windows DEV EXE checks on 2026-11-07. They address export preflight, no-clobber private bundle publication, and literal source-derived topic hints. No complete physical Windows/ASR/human semantics acceptance; 0/9 VN DONE unchanged."
   ],
   "last_verified_develop_before_pr8": "344e227571ba09802da8a8bea7c50498473dc2e6"
 }
