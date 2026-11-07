@@ -53,7 +53,7 @@ def _topic_heading(citations: list[dict], number: int) -> str:
     first_spelling: dict[str, str] = {}
     for citation in citations:
         seen = set()
-        for word in re.findall(r"[^\\W_]+", citation["text"], re.UNICODE):
+        for word in re.findall(r"[^\W_]+", citation["text"], re.UNICODE):
             normalized = word.casefold()
             if len(word) < 3 or normalized in STOPWORDS or len(word) > 40:
                 continue
@@ -62,7 +62,8 @@ def _topic_heading(citations: list[dict], number: int) -> str:
         counts.update(seen)
     repeated = [term for term, count in counts.items() if count >= 2]
     if repeated:
-        ranked = sorted(repeated, key=lambda term: (-counts[term], list(first_spelling).index(term)))
+        first_rank = {term: index for index, term in enumerate(first_spelling)}
+        ranked = sorted(repeated, key=lambda term: (-counts[term], first_rank[term]))
     else:
         ranked = list(first_spelling)
     fragments = []
