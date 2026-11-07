@@ -148,6 +148,36 @@ class BackupTest(unittest.TestCase):
                 create_backup(project, root / "archive.vnproj")
             self.assertFalse((root / "archive.vnproj").exists())
 
+    def test_backup_concurrent_name_collision_preserves_other_file(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            project = root / "project"
+            fixture(project)
+            target = root / "race.vnproj"
+            from os import link as real_link
+
+            def another_writer_arrives(src, dst):
+                Path(dst).write_bytes(b"OTHER WRITER DATA")
+                return real_link(src, dst)
+
+            with patch("videonotes.backup.os.link", side_effect=another_writer_arrives):
+                with self.assertRaisesRegex(VideoNotesError, "już istnieje"):
+                    create_backup(project, target)
+            self.assertEqual(target.read_bytes(), b"OTHER WRITER DATA")
+            self.assertEqual(list(root.glob(".vn-backup-*")), [])
+
+    def test_unsupported_filesystem_fails_closed_without_partial_backup(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            project = root / "project"
+            fixture(project)
+            target = root / "archive.vnproj"
+            with patch("videonotes.backup.os.link", side_effect=OSError("hardlink unsupported")):
+                with self.assertRaisesRegex(VideoNotesError, "System plików"):
+                    create_backup(project, target)
+            self.assertFalse(target.exists())
+            self.assertEqual(list(root.glob(".vn-backup-*")), [])
+
 
 if __name__ == "__main__":
     unittest.main()
