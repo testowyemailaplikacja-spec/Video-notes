@@ -157,8 +157,18 @@ async function main() {
     process.stdout.write("Chromium file:// KWN import/edit/export/replace smoke PASS\n");
   } finally {
     if (socket) socket.close();
+    const exited = new Promise(resolve => {
+      if (browser.exitCode !== null) return resolve();
+      browser.once("exit", resolve);
+      setTimeout(resolve, 3000);
+    });
     browser.kill("SIGTERM");
-    fs.rmSync(userData, {recursive: true, force: true, maxRetries: 4, retryDelay: 200});
+    await exited;
+    try {
+      fs.rmSync(userData, {recursive: true, force: true, maxRetries: 10, retryDelay: 150});
+    } catch (error) {
+      process.stderr.write("Chromium temporary-profile cleanup warning: " + error.code + "\n");
+    }
   }
 }
 main().catch(error => { process.stderr.write(String(error.stack || error) + "\n"); process.exitCode = 1; });
