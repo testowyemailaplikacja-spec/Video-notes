@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+from concurrent.futures import ThreadPoolExecutor
 import tempfile
 import zipfile
 from xml.etree import ElementTree as ET
@@ -177,6 +178,19 @@ class AdvancedNotesTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "walidacji"):
                 export_advanced_outline(self.folder, include_docx=True)
         self.assertFalse((self.folder / "exports").exists())
+
+    def test_concurrent_docx_exports_keep_canonical_package_namespaces(self):
+        outline = build_advanced_outline(self.folder, template="lecture", detail="full")
+        with ThreadPoolExecutor(max_workers=8) as workers:
+            documents = list(workers.map(render_advanced_docx, [outline] * 48))
+        self.assertEqual(len(documents), 48)
+        for data in documents:
+            with zipfile.ZipFile(io.BytesIO(data)) as document:
+                package = document.read("[Content_Types].xml")
+                relationships = document.read("_rels/.rels")
+                self.assertIn(b'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"', package)
+                self.assertIn(b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"', relationships)
+                self.assertNotIn(b"ns0:", package + relationships)
 
     def test_docx_keeps_unsafe_source_literal_and_replaces_bad_xml_char(self):
         save_json(self.folder / "edits.json",
