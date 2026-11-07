@@ -28,7 +28,7 @@ MANIFEST = "archive-manifest.json"
 REQUIRED = ("project.json", "transcript.json", "edits.json")
 OPTIONAL = ("notes.json", "notes-edits.json")
 ALLOWED = frozenset(REQUIRED + OPTIONAL + (MANIFEST,))
-HISTORY_ENTRY = re.compile(r"notes-history/[0-9a-f]{32}\\.json\\Z")
+HISTORY_ENTRY = re.compile(r"notes-history/[0-9a-f]{32}\.json\Z")
 MAX_ITEM_BYTES = 64 * 1024 * 1024
 MAX_TOTAL_BYTES = 128 * 1024 * 1024
 
