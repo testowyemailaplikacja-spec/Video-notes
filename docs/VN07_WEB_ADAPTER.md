@@ -40,3 +40,9 @@ Testy są dodane do GitHub Actions Linux/Windows. Potwierdzają walidację kontr
 ## Integralność eksportu napisów — 07.11.2026
 
 W SRT i VTT każdy segment pozostaje jednym cue: wielowierszowe poprawki są łączone w pojedynczy wiersz przez spacje, aby tekst nie wstrzykiwał pozornych znaczników czasu i nowych bloków napisów. W VTT znaki `&`, `<`, `>` są kodowane jako tekst, aby nie interpretować wpisanej transkrypcji jako składni WebVTT. Eksporty TXT/JSON zachowują oryginalne znaki nowej linii i tekst użytkownika. Testy syntetyczne obejmują oba eksportery (Python i WWW); nie zastępują testu rzeczywistych odtwarzaczy napisów.
+
+## Poprawki bezpieczeństwa edycji (07.11.2026)
+
+* Jeśli zawartość edytora różni się od zapisanej w pamięci poprawki, pobieranie TXT/SRT/VTT/JSON jest wstrzymywane. Najpierw trzeba kliknąć „Zachowaj poprawkę”, aby nie pobrać pozornie poprawnego pliku bez ostatnich zmian. Nie dochodzi do automatycznego nadpisania szkicu.
+* Gdy import JSON trwa asynchronicznie, a użytkownik w międzyczasie dopisze lub zapisze poprawki, aplikacja ponownie wymaga świadomego potwierdzenia przed zastąpieniem dokumentu. Odrzucenie zachowuje dotychczasowy dokument i szkic.
+* Syntetyczne testy kontrolera sprawdzają blokadę eksportu i konflikt importu; nadal potrzebne są testy rzeczywistych przeglądarek, klawiatury i czytnika ekranu. Etap VN-07 pozostaje W_TRAKCIE.
