@@ -15,7 +15,7 @@ from .media import probe
 from .microphone import record_microphone, list_microphone_devices
 from .notes import generate_basic_notes, read_basic_notes, edit_note_point, export_basic_notes, export_basic_notes_docx
 from .advanced_notes import export_advanced_outline
-from .note_revisions import regenerate_basic_notes, list_note_versions, restore_note_version
+from .note_revisions import regenerate_basic_notes, list_note_versions, restore_note_version, recover_interrupted_note_update
 from .pipeline import create_project, transcribe_project
 from .storage import read_project
 
@@ -415,6 +415,26 @@ class VideoNotesWindow:
             notes, changes = read_basic_notes(folder)
             export_basic_notes(folder)
         except VideoNotesError as error:
+            if "notes-recover" in str(error):
+                if messagebox.askyesno(
+                    "Przerwana aktualizacja notatek",
+                    "Znaleziono przerwaną aktualizację dwóch plików notatek. "
+                    "Przed odzyskaniem wykonaj kopię folderu projektu i upewnij się, "
+                    "że drugi program nie edytuje notatek. "
+                    "Odzyskać wyłącznie wersje zgodne z zapisanym dziennikiem i historią?"
+                ):
+                    try:
+                        recovery = recover_interrupted_note_update(folder, confirm=True)
+                    except VideoNotesError as recovery_error:
+                        messagebox.showerror("Odzyskiwanie notatki", str(recovery_error))
+                        return
+                    messagebox.showinfo(
+                        "Odzyskiwanie notatki",
+                        "Kontrola zakończona: " + recovery["status"] +
+                        ". Zachowano dziennik wersji w historii."
+                    )
+                    self._show_notes()
+                return
             if "Transkrypcja zmieniła się" in str(error) and messagebox.askyesno(
                 "Notatka nieaktualna",
                 "Transkrypcja została poprawiona. Odbudować notatkę z aktualnych wypowiedzi, zachowując ręczne zmiany i poprzednią wersję?"
