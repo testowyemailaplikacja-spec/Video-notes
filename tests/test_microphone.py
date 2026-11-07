@@ -96,6 +96,54 @@ class MicrophoneTest(unittest.TestCase):
         self.assertEqual(recording_status(self.folder)["status"], "needs_review")
         self.assertEqual(recording_status(self.folder)["segments"], [])
 
+    def test_crash_status_preserves_earlier_wav_and_lists_broken_later_part(self):
+        self._record()
+        first = self.folder / "part-00000.wav"
+        original = first.read_bytes()
+        broken = self.folder / "part-00001.wav"
+        broken.write_bytes(b"unfinished RIFF header after power loss")
+        private_journal = self.folder / "recording.json"
+        journal = json.loads(private_journal.read_text("utf-8"))
+        for state in ("recording", "needs_review"):
+            with self.subTest(state=state):
+                journal["status"] = state
+                private_journal.write_text(json.dumps(journal), encoding="utf-8")
+                before_bad = broken.read_bytes()
+                result = recording_status(self.folder)
+                self.assertEqual(result["status"], state)
+                self.assertTrue(result["requires_manual_review"])
+                self.assertEqual([row["name"] for row in result["segments"]], [first.name])
+                self.assertEqual(result["unreadable_parts"], [broken.name])
+                self.assertEqual(first.read_bytes(), original)
+                self.assertEqual(broken.read_bytes(), before_bad)
+                self.assertEqual(json.loads(private_journal.read_text("utf-8"))["status"], state)
+
+        journal["status"] = "finished"
+        private_journal.write_text(json.dumps(journal), encoding="utf-8")
+        with self.assertRaisesRegex(VideoNotesError, "uszkodzony"):
+            recording_status(self.folder)
+        self.assertEqual(first.read_bytes(), original)
+        self.assertTrue(broken.exists())
+
+    def test_crash_status_does_not_follow_symlink_part(self):
+        self._record()
+        outside = self.folder.parent / "private.txt"
+        outside.write_text("do not read this", encoding="utf-8")
+        link = self.folder / "part-00001.wav"
+        try:
+            link.symlink_to(outside)
+        except (OSError, NotImplementedError):
+            self.skipTest("Symlinks unavailable to test account")
+        private_journal = self.folder / "recording.json"
+        journal = json.loads(private_journal.read_text("utf-8"))
+        journal["status"] = "needs_review"
+        private_journal.write_text(json.dumps(journal), encoding="utf-8")
+        report = recording_status(self.folder)
+        self.assertEqual(report["unreadable_parts"], [link.name])
+        self.assertEqual([row["name"] for row in report["segments"]], ["part-00000.wav"])
+        self.assertEqual(outside.read_text("utf-8"), "do not read this")
+        self.assertTrue(link.is_symlink())
+
     def test_stop_event_closes_capture_and_keeps_valid_audio(self):
         stop = threading.Event()
         stop.set()
