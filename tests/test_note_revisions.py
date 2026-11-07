@@ -181,6 +181,13 @@ class NotesVersionTest(unittest.TestCase):
         edit_note_point(self.folder, self.point, "Prywatna ręczna poprawka; zachowaj mnie")
         old_notes = (self.folder / "notes.json").read_bytes()
         old_edits = (self.folder / "notes-edits.json").read_bytes()
+        # The edited segment no longer appears in the source: regeneration
+        # will archive that user edit, not copy it to the new live note.
+        transcript = read_project(self.folder)[1]
+        transcript["segments"] = [
+            row for row in transcript["segments"] if row["id"] != self.point.removeprefix("quote-")
+        ]
+        save_json(self.folder / "transcript.json", transcript)
         self._simulate_note_crash()
         self.assertTrue((self.folder / ".notes-transaction.json").is_file())
         self.assertFalse((self.folder / ".notes.lock").exists())
@@ -200,14 +207,31 @@ class NotesVersionTest(unittest.TestCase):
         self.assertEqual((self.folder / "notes.json").read_bytes(), old_notes)
         self.assertEqual((self.folder / "notes-edits.json").read_bytes(), old_edits)
         self.assertFalse((self.folder / ".notes-transaction.json").exists())
-        self.assertEqual(read_basic_notes(self.folder)[1]["edits"][self.point],
+        self.assertEqual(json.loads(old_edits)["edits"][self.point],
                          "Prywatna ręczna poprawka; zachowaj mnie")
         self.assertEqual(recover_interrupted_note_update(self.folder, confirm=True)["status"],
                          "no_pending_update")
-        self.assertTrue(regenerate_basic_notes(self.folder, window_minutes=2)["changed"])
+        refreshed = regenerate_basic_notes(self.folder, window_minutes=2)
+        self.assertTrue(refreshed["changed"])
+        self.assertEqual(refreshed["unmatched_edits"], 1)
+        self.assertEqual(read_basic_notes(self.folder)[1]["edits"], {})
+
+    def test_crash_after_note_write_with_identical_edits_counts_as_complete(self):
+        edit_note_point(self.folder, self.point, "Nadal moja ręczna poprawka")
+        self._simulate_note_crash()
+        result = recover_interrupted_note_update(self.folder, confirm=True)
+        self.assertEqual(result["status"], "completed_before_crash")
+        notes, edits = read_basic_notes(self.folder)
+        self.assertEqual(len(notes["sections"]), 1)
+        self.assertEqual(edits["edits"][self.point], "Nadal moja ręczna poprawka")
 
     def test_user_changes_after_interrupted_revision_refuse_overwrite(self):
         edit_note_point(self.folder, self.point, "Początkowy tekst użytkownika")
+        transcript = read_project(self.folder)[1]
+        transcript["segments"] = [
+            row for row in transcript["segments"] if row["id"] != self.point.removeprefix("quote-")
+        ]
+        save_json(self.folder / "transcript.json", transcript)
         self._simulate_note_crash()
         journal = self.folder / ".notes-transaction.json"
         preserved = (self.folder / "notes-edits.json")
@@ -251,6 +275,7 @@ class NotesVersionTest(unittest.TestCase):
     def test_restore_transaction_interruption_can_restore_previous_active_pair(self):
         edit_note_point(self.folder, self.point, "Nie utracę mojej poprawki")
         result = regenerate_basic_notes(self.folder, window_minutes=2)
+        edit_note_point(self.folder, self.point, "Późniejsza poprawka, inna niż w zapisanej wersji")
         before = ((self.folder / "notes.json").read_bytes(),
                   (self.folder / "notes-edits.json").read_bytes())
         real_save_json = save_json
@@ -266,7 +291,7 @@ class NotesVersionTest(unittest.TestCase):
         self.assertEqual((self.folder / "notes.json").read_bytes(), before[0])
         self.assertEqual((self.folder / "notes-edits.json").read_bytes(), before[1])
         self.assertEqual(read_basic_notes(self.folder)[1]["edits"][self.point],
-                         "Nie utracę mojej poprawki")
+                         "Późniejsza poprawka, inna niż w zapisanej wersji")
 
     def test_concurrent_lock_prevents_overwriting_history(self):
         (self.folder / ".notes.lock").write_text("other writer", encoding="utf-8")
