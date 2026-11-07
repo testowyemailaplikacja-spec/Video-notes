@@ -88,10 +88,64 @@ async function browserScenario() {
   if (!document.getElementById("edit-count").textContent.startsWith("1 poprawek")) {
     throw new Error("Anulowany import usunął poprawki");
   }
+  // WEB-02 automated subtest: genuine browser import/search/page navigation with 50k rows.
+  // The fixture is synthetic, never contains a private recording, and stays within MAX_BYTES.
+  window.confirm = () => true;
+  const largeFixture = {
+    schema: "videonotes-export-v1", project_id: "kwn-50k-synthetic",
+    language: "pl", complete: true,
+    segments: Array.from({length: 50000}, (_, i) => ({
+      id: "large-" + i, start_ms: i * 1000, end_ms: i * 1000 + 750,
+      text: "Wypowiedź " + i + " znacznik-" + i
+    }))
+  };
+  const largeFile = new File([JSON.stringify(largeFixture)], "synthetic-50k.json",
+                             {type: "application/json"});
+  if (largeFile.size > window.VideoNotesWebCore.MAX_BYTES) throw new Error("50k fixture exceeds file cap");
+  Object.defineProperty(input, "files", {configurable: true, value: [largeFile]});
+  const largeStarted = performance.now();
+  input.dispatchEvent(new Event("change", {bubbles: true}));
+  const largeDeadline = Date.now() + 20000;
+  while (!label.textContent.startsWith("50000 z 50000") && Date.now() < largeDeadline) {
+    await new Promise(resolve => setTimeout(resolve, 30));
+  }
+  if (!label.textContent.startsWith("50000 z 50000")) throw new Error("50k import failed: " + status.textContent);
+  if (document.querySelectorAll("#segment-rows button.segment-choice").length !== 75) {
+    throw new Error("50k table was not restricted to 75 visible buttons");
+  }
+  const search = document.getElementById("search");
+  search.value = "znacznik-49999";
+  search.dispatchEvent(new Event("input", {bubbles: true}));
+  if (!label.textContent.startsWith("1 z 50000")) throw new Error("50k search did not find last segment");
+  if (!document.querySelector("#segment-rows button.segment-choice")?.textContent.includes("49999")) {
+    throw new Error("50k search returned wrong segment");
+  }
+  search.value = "";
+  search.dispatchEvent(new Event("input", {bubbles: true}));
+  document.getElementById("next").click();
+  if (!document.getElementById("page-number").textContent.includes("Strona 2 / 667")) {
+    throw new Error("50k pagination failed");
+  }
+  document.getElementById("previous").click();
+  const firstLarge = document.querySelector("#segment-rows button.segment-choice");
+  firstLarge.focus();
+  firstLarge.click();
+  const refreshed = document.querySelector("#segment-rows button.segment-choice");
+  if (document.activeElement !== refreshed || refreshed.getAttribute("aria-pressed") !== "true" ||
+      refreshed.getAttribute("aria-controls") !== "edit-text") {
+    throw new Error("Selecting a segment lost keyboard focus or ARIA selection state");
+  }
+  if (!document.querySelector("table caption") ||
+      document.querySelector(".editor").getAttribute("aria-labelledby") !== "editor-heading") {
+    throw new Error("Missing accessible table/editor labeling");
+  }
+  const largeMs = performance.now() - largeStarted;
+  if (largeMs > 15000) throw new Error("50k browser interaction exceeded 15s: " + Math.round(largeMs));
   const network = performance.getEntriesByType("resource")
     .filter(item => /^https?:/i.test(item.name)).map(item => item.name);
   return {protocol: location.protocol, imported: fixture.segments.length,
-          exportContainsEdit: true, deniedReplacePreserved: true,
+          largeSegments: largeFixture.segments.length, largeInteractionMs: Math.round(largeMs),
+          focusPreserved: true, exportContainsEdit: true, deniedReplacePreserved: true,
           networkRequests: network.length};
 }
 
@@ -168,15 +222,18 @@ async function main() {
     const expression = "(" + browserScenario.toString() + ")()";
     let evaluated;
     try {
-      evaluated = await cdp(3, "Runtime.evaluate", {expression, awaitPromise: true, returnByValue: true});
+      evaluated = await cdp(3, "Runtime.evaluate", {expression, awaitPromise: true, returnByValue: true}, 60000);
     } catch (error) {
       if (!String(error.message).includes("Execution context was destroyed")) throw error;
       await pause(1200);
-      evaluated = await cdp(4, "Runtime.evaluate", {expression, awaitPromise: true, returnByValue: true});
+      evaluated = await cdp(4, "Runtime.evaluate", {expression, awaitPromise: true, returnByValue: true}, 60000);
     }
     const payload = evaluated?.result?.value;
     assert.equal(payload.protocol, "file:");
     assert.equal(payload.imported, 2);
+    assert.equal(payload.largeSegments, 50000);
+    assert.equal(payload.focusPreserved, true);
+    process.stdout.write("50k synthetic KWN browser interactions in " + payload.largeInteractionMs + "ms PASS\\n");
     assert.equal(payload.exportContainsEdit, true);
     assert.equal(payload.deniedReplacePreserved, true);
     assert.equal(payload.networkRequests, 0);
