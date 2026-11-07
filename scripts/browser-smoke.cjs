@@ -26,11 +26,15 @@ function httpJSON(url) {
 }
 
 async function browserScenario() {
+  const readyUntil = Date.now() + 6000;
+  while (!document.getElementById("source-file") && Date.now() < readyUntil) {
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
   const input = document.getElementById("source-file");
   const label = document.getElementById("match-count");
   const editor = document.getElementById("edit-text");
   const status = document.getElementById("status");
-  if (!input || !label || !editor || !status) throw new Error("Brak wymaganych elementów KWN");
+  if (!input || !label || !editor || !status) throw new Error("Brak wymaganych elementów KWN. URL=" + location.href + " ready=" + document.readyState + " title=" + document.title);
   const fixture = {
     schema: "videonotes-export-v1", project_id: "chromium-demo",
     language: "pl", complete: true, segments: [
