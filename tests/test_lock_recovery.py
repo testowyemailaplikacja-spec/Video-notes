@@ -43,6 +43,14 @@ class StaleLockTest(unittest.TestCase):
         self.assertFalse(self.lock.exists())
         self.assertEqual((self.project / "transcript.json").read_bytes(), original)
 
+    def test_lf_and_windows_crlf_pid_formats(self):
+        for ending in (b"\n", b"\r\n"):
+            with self.subTest(ending=ending):
+                self.lock.write_bytes(b"pid=12345" + ending)
+                with patch("videonotes.pipeline._process_state", return_value="stale"):
+                    status = transcription_lock_status(self.project)
+                self.assertEqual(status, {"state": "stale", "pid": 12345})
+
     def test_malformed_and_unknown_pid_refused(self):
         for malformed in ("not a PID\n", "pid=0\n", "pid=abc\n"):
             self.lock.write_text(malformed, encoding="ascii")
