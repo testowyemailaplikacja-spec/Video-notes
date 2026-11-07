@@ -21,7 +21,7 @@ def _cue_text(text: str, *, vtt: bool = False) -> str:
     TXT/JSON remain verbatim; subtitle payloads cannot introduce fake cues
     through embedded line breaks. WebVTT markup is escaped as literal text.
     """
-    line = " ".join(text.splitlines()).strip()
+    line = " ".join(part for part in text.splitlines() if part).strip()
     if vtt:
         line = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     return line
