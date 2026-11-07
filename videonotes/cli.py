@@ -14,7 +14,7 @@ from .microphone import record_microphone, recording_status, list_microphone_dev
 from .notes import generate_basic_notes, edit_note_point, export_basic_notes, export_basic_notes_text, export_basic_notes_docx
 from .advanced_notes import export_advanced_outline
 from .pdf_export import export_basic_notes_pdf
-from .note_revisions import regenerate_basic_notes, list_note_versions, restore_note_version, recover_interrupted_note_update
+from .note_revisions import regenerate_basic_notes, list_note_versions, restore_note_version, recover_interrupted_note_update, notes_lock_status, recover_stale_notes_lock
 from .quality import compare_text_files
 from .asr_lab import run_real_benchmark
 from .backup import create_backup, restore_backup, relink_backup
@@ -77,6 +77,11 @@ def parser() -> argparse.ArgumentParser:
     recover = sub.add_parser("notes-recover", help="Sprawdź i bezpiecznie dokończ kontrolę przerwanej aktualizacji notatek")
     recover.add_argument("project", type=Path)
     recover.add_argument("--confirm", action="store_true", help="Wymagane potwierdzenie przed przywróceniem wcześniejszej wersji")
+    notes_lock = sub.add_parser("notes-lock-status", help="Pokaż status PID blokady notatek po awarii")
+    notes_lock.add_argument("project", type=Path)
+    notes_lock_recover = sub.add_parser("notes-lock-recover", help="Usuń tylko sprawdzoną osieroconą blokadę notatek")
+    notes_lock_recover.add_argument("project", type=Path)
+    notes_lock_recover.add_argument("--confirm", action="store_true", help="Wymagana odrębna zgoda")
     note_export = sub.add_parser("notes-export", help="Zapisz lokalny notes-basic.md")
     note_export.add_argument("project", type=Path)
     note_export.add_argument("--txt", action="store_true", help="Dodatkowo zapisz notes-basic.txt, bez zmian w źródle")
@@ -210,6 +215,11 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"previous_version_backup": previous, "notes_export": str(export_basic_notes(args.project))}, ensure_ascii=False))
         elif args.action == "notes-recover":
             print(json.dumps(recover_interrupted_note_update(args.project, confirm=args.confirm), ensure_ascii=False))
+        elif args.action == "notes-lock-status":
+            read_project(args.project)
+            print(json.dumps(notes_lock_status(args.project), ensure_ascii=False))
+        elif args.action == "notes-lock-recover":
+            print(json.dumps(recover_stale_notes_lock(args.project, confirm=args.confirm), ensure_ascii=False))
         elif args.action == "notes-export":
             # PDF is pre-rendered in a private temporary folder; missing optional
             # LibreOffice leaves all other existing exports unchanged.
