@@ -27,7 +27,8 @@ function httpJSON(url) {
 
 async function browserScenario() {
   const readyUntil = Date.now() + 6000;
-  while (!document.getElementById("source-file") && Date.now() < readyUntil) {
+  while ((document.readyState !== "complete" || !window.VideoNotesWebCore) &&
+         Date.now() < readyUntil) {
     await new Promise(resolve => setTimeout(resolve, 50));
   }
   const input = document.getElementById("source-file");
