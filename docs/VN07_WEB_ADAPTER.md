@@ -46,3 +46,9 @@ W SRT i VTT każdy segment pozostaje jednym cue: wielowierszowe poprawki są ł�
 * Jeśli zawartość edytora różni się od zapisanej w pamięci poprawki, pobieranie TXT/SRT/VTT/JSON jest wstrzymywane. Najpierw trzeba kliknąć „Zachowaj poprawkę”, aby nie pobrać pozornie poprawnego pliku bez ostatnich zmian. Nie dochodzi do automatycznego nadpisania szkicu.
 * Gdy import JSON trwa asynchronicznie, a użytkownik w międzyczasie dopisze lub zapisze poprawki, aplikacja ponownie wymaga świadomego potwierdzenia przed zastąpieniem dokumentu. Odrzucenie zachowuje dotychczasowy dokument i szkic.
 * Syntetyczne testy kontrolera sprawdzają blokadę eksportu i konflikt importu; nadal potrzebne są testy rzeczywistych przeglądarek, klawiatury i czytnika ekranu. Etap VN-07 pozostaje W_TRAKCIE.
+
+## Rzeczywista przeglądarka Chromium w CI (07.11.2026)
+
+Dodano `scripts/browser-smoke.cjs` uruchamiany w osobnej pracy GitHub Actions na Ubuntu 24.04. Skrypt otwiera **rzeczywiste** `web/index.html` przez `file://` w headless Chromium/Chrome, korzystając z lokalnego Chrome DevTools Protocol i Node 22 (bez npm, zewnętrznych API i prywatnych plików). Sprawdza import syntetycznego JSON, wybranie i poprawienie segmentu, odmowę eksportu niezapisanego szkicu, lokalną treść poprawionego TXT, odmowę utraty poprawek przy imporcie oraz brak zasobów HTTP(S) w rejestrze ładowania strony.
+
+Ten test potwierdza zachowanie Chromium na runnerze Linux **dopiero po zielonym przebiegu workflow**. Nie jest testem prawdziwego użytkownika Windows w Chrome/Edge/Firefox, dostępności czy wydajności 50 000 segmentów. Nie można na tej podstawie oznaczyć WEB-01/WEB-02 ani VN-07 jako w pełni odebranych.
