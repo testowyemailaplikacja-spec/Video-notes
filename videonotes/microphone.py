@@ -59,37 +59,62 @@ def capture_command(ffmpeg: str, device: str, output: Path, *, max_seconds: int 
     return args
 
 
+def _inspect_single_wav(part: Path) -> dict:
+    """Inspect one regular local part without modifying its audio bytes."""
+    if part.is_symlink() or not part.is_file():
+        raise VideoNotesError("Niedozwolony symlink lub niepoprawny plik nagrania.")
+    try:
+        with wave.open(str(part), "rb") as audio:
+            sample_rate, channels = audio.getframerate(), audio.getnchannels()
+            sample_width, samples = audio.getsampwidth(), audio.getnframes()
+        size = part.stat().st_size
+    except (OSError, EOFError, wave.Error) as error:
+        raise VideoNotesError("Plik WAV jest niekompletny lub uszkodzony; zachowano nagranie do kontroli.") from error
+    if sample_rate != 16000 or channels != 1 or sample_width != 2 or samples <= 0:
+        raise VideoNotesError("Nagranie nie ma formatu mono PCM 16 kHz/16 bit lub jest puste.")
+    return {"name": part.name, "duration_ms": samples * 1000 // sample_rate,
+            "size_bytes": size}
+
+
+def _wav_paths(folder: Path) -> list[Path]:
+    return sorted(path for path in Path(folder).glob("part-*.wav") if PATTERN.fullmatch(path.name))
+
+
 def inspect_wav_segments(folder: Path) -> list[dict]:
-    """Inspect only regular WAV chunks; never trust paths from a manifest."""
-    folder = Path(folder)
-    parts = sorted(path for path in folder.glob("part-*.wav") if PATTERN.fullmatch(path.name))
-    report = []
-    for part in parts:
-        if part.is_symlink() or not part.is_file():
-            raise VideoNotesError("Niedozwolony symlink lub niepoprawny plik nagrania.")
-        try:
-            with wave.open(str(part), "rb") as audio:
-                sample_rate, channels = audio.getframerate(), audio.getnchannels()
-                sample_width, samples = audio.getsampwidth(), audio.getnframes()
-        except (OSError, EOFError, wave.Error) as error:
-            raise VideoNotesError("Plik WAV jest niekompletny lub uszkodzony; zachowano nagranie do kontroli.") from error
-        if sample_rate != 16000 or channels != 1 or sample_width != 2 or samples <= 0:
-            raise VideoNotesError("Nagranie nie ma formatu mono PCM 16 kHz/16 bit lub jest puste.")
-        report.append({"name": part.name, "duration_ms": samples * 1000 // sample_rate,
-                       "size_bytes": part.stat().st_size})
-    return report
+    """Strict inspection: any invalid WAV makes a completed recording untrusted."""
+    return [_inspect_single_wav(part) for part in _wav_paths(folder)]
 
 
 def recording_status(folder: Path) -> dict:
-    """Read recording journal and current files, even after a crash."""
+    """Report readable parts after a crash without deleting damaged last chunks.
+
+    Finished sessions remain strict. In recording/needs_review state an
+    interrupted last WAV might have an incomplete header. List intact prior
+    chunks and identify unreadable parts for manual inspection, never repair
+    or mark the session finished automatically.
+    """
     folder = Path(folder)
     info = load_json(folder / "recording.json")
     if not isinstance(info, dict) or info.get("schema") != SCHEMA:
         raise VideoNotesError("Nieobsługiwany format dziennika nagrania.")
     if info.get("status") not in {"recording", "finished", "needs_review"}:
         raise VideoNotesError("Nieprawidłowy stan nagrania.")
+    if info["status"] == "finished":
+        segments = inspect_wav_segments(folder)
+        damaged: list[str] = []
+    else:
+        segments = []
+        damaged = []
+        for part in _wav_paths(folder):
+            try:
+                segments.append(_inspect_single_wav(part))
+            except VideoNotesError:
+                # Do not follow symlinks or mutate user data to 'fix' it.
+                damaged.append(part.name)
     return {"schema": SCHEMA, "session_id": info.get("session_id"),
-            "status": info["status"], "segments": inspect_wav_segments(folder)}
+            "status": info["status"], "segments": segments,
+            "unreadable_parts": damaged, "requires_manual_review": info["status"] != "finished"}
+
 
 
 def _stop_ffmpeg(proc: object) -> int:
