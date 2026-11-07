@@ -30,3 +30,9 @@
 Wykonać rzeczywiste benchmarki dwóch silników ASR i decyzję technologiczną, następnie Windows offline i test GUI. VN-02–VN-08 pozostają nieukończone. Nie przenosić zmian na główną stronę przed zbiorczą aktualizacją i osobną zgodą.
 
 Źródła interfejsów (zweryfikowane 06.11): https://github.com/ggml-org/whisper.cpp/tree/master/examples/cli i https://ffmpeg.org/ffmpeg.html.
+
+## Dwustrumieniowy OBS przez pełny lokalny łańcuch CLI (07.11.2026)
+
+Test `tests/test_obs_multitrack_cli.py` tworzy osobno **prawdziwe pliki MP4 i MKV z wideo i dwiema syntetycznymi ścieżkami audio** (tony 440 i 880 Hz), wykorzystując FFmpeg i FFprobe w GitHub-hosted Ubuntu. Sprawdza odmowę automatycznego wyboru ścieżki w dwustrumieniowym źródle, poprawny wybór globalnego indeksu każdej ścieżki, dekodowanie FFmpeg do PCM 16 kHz, wywołanie **rzeczywistego lokalnego procesu w miejscu `whisper-cli`**, parsowanie JSON, globalne znaczniki czasu, przerwanie po checkpointcie, wznowienie bez dubli, poprawkę użytkownika i eksport JSON/TXT/SRT/VTT bez zmiany surowej transkrypcji.
+
+Zastosowane lokalne `synthetic-whisper-cli` **nie rozpoznaje mowy**. To deterministyczna atrapa programu zewnętrznego, która na podstawie częstotliwości otrzymanego WAV zapisuje testowe segmenty w formacie whisper.cpp. Weryfikuje prawdziwy łańcuch procesów i wybór ścieżki, a nie jakość PL/EN ASR, zgodność binarium whisper.cpp ani instalatora. Żadne prywatne nagranie lub licencjonowany model nie jest przesyłany na GitHub.
