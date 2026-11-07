@@ -9,7 +9,7 @@ from pathlib import Path
 
 from tests.test_notes import fixture
 from videonotes.errors import VideoNotesError
-from videonotes.note_revisions import (list_note_versions, regenerate_basic_notes,
+from videonotes.note_revisions import (_load_snapshot, list_note_versions, regenerate_basic_notes,
                                        restore_note_version)
 from videonotes.notes import (generate_basic_notes, edit_note_point, read_basic_notes,
                               render_basic_markdown)
@@ -55,6 +55,15 @@ class NotesVersionTest(unittest.TestCase):
         self.assertEqual(read_basic_notes(self.folder)[1]["edits"][self.point], "Ręczna poprawka 1")
         self.assertNotEqual(undo_snapshot, a["revision"])
         self.assertEqual(len(list_note_versions(self.folder)), 2)
+
+    def test_snapshot_reader_keeps_two_item_api_for_backup(self):
+        result = regenerate_basic_notes(self.folder, window_minutes=2)
+        original_notes, original_edits = _load_snapshot(self.folder, result["revision"])
+        self.assertEqual(original_notes["project_id"], self.notes["project_id"])
+        self.assertEqual(original_edits["edits"], {})
+        metadata = _load_snapshot(self.folder, result["revision"], include_created_at=True)
+        self.assertEqual(len(metadata), 3)
+        self.assertEqual(metadata[:2], (original_notes, original_edits))
 
     def test_history_has_created_at_and_is_ordered_newest_first(self):
         first = regenerate_basic_notes(self.folder, window_minutes=2, points_per_section=2)
