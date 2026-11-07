@@ -59,3 +59,9 @@ Dokument jest składany wyłącznie przez standardową bibliotekę Python; tekst
 Optymalizacja wyboru cytatów nie zmienia punktacji ani kolejności pierwszego/ostatniego cytatu. Słowa każdego segmentu oraz jego waga są analizowane raz, a najkrótsza odległość czasowa od już wybranych fragmentów aktualizowana po kolejnym wyborze. Eliminujemy ponowne rozbijanie każdego tekstu i przeliczanie wszystkich wybranych odległości w każdej iteracji.
 
 Złożoność etapu wyboru po przygotowaniu tokenów spada z podejścia wielokrotnie skanującego wybrane fragmenty do O(n × liczba_punktów) i O(n) pamięci pomocniczej. `tests/test_note_selection.py` porównuje wyniki bezpośrednio z poprzednim algorytmem dla wielu losowo wygenerowanych okien, polskich/angielskich słów, powtarzających się czasów i remisów oraz uruchamia syntetyczną próbę **50 000 segmentów, 20 punktów**. To test wydajności algorytmu, nie próba rzeczywistego 2-godzinnego nagrania lub realnego ASR. Status etapu VN-02 nadal W_TRAKCIE.
+
+## Test rzeczywistego otwierania DOCX w LibreOffice (automatyczny Linux)
+
+Do CI dodano oddzielny test integracyjny `tests/test_office_docx.py`, który generuje **syntetyczne** notatki podstawowe i zaawansowane, otwiera oba pliki DOCX w rzeczywistym LibreOffice Writer (tryb headless), konwertuje je tymczasowo do PDF, sprawdza odczyt polskich znaków, cytatów, literalnego tekstu HTML oraz renderuje pierwszą stronę do obrazu PNG. Żaden przykład nie zawiera prywatnego nagrania. Tymczasowe pliki PDF/PNG są elementem testu, **nie nowym eksportem PDF w aplikacji**.
+
+Test ma własny workflow `.github/workflows/vn-docx-libreoffice.yml` i wymaga widocznego wyniku PASS. Nie zastępuje ręcznej kontroli układu w LibreOffice GUI ani Wordzie na fizycznym Windows, druku, długiego dokumentu czy decyzji wydawniczej. VN-02 pozostaje W_TRAKCIE.

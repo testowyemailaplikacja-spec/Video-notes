@@ -1,0 +1,38 @@
+name: Video Notes — real LibreOffice DOCX render (synthetic data)
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'videonotes/docx_export.py'
+      - 'videonotes/notes.py'
+      - 'videonotes/advanced_notes.py'
+      - 'tests/test_office_docx.py'
+      - '.github/workflows/vn-docx-libreoffice.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  libreoffice-document-smoke:
+    name: Real LibreOffice Writer opens/render basic and advanced DOCX (Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Ensure actual local LibreOffice and Poppler are available
+        shell: bash
+        run: |
+          if ! command -v libreoffice >/dev/null || ! command -v pdftotext >/dev/null || ! command -v pdftoppm >/dev/null; then
+            timeout 240s sudo apt-get update -qq
+            timeout 360s sudo apt-get install -y --no-install-recommends libreoffice-writer poppler-utils
+          fi
+          command -v libreoffice
+          command -v pdftotext
+          command -v pdftoppm
+          libreoffice --version
+      - name: Convert real DOCX to rendered pages and verify literal Polish citations
+        run: |
+          python -m compileall -q videonotes tests/test_office_docx.py
+          python -m unittest tests.test_office_docx -v
