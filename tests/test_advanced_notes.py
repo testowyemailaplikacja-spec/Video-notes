@@ -4,11 +4,14 @@ import contextlib
 import io
 import json
 import tempfile
+import zipfile
+from xml.etree import ElementTree as ET
 import unittest
 from pathlib import Path
 
 from tests.test_notes import fixture
 from videonotes.advanced_notes import build_advanced_outline, export_advanced_outline, render_advanced_markdown
+from videonotes.docx_export import render_advanced_docx
 from videonotes.cli import main
 from videonotes.errors import VideoNotesError
 from videonotes.storage import read_project, save_json
@@ -87,6 +90,64 @@ class AdvancedNotesTest(unittest.TestCase):
         save_json(self.folder / "transcript.json", transcript)
         with self.assertRaisesRegex(VideoNotesError, "pusta"):
             build_advanced_outline(self.folder)
+
+    def test_docx_opt_in_contains_offline_source_citations(self):
+        before = {name: (self.folder / name).read_bytes() for name in
+                  ("project.json", "transcript.json", "edits.json")}
+        md, structured, docx = export_advanced_outline(self.folder, include_docx=True,
+                                                       template="lecture", detail="full",
+                                                       section_minutes=1)
+        self.assertTrue(md.is_file() and structured.is_file() and docx.is_file())
+        self.assertEqual(docx.suffix, ".docx")
+        with zipfile.ZipFile(docx) as document:
+            names = set(document.namelist())
+            self.assertEqual(names, {"[Content_Types].xml", "_rels/.rels",
+                                     "word/document.xml", "word/styles.xml",
+                                     "word/_rels/document.xml.rels"})
+            root = ET.fromstring(document.read("word/document.xml"))
+            text = " ".join(node.text or "" for node in root.iter()
+                            if node.tag.endswith("}t"))
+            self.assertIn("Konspekt wykładu", text)
+            self.assertIn("c0000000-s00000", text)
+            self.assertIn("Źródło", text)
+            rels = document.read("word/_rels/document.xml.rels")
+            self.assertNotIn(b"TargetMode", rels)
+            self.assertNotIn(b"external", rels.lower())
+            self.assertNotIn("vbaProject.bin", names)
+        for name, content in before.items():
+            self.assertEqual((self.folder / name).read_bytes(), content)
+
+    def test_docx_keeps_unsafe_source_literal_and_replaces_bad_xml_char(self):
+        save_json(self.folder / "edits.json",
+                  {"schema": "videonotes-edits-v1", "edits": {
+                      "c0000000-s00000": "<script>alert('x')</script> & źródło\n# Nagłówek"}})
+        outline = build_advanced_outline(self.folder, detail="full")
+        for sec in outline["sections"]:
+            for topic in sec["topics"]:
+                for item in topic["citations"]:
+                    if item["segment_id"] == "c0000000-s00000":
+                        item["text"] += "\x01"  # invalid XML char must be sanitized
+        data = render_advanced_docx(outline)
+        with zipfile.ZipFile(io.BytesIO(data)) as document:
+            xml_bytes = document.read("word/document.xml")
+            root = ET.fromstring(xml_bytes)
+            texts = [elem.text or "" for elem in root.iter() if elem.tag.endswith("}t")]
+            self.assertIn("<script>alert('x')</script> & źródło", "".join(texts))
+            self.assertIn("\uFFFD", "".join(texts))
+            self.assertFalse(any(elem.tag.endswith("}script") for elem in root.iter()))
+            self.assertIn(b"&lt;script&gt;", xml_bytes)
+            for name in document.namelist():
+                if name.endswith(".xml") or name.endswith(".rels"):
+                    ET.fromstring(document.read(name))
+
+    def test_docx_cli_flag_does_not_change_default_exports(self):
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            code = main(["advanced-notes", str(self.folder), "--docx"])
+        self.assertEqual(code, 0)
+        self.assertIn("notes-advanced.docx", output.getvalue())
+        self.assertTrue((self.folder / "exports/notes-advanced.docx").is_file())
+        self.assertEqual(len(export_advanced_outline(self.folder)), 2)
 
     def test_cli_exports_with_template_and_options(self):
         output = io.StringIO()

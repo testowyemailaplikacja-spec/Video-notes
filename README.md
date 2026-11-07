@@ -19,6 +19,8 @@ CI sprawdza kod źródłowy na Linux i Windows oraz plik Windows DEV EXE. **Nie 
 
 Otwórz lokalnie `web/index.html` i wybierz plik `exports/transcript.json` utworzony przez program Windows/Python (`python -m videonotes export KATALOG_PROJEKTU`). Możesz bez serwera i internetu przeszukiwać wypowiedzi, nanosić poprawki i pobierać TXT/SRT/VTT/JSON. **Nie ma jeszcze transkrypcji ASR w przeglądarce ani integracji z Wiedorą.** [Instrukcja i ograniczenia](docs/VN07_WEB_ADAPTER.md).
 
+**Eksport DOCX dla konspektu (VN-03):** dodaj opcję `--docx` do polecenia `advanced-notes`, aby otrzymać `exports/notes-advanced.docx` z cytatami i znacznikami czasu, bez API lub instalacji pakietów. Nie jest to podsumowanie semantyczne ani PDF. Etap VN-03 nadal W TRAKCIE.
+
 ## Kolejność rozwoju
 
 1. **VN-00** — fundamenty programu, analiza istniejących Notatek i wybór lokalnego silnika transkrypcji.

@@ -75,6 +75,7 @@ def parser() -> argparse.ArgumentParser:
     advanced.add_argument("--template", choices=["lecture", "tutorial", "meeting", "study"], default="lecture")
     advanced.add_argument("--detail", choices=["brief", "standard", "full"], default="standard")
     advanced.add_argument("--section-minutes", type=int, default=10)
+    advanced.add_argument("--docx", action="store_true", help="Dodatkowo zapisz lokalny DOCX z cytatami (bez sieci)")
     real = sub.add_parser("benchmark-real", help="Uruchom lokalne whisper.cpp i faster-whisper na tym samym audio OBS (bez chmury)")
     real.add_argument("source", type=Path)
     real.add_argument("--reference", type=Path, required=True, help="Ręcznie sprawdzona transkrypcja wybranego fragmentu")
@@ -190,7 +191,8 @@ def main(argv: list[str] | None = None) -> int:
         elif args.action == "notes-export":
             print(export_basic_notes(args.project))
         elif args.action == "advanced-notes":
-            for path in export_advanced_outline(args.project, template=args.template, detail=args.detail, section_minutes=args.section_minutes):
+            for path in export_advanced_outline(args.project, template=args.template, detail=args.detail, section_minutes=args.section_minutes,
+                                                include_docx=args.docx):
                 print(path)
         elif args.action == "benchmark-real":
             report = run_real_benchmark(args.source, args.reference, cpp_executable=args.cpp_executable,
