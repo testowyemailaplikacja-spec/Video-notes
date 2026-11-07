@@ -90,3 +90,16 @@ test("prototype-less correction handles special IDs safely", () => {
   assert.equal(JSON.parse(out["transcript.json"]).segments[0].text, "Naprawiona wypowiedź.");
   assert.equal(Object.prototype.polluted, undefined);
 });
+
+test("single-format export matches legacy all-format adapter", () => {
+  const doc = fixture();
+  const edits = Object.create(null);
+  edits["c0000000-s00001"] = "Poprawka użytkownika.";
+  const legacy = core.renderExports(doc, edits);
+  for (const name of Object.keys(legacy)) {
+    assert.equal(core.renderExport(doc, edits, name), legacy[name]);
+  }
+  assert.throws(() => core.renderExport(doc, edits, "transcript.html"), /Nieobsługiwany/);
+  assert.equal(JSON.parse(core.renderExport(doc, edits, "transcript.json")).segments[1].text, edits["c0000000-s00001"]);
+  assert.equal(doc.segments[1].text, "Protokół DHCP nadaje adres IP.");
+});

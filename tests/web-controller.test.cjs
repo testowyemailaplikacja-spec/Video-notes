@@ -115,3 +115,30 @@ test("slow older file read may not replace newer successfully imported file", as
   ux.select(0);
   assert.equal(ux.elements["edit-text"].value, "latest text 0");
 });
+
+test("reset restores imported segment and removes saved in-memory correction", async () => {
+  const ux = boot();
+  await ux.importFile(source("original", 2));
+  ux.select(0);
+  ux.elements["edit-text"].value = "Manual correction";
+  ux.elements["save-edit"].events.click();
+  assert.equal(unload(ux).prevented, true);
+  ux.elements["reset-edit"].events.click();
+  assert.equal(ux.elements["edit-text"].value, "original text 0");
+  assert.match(ux.elements["edit-count"].textContent, /^0 poprawek/);
+  assert.equal(unload(ux).prevented, false);
+});
+
+test("reset never silently discards unsaved textarea text", async () => {
+  const ux = boot();
+  await ux.importFile(source("original", 2));
+  ux.select(0);
+  ux.elements["edit-text"].value = "Still editing";
+  ux.elements["reset-edit"].events.click();
+  assert.equal(ux.elements["edit-text"].value, "Still editing");
+  assert.equal(ux.state.prompts.length, 1);
+  ux.state.allow = true;
+  ux.elements["reset-edit"].events.click();
+  assert.equal(ux.elements["edit-text"].value, "original text 0");
+  assert.equal(unload(ux).prevented, false);
+});

@@ -15,7 +15,8 @@
     source: get("source-file"), status: get("status"), search: get("search"),
     count: get("match-count"), edits: get("edit-count"), rows: get("segment-rows"),
     previous: get("previous"), next: get("next"), page: get("page-number"),
-    selected: get("selected-label"), text: get("edit-text"), save: get("save-edit")
+    selected: get("selected-label"), text: get("edit-text"),
+    save: get("save-edit"), reset: get("reset-edit")
   };
   function message(text, error) {
     elements.status.textContent = text;
@@ -43,6 +44,7 @@
     elements.text.value = current(item);
     elements.text.disabled = false;
     elements.save.disabled = false;
+    elements.reset.disabled = false;
     renderList();
   }
   function renderList() {
@@ -116,6 +118,18 @@
     renderList();
     message("Poprawkę zachowano tylko w pamięci strony. Pobierz plik, aby nie utracić zmian.", false);
   });
+  elements.reset.addEventListener("click", function () {
+    if (!doc || selected === null) return;
+    if (hasPendingEdit() && !window.confirm(
+      "W edytorze jest niezapisana poprawka. Odrzucić ją i przywrócić tekst z importowanego pliku?"
+    )) return;
+    var item = doc.segments[selected];
+    delete edits[item.id];
+    elements.text.value = item.text;
+    matches = core.search(doc, edits, elements.search.value);
+    renderList();
+    message("Przywrócono segment z importowanego pliku. Źródło na dysku pozostaje bez zmian.", false);
+  });
   elements.source.addEventListener("change", async function (event) {
     var file = event.target.files && event.target.files[0];
     if (!file) return;
@@ -140,6 +154,7 @@
       elements.text.disabled = true;
       elements.text.value = "";
       elements.save.disabled = true;
+      elements.reset.disabled = true;
       elements.selected.textContent = "Wybierz wiersz transkrypcji.";
       document.querySelectorAll("button[data-export]").forEach(function (button) {
         button.disabled = false;
@@ -159,10 +174,10 @@
       if (!doc) return;
       var filename = button.getAttribute("data-export");
       try {
-        var files = core.renderExports(doc, edits);
+        var payload = core.renderExport(doc, edits, filename);
         var mime = filename.endsWith(".json") ? "application/json;charset=utf-8" :
           "text/plain;charset=utf-8";
-        var blob = new Blob([files[filename]], {type: mime});
+        var blob = new Blob([payload], {type: mime});
         var url = URL.createObjectURL(blob);
         var a = document.createElement("a");
         a.href = url;

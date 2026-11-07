@@ -12,7 +12,7 @@ Najpierw wyeksportuj transkrypcję desktopową:
 
 Następnie w lokalnej stronie wybierz KATALOG_PROJEKTU/exports/transcript.json. Obsługiwany jest wersjonowany format videonotes-export-v1. Nie wczytuj bezpośrednio wewnętrznego transcript.json z katalogu projektu; zawiera inną strukturę i nie obejmuje poprawek.
 
-Interfejs przedstawia segmenty z czasami, pozwala przeszukiwać do 50 000 segmentów, ręcznie poprawiać wybrany tekst w pamięci strony i pobierać aktualny wynik w TXT, SRT, VTT lub JSON. Oryginalny plik nie jest modyfikowany. Wszelkie zmiany znikną po zamknięciu strony, jeśli użytkownik nie pobierze nowego eksportu.
+Interfejs przedstawia segmenty z czasami, pozwala przeszukiwać do 50 000 segmentów, ręcznie poprawiać wybrany tekst w pamięci strony, przywracać wybrany segment do wersji z importu i pobierać aktualny wynik w TXT, SRT, VTT lub JSON. Oryginalny plik nie jest modyfikowany. Wszelkie zmiany znikną po zamknięciu strony, jeśli użytkownik nie pobierze nowego eksportu.
 
 ## Bezpieczeństwo i prywatność
 
@@ -24,8 +24,15 @@ Niektóre przeglądarki ograniczają lokalny dostęp do innych zasobów dla stro
 
     node --check web/transcript-core.js
     node --check web/app.js
-    node --test tests/web-core.test.cjs
+    node --test tests/web-core.test.cjs tests/web-controller.test.cjs
 
 Testy są dodane do GitHub Actions Linux/Windows. Potwierdzają walidację kontraktu, czasów, ochronę źródła, eksporty i obsługę złośliwego tekstu. Nie zastępują testów GUI przeglądarek, testów dostępności, wydajności dużych importów ani bezpieczeństwa integracji z portalem.
 
 **VN-07 pozostaje W_TRAKCIE.** To działający lokalny interfejs odczytu/edycji istniejącego eksportu, ale bez ASR w przeglądarce, nagrywania na WWW, synchronizacji, wdrożenia do Wiedora i pełnego odbioru użytkownika. Dalsza publikacja na platformie wymaga osobnego zlecenia, testów hosta i wcześniejszych bramek KWN.
+
+## Aktualizacja 07.11.2026 — eksport i ochrona zmian
+
+* Przywrócenie wybranego segmentu do stanu z importowanego JSON; przy niezapisanym tekście wymagane jest potwierdzenie odrzucenia zmian. Nie odzyskuje surowego ASR z programu Windows.
+* Eksport tworzy tylko żądany format TXT/SRT/VTT/JSON, aby nie zużywać pamięci na pozostałe trzy wyniki. API `renderExports` pozostaje dla kompatybilności.
+* CI Linux i Windows uruchamia także `tests/web-controller.test.cjs`: testy niezapisanych zmian, wyścigów importu, przywracania tekstu.
+* Testy są symulacją DOM, nie odbiorem Chrome/Edge/Firefox, dostępności ani integracji hosta; VN-07 nadal W_TRAKCIE.
