@@ -33,7 +33,9 @@
       "evidence": [
         "PR #1: OBS import, CLI, checkpoints, resume and exports",
         "PR #4: local portable project backup and integrity-checked relink",
-        "PR #21: SRT/VTT cue boundary hardening for multiline corrections; Python/Node regression and Linux/Windows CI PASS; no real-ASR acceptance"
+        "PR #21: SRT/VTT cue boundary hardening for multiline corrections; Python/Node regression and Linux/Windows CI PASS; no real-ASR acceptance",
+        "PR #27: conservative explicit dead-PID project lock recovery; safe WinAPI process inspection, CRLF compatibility; Linux/Windows source CI and Windows DEV EXE PASS",
+        "PR #28: synthetic 2h+ session checkpoint/resume/idempotent export (61 chunks, 12-before-cancel); Linux/Windows CI PASS, not real media or ASR"
       ],
       "blockers": [
         "Real Whisper model end-to-end transcript of MP4/MKV",
@@ -47,7 +49,8 @@
       "status": "W_TRAKCIE",
       "evidence": [
         "PR #3: verbatim source-linked basic notes, independent edits and Markdown, CLI/GUI",
-        "PR #6: versioned note regeneration with edits preservation and safe source-bound history"
+        "PR #6: versioned note regeneration with edits preservation and safe source-bound history",
+        "PR #26: optional source-grounded basic notes TXT export with manual corrections, CLI and stale-source refusal; Linux/Windows CI and Windows DEV EXE PASS"
       ],
       "blockers": [
         "Human assessment on real lectures",
@@ -107,7 +110,8 @@
         "PR #9: actual Windows runner PyInstaller 6.16 development EXE smoke checks PASS, short-lived .exe + .sha256 artifact, workflow #42296659497",
         "PR #13: internal-only portable bundle from user-supplied Windows binaries + model, SHA-256 manifest, no distribution approval",
         "PR #17: bundle-verify preflight before GUI and manifest integrity tests; Linux/Windows CI + Windows DEV EXE PASS",
-        "PR #22: atomic no-clobber portable backup output, concurrent-name race and unsupported filesystem tests; Linux/Windows CI and DEV EXE PASS"
+        "PR #22: atomic no-clobber portable backup output, concurrent-name race and unsupported filesystem tests; Linux/Windows CI and DEV EXE PASS",
+        "PR #25: secure portable backup of note-revision history with per-snapshot validation and restore/undo regression; Linux/Windows CI and Windows DEV EXE PASS"
       ],
       "blockers": [
         "Installer .exe/.msi with model/runtime",
@@ -124,7 +128,8 @@
         "Separate web/index.html offline transcript viewer with source-linked JSON import/export and local editing, tests/web-core.test.cjs on Linux/Windows CI (PR #15 merged, source CI PASS)",
         "PR #16: browser warning on unsaved edit/reimport/unload and stale import rejection; Node Linux/Windows tests PASS",
         "PR #20: safe restore from imported transcript, per-format reduced-memory export and previously omitted web-controller tests in Linux/Windows CI PASS",
-        "PR #21: WebVTT markup escape and cue-boundary protection; Linux/Windows CI and DEV EXE PASS"
+        "PR #21: WebVTT markup escape and cue-boundary protection; Linux/Windows CI and DEV EXE PASS",
+        "PR #24: block browser export with uncommitted draft, re-confirm edits made during asynchronous file import; Linux/Windows controller CI PASS"
       ],
       "blockers": [
         "Real desktop browser acceptance Chrome/Edge/Firefox and accessibility testing",
@@ -293,6 +298,57 @@
       "windows_executable": "PASS",
       "offline_installer": false,
       "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42377594510",
+      "scope": "PR #24 Linux/Windows browser controller integration and no-dropped-draft regression",
+      "source_linux_windows": "PASS",
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42377833506",
+      "scope": "PR #25 Linux/Windows source tests of note history backup and recovery",
+      "source_linux_windows": "PASS",
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42377833507",
+      "scope": "PR #25 Windows DEV EXE build/smoke (no offline model)",
+      "windows_executable": "PASS",
+      "offline_installer": false,
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42378060181",
+      "scope": "PR #26 Linux/Windows optional TXT notes export",
+      "source_linux_windows": "PASS",
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42378060152",
+      "scope": "PR #26 Windows DEV EXE build/smoke (no offline model)",
+      "windows_executable": "PASS",
+      "offline_installer": false,
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42378572301",
+      "scope": "PR #27 Linux/Windows safe stale-lock recovery and CRLF regression",
+      "source_linux_windows": "PASS",
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42378572331",
+      "scope": "PR #27 Windows DEV EXE smoke; no physical crash recovery",
+      "windows_executable": "PASS",
+      "offline_installer": false,
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42378779405",
+      "scope": "PR #28 Linux/Windows synthetic 2h+ checkpoint state-machine test, no real audio/ASR",
+      "source_linux_windows": "PASS",
+      "real_asr": false
     }
   ],
   "notes": [
@@ -303,7 +359,10 @@
     "PR #16, #17, #18 were merged to develop on 2026-11-07 after respective GitHub Actions checks succeeded. None closes a full VN phase.",
     "Status accounting 0/9 VN phases DONE is separate from historical Constant_app KWN ledger 100/189.",
     "PR #20/#21/#22 were merged into develop on 2026-11-07 after their applicable CI jobs passed; no physical Windows/browser or licensed ASR model acceptance was performed.",
-    "DOCS sync for PR #20-22 retains 0/9 DONE; model quality, offline installer, hardware microphone and web host acceptance are still NOT_RUN."
+    "DOCS sync for PR #20-22 retains 0/9 DONE; model quality, offline installer, hardware microphone and web host acceptance are still NOT_RUN.",
+    "PR #24–#28 merged to develop on 2026-11-07 after applicable Linux/Windows source CI and Windows development EXE checks passed; none proved physical Windows or ASR model acceptance.",
+    "PR #27 safety: Windows PID liveness is checked with OpenProcess, never os.kill(pid,0); user must explicitly confirm stale-lock cleanup.",
+    "PR #28 synthetic 2h+ checkpoint test does not satisfy HW-01 or ASR-05; physical long-run time/RAM and microphone tests still NOT_RUN."
   ],
   "last_verified_develop_before_pr8": "344e227571ba09802da8a8bea7c50498473dc2e6"
 }
