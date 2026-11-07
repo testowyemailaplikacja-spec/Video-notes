@@ -105,11 +105,15 @@ async function main() {
     "--disable-background-networking", "--no-first-run", "--no-default-browser-check",
     "--remote-allow-origins=*", "--remote-debugging-port=0",
     "--user-data-dir=" + userData, pathToFileURL(root).href
-  ], {stdio: "ignore"});
+  ], {stdio: ["ignore", "ignore", "pipe"]});
+  let chromeErrors = "";
+  browser.stderr.on("data", chunk => {
+    chromeErrors = (chromeErrors + String(chunk)).slice(-4096);
+  });
   let socket;
   try {
     let port = null;
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 300; i++) {
       if (browser.exitCode !== null) throw new Error("Chromium exited before CDP became ready");
       const portFile = path.join(userData, "DevToolsActivePort");
       if (fs.existsSync(portFile)) {
@@ -118,7 +122,7 @@ async function main() {
       }
       await pause(100);
     }
-    if (!port) throw new Error("Chromium CDP port unavailable");
+    if (!port) throw new Error("Chromium CDP port unavailable; stderr tail: " + chromeErrors.slice(-1500));
     let page = null;
     for (let i = 0; i < 50; i++) {
       const pages = await httpJSON("http://127.0.0.1:" + port + "/json/list");
