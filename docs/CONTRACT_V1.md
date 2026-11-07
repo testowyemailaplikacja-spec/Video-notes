@@ -23,3 +23,20 @@ Wykrycie zmiany SHA-256 pliku lub modelu zatrzymuje wznowienie. Obliczenie SHA-2
 ## Integralność eksportu napisów — 07.11.2026
 
 W SRT i VTT każdy segment pozostaje jednym cue: wielowierszowe poprawki są łączone w pojedynczy wiersz przez spacje, aby tekst nie wstrzykiwał pozornych znaczników czasu i nowych bloków napisów. W VTT znaki `&`, `<`, `>` są kodowane jako tekst, aby nie interpretować wpisanej transkrypcji jako składni WebVTT. Eksporty TXT/JSON zachowują oryginalne znaki nowej linii i tekst użytkownika. Testy syntetyczne obejmują oba eksportery (Python i WWW); nie zastępują testu rzeczywistych odtwarzaczy napisów.
+
+## Jawne odzyskanie blokady po awarii (07.11.2026)
+
+Po przerwanym działaniu procesu `.processing.lock` może pozostać na dysku. Bez usuwania jakichkolwiek plików projektu sprawdź:
+
+```bash
+python -m videonotes lock-status KATALOG_PROJEKTU
+```
+
+Stan `active` oznacza działający proces, `stale` potwierdzony brak procesu o danym PID, `unknown` niewystarczające uprawnienia/wynik, `invalid` nieznany format blokady, `missing` brak blokady. **Tylko dla `stale`** po kontroli, że poprzednia transkrypcja rzeczywiście się zakończyła, uruchom:
+
+```bash
+python -m videonotes lock-recover KATALOG_PROJEKTU --confirm
+python -m videonotes resume KATALOG_PROJEKTU
+```
+
+Na Windows sprawdzanie obecności procesu korzysta z `OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION)`, nigdy z potencjalnie destrukcyjnego `os.kill(pid,0)`. Dla aktywnych, nieznanych, uszkodzonych i zmienionych w trakcie kontroli blokad odmowa jest obowiązkowa. Odzyskiwanie nie kasuje żadnych zapisanych checkpointów, transkrypcji ani edycji. PID może zostać wykorzystany ponownie przez inny proces, dlatego w takiej sytuacji odzyskiwanie jest zachowawczo blokowane; test realnej awarii Windows nadal pozostaje otwarty.
