@@ -103,7 +103,7 @@ def transcription_lock_status(folder: Path) -> dict:
     try:
         if lock.stat().st_size > 80:
             return {"state": "invalid"}
-        match = re.fullmatch(rb"pid=([1-9][0-9]{0,9})\n", lock.read_bytes())
+        match = re.fullmatch(rb"pid=([1-9][0-9]{0,9})\r?\n", lock.read_bytes())
     except OSError:
         return {"state": "unknown"}
     if match is None:
