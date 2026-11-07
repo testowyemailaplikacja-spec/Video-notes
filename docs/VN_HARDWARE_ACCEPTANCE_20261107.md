@@ -107,3 +107,13 @@ Jest to potwierdzony podtest przeglądarkowy, **nie całe WEB-01** (Chrome/Edge/
 | [#41](https://github.com/testowyemailaplikacja-spec/Video-notes/pull/41) | [42418076484](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42418076484) — 5/5 PASS | [42418076494](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42418076494) — PASS | Heurystyczne nagłówki z cytowanych słów bez wstrzykiwania nieufnego znacznika HTML/Markdown |
 
 Te testy nie zastępują całego `NOTE-01`/`NOTE-02`, `HW-01`, `PKG-01`/`PKG-02`. Nie przeprowadzono odbioru jakości na rzeczywistych wykładach, rzeczywistego modelu Whisper na Windows ani testu instalacji i licencji offline. **Nie zmieniono pełnej tabeli NOT_RUN ani statusu któregokolwiek etapu na DONE.**
+
+## 11. Odbiory automatyczne VN-01, VN-02, VN-04 — PR #43–45
+
+| Pakiet | Test źródłowy i przeglądarkowy | Windows DEV EXE | Weryfikacja |
+| --- | --- | --- | --- |
+| [#43](https://github.com/testowyemailaplikacja-spec/Video-notes/pull/43), OBS MP4/MKV | [42418596749](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42418596749), 5/5 PASS, 120 testów Linux | Nie wymagano nowego EXE dla zmiany testowo-dokumentacyjnej | Prawdziwy FFmpeg obsłużył wideo z 2 ścieżkami; synteza testowego JSON przez osobny program **bez modelu ASR** |
+| [#44](https://github.com/testowyemailaplikacja-spec/Video-notes/pull/44), DOCX podstawowy | [42418950037](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42418950037), 5/5 PASS, 123 testy Linux | [42418949964](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42418949964), PASS | Offline OOXML z cytatami i ręcznymi poprawkami, odmowa nieaktualnego źródła; bez rzeczywistego Word/LibreOffice GUI |
+| [#45](https://github.com/testowyemailaplikacja-spec/Video-notes/pull/45), części WAV po awarii | [42419200898](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42419200898), 5/5 PASS, 125 testów Linux | [42419200975](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42419200975), PASS | Raport części sprawnych/uszkodzonych dla syntetycznego awaryjnego WAV, bez usuwania nagrań i symlinków |
+
+**Pełne odbiory nadal NOT_RUN:** ASR-01 do ASR-05 (prawdziwe nagrania PL/EN/model), MIC-01/MIC-02 (sprzętowy mikrofon/awaria 2 h), NOTE-01/NOTE-02 (ręczna ocena jakości i Word/LibreOffice), PKG-01/PKG-02 (kompletna instalacja bez sieci). Żaden etap VN-00–VN-08 nie został tu oznaczony jako DONE.
