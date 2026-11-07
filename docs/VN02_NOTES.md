@@ -65,3 +65,15 @@ Złożoność etapu wyboru po przygotowaniu tokenów spada z podejścia wielokro
 Do CI dodano oddzielny test integracyjny `tests/test_office_docx.py`, który generuje **syntetyczne** notatki podstawowe i zaawansowane, otwiera oba pliki DOCX w rzeczywistym LibreOffice Writer (tryb headless), konwertuje je tymczasowo do PDF, sprawdza odczyt polskich znaków, cytatów, literalnego tekstu HTML oraz renderuje pierwszą stronę do obrazu PNG. Żaden przykład nie zawiera prywatnego nagrania. Tymczasowe pliki PDF/PNG są elementem testu, **nie nowym eksportem PDF w aplikacji**.
 
 Test ma własny workflow `.github/workflows/vn-docx-libreoffice.yml` i wymaga widocznego wyniku PASS. Nie zastępuje ręcznej kontroli układu w LibreOffice GUI ani Wordzie na fizycznym Windows, druku, długiego dokumentu czy decyzji wydawniczej. VN-02 pozostaje W_TRAKCIE.
+
+## Opcjonalny eksport PDF (08.11.2026)
+
+Jeżeli na komputerze jest **lokalnie zainstalowany LibreOffice Writer**, podstawowe notatki można wyeksportować do PDF bez usług w chmurze:
+
+    python -m videonotes notes-export KATALOG_PROJEKTU --pdf
+
+Na Windows, gdy `soffice.exe` nie jest dostępny w PATH, wskaż jego plik przez `--office "C:\\Program Files\\LibreOffice\\program\\soffice.exe"`. GUI udostępnia osobny przycisk „Eksportuj PDF (LibreOffice)” i wymaga wcześniej zapisania ręcznych poprawek. LibreOffice **nie jest częścią obecnego rozwojowego EXE**; bez zainstalowanego LibreOffice eksport PDF zostaje odmówiony z komunikatem, a dotychczasowe pliki pozostają nienaruszone.
+
+Program najpierw weryfikuje zgodność notatek z transkrypcją, tworzy DOCX w pamięci, uruchamia lokalny LibreOffice bez powłoki z odseparowanym profilem w katalogu tymczasowym, sprawdza wynik PDF i dopiero potem atomowo zapisuje `exports/notes-basic.pdf`. Dokument wejściowy i profil tymczasowy są usuwane; nie ma automatycznego pobierania dodatkowego oprogramowania. Narzędzie nie gwarantuje braku własnych mechanizmów sieciowych zewnętrznej instalacji LibreOffice.
+
+Regresje obejmują odmowę uszkodzonego PDF, zachowanie poprzednich eksportów i faktyczny odczyt polskich cytatów z wyjściowego PDF w LibreOffice/Poppler na Ubuntu. To lokalny opcjonalny eksport, nie uniwersalny niezależny od środowiska generator PDF ani fizyczny odbiór Windows. VN-02 pozostaje W_TRAKCIE.
