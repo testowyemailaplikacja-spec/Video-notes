@@ -117,8 +117,9 @@ jobs:
               if count < 1:
                   raise RuntimeError("Empty synthetic TTS result")
           except Exception as error:
-              print("faster-whisper failed with class", type(error).__name__)
-              # No arbitrary exception messages or transcript text are printed.
+              detail = str(error).replace(os.environ["RUNNER_TEMP"], "<ephemeral-runner>")
+              print("faster-whisper failed with class", type(error).__name__, "synthetic model error:", detail[:500])
+              # Error is from an ephemeral downloaded model and original TTS, never private user audio.
               raise SystemExit(2)
           PY
       - name: Compare two real local CPU engines on exactly the same PL and EN TTS WAV
