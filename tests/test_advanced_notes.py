@@ -136,6 +136,11 @@ class AdvancedNotesTest(unittest.TestCase):
             self.assertEqual(names, {"[Content_Types].xml", "_rels/.rels",
                                      "word/document.xml", "word/styles.xml",
                                      "word/_rels/document.xml.rels"})
+            content_types = document.read("[Content_Types].xml")
+            package_relationships = document.read("_rels/.rels")
+            self.assertIn(b'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"', content_types)
+            self.assertIn(b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"', package_relationships)
+            self.assertNotIn(b"ns0:", content_types + package_relationships)
             root = ET.fromstring(document.read("word/document.xml"))
             text = " ".join(node.text or "" for node in root.iter()
                             if node.tag.endswith("}t"))
