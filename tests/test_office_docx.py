@@ -49,10 +49,14 @@ class LibreOfficeDocxIntegrationTest(unittest.TestCase):
                     command = [OFFICE, "-env:UserInstallation=" + profile.as_uri(),
                                "--headless", "--convert-to", "pdf:writer_pdf_Export",
                                "--outdir", str(output), str(docx)]
-                    subprocess.run(command, check=True, timeout=120,
-                                   stdin=subprocess.DEVNULL, capture_output=True)
+                    run = subprocess.run(command, check=True, timeout=120,
+                                         stdin=subprocess.DEVNULL, capture_output=True,
+                                         text=True, encoding="utf-8", errors="replace")
                     pdf = output / (docx.stem + ".pdf")
-                    self.assertTrue(pdf.is_file(), f"LibreOffice did not create {pdf.name}")
+                    self.assertTrue(pdf.is_file(),
+                                    f"LibreOffice did not create {pdf.name}: "
+                                    f"stdout={run.stdout[-1200:]!r}, stderr={run.stderr[-1200:]!r}, "
+                                    f"folder={[item.name for item in output.iterdir()]}")
                     self.assertTrue(pdf.read_bytes().startswith(b"%PDF-"))
                     extracted = subprocess.run([PDTO, "-layout", "-enc", "UTF-8",
                                                 str(pdf), "-"],
