@@ -13,6 +13,7 @@ from .media import probe
 from .microphone import record_microphone, recording_status, list_microphone_devices
 from .notes import generate_basic_notes, edit_note_point, export_basic_notes, export_basic_notes_text, export_basic_notes_docx
 from .advanced_notes import export_advanced_outline
+from .pdf_export import export_basic_notes_pdf
 from .note_revisions import regenerate_basic_notes, list_note_versions, restore_note_version, recover_interrupted_note_update
 from .quality import compare_text_files
 from .asr_lab import run_real_benchmark
@@ -80,12 +81,16 @@ def parser() -> argparse.ArgumentParser:
     note_export.add_argument("project", type=Path)
     note_export.add_argument("--txt", action="store_true", help="Dodatkowo zapisz notes-basic.txt, bez zmian w źródle")
     note_export.add_argument("--docx", action="store_true", help="Dodatkowo zapisz offline notes-basic.docx z cytatami i poprawkami")
+    note_export.add_argument("--pdf", action="store_true", help="Opcjonalny lokalny PDF z zainstalowanym LibreOffice")
+    note_export.add_argument("--office", default="libreoffice", help="Ścieżka do lokalnego libreoffice/soffice.exe (tylko PDF)")
     advanced = sub.add_parser("advanced-notes", help="Źródłowy konspekt wielopoziomowy bez dopisywania faktów (VN-03)")
     advanced.add_argument("project", type=Path)
     advanced.add_argument("--template", choices=["lecture", "tutorial", "meeting", "study"], default="lecture")
     advanced.add_argument("--detail", choices=["brief", "standard", "full"], default="standard")
     advanced.add_argument("--section-minutes", type=int, default=10)
     advanced.add_argument("--docx", action="store_true", help="Dodatkowo zapisz lokalny DOCX z cytatami (bez sieci)")
+    advanced.add_argument("--pdf", action="store_true", help="Opcjonalny lokalny PDF z zainstalowanym LibreOffice")
+    advanced.add_argument("--office", default="libreoffice", help="Ścieżka do lokalnego libreoffice/soffice.exe (tylko PDF)")
     real = sub.add_parser("benchmark-real", help="Uruchom lokalne whisper.cpp i faster-whisper na tym samym audio OBS (bez chmury)")
     real.add_argument("source", type=Path)
     real.add_argument("--reference", type=Path, required=True, help="Ręcznie sprawdzona transkrypcja wybranego fragmentu")
@@ -206,8 +211,10 @@ def main(argv: list[str] | None = None) -> int:
         elif args.action == "notes-recover":
             print(json.dumps(recover_interrupted_note_update(args.project, confirm=args.confirm), ensure_ascii=False))
         elif args.action == "notes-export":
-            # Render optional formats first, so a failed DOCX validation does not
-            # replace the previously reviewed default Markdown export.
+            # PDF is pre-rendered in a private temporary folder; missing optional
+            # LibreOffice leaves all other existing exports unchanged.
+            if args.pdf:
+                print(export_basic_notes_pdf(args.project, office=args.office))
             if args.docx:
                 print(export_basic_notes_docx(args.project))
             if args.txt:
@@ -215,7 +222,7 @@ def main(argv: list[str] | None = None) -> int:
             print(export_basic_notes(args.project))
         elif args.action == "advanced-notes":
             for path in export_advanced_outline(args.project, template=args.template, detail=args.detail, section_minutes=args.section_minutes,
-                                                include_docx=args.docx):
+                                                include_docx=args.docx, include_pdf=args.pdf, office=args.office):
                 print(path)
         elif args.action == "benchmark-real":
             report = run_real_benchmark(args.source, args.reference, cpp_executable=args.cpp_executable,

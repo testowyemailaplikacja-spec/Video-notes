@@ -15,6 +15,7 @@ from pathlib import Path
 from tests.test_notes import fixture
 from videonotes.advanced_notes import export_advanced_outline
 from videonotes.notes import generate_basic_notes, edit_note_point, export_basic_notes_docx
+from videonotes.pdf_export import export_basic_notes_pdf
 
 OFFICE = shutil.which("libreoffice") or shutil.which("soffice")
 PDTO = shutil.which("pdftotext")
@@ -79,6 +80,35 @@ class LibreOfficeDocxIntegrationTest(unittest.TestCase):
                     self.assertGreater(width, 400)
                     self.assertGreater(height, 400)
                     self.assertGreater(len(image), 2000)
+
+
+    def test_opt_in_pdf_export_with_actual_libreoffice_and_cited_polish_text(self):
+        with tempfile.TemporaryDirectory(prefix="vn-live-local-pdf-") as temporary:
+            root = Path(temporary)
+            project = root / "project"
+            fixture(project)
+            generated = generate_basic_notes(project)
+            edit_note_point(project, generated["sections"][0]["points"][0]["id"],
+                            "Zażółć gęślą jaźń i przykład sieci")
+            basic = export_basic_notes_pdf(project, office=OFFICE)
+            advanced_result = export_advanced_outline(
+                project, template="study", detail="full",
+                include_pdf=True, office=OFFICE)
+            advanced = advanced_result[-1]
+            self.assertEqual(advanced.suffix, ".pdf")
+            self.assertFalse((project / "exports/notes-advanced.docx").exists())
+            for pdf, expected in ((basic, "Zażółć"), (advanced, "Materiał do nauki")):
+                with self.subTest(pdf=pdf.name):
+                    self.assertTrue(pdf.read_bytes().startswith(b"%PDF-"))
+                    extracted = subprocess.run(
+                        [PDTO, "-layout", "-enc", "UTF-8", str(pdf), "-"],
+                        check=True, capture_output=True, timeout=30,
+                        text=True, encoding="utf-8", errors="replace"
+                    ).stdout
+                    self.assertIn(expected, extracted)
+                    self.assertIn("Źródło", extracted)
+            self.assertTrue((project / "exports/notes-advanced.md").exists())
+            self.assertTrue((project / "exports/notes-advanced.json").exists())
 
 
 if __name__ == "__main__":

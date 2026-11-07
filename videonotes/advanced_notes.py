@@ -155,24 +155,33 @@ def render_advanced_markdown(outline: dict) -> str:
 
 
 def export_advanced_outline(folder: Path, *, template: str = "lecture", detail: str = "standard",
-                            section_minutes: int = 10, include_docx: bool = False) -> tuple[Path, ...]:
+                            section_minutes: int = 10, include_docx: bool = False,
+                            include_pdf: bool = False, office: str = "libreoffice") -> tuple[Path, ...]:
     folder = Path(folder)
     outline = build_advanced_outline(folder, template=template, detail=detail, section_minutes=section_minutes)
     markdown = folder / "exports" / "notes-advanced.md"
     structured = folder / "exports" / "notes-advanced.json"
-    # Pre-render and validate *all* requested formats before replacing any
-    # existing output. If optional DOCX encoding fails, the user's older
-    # Markdown and JSON exports must remain byte-for-byte unchanged.
+    # Pre-render/validate every requested format before replacing ANY older
+    # output. A missing optional LibreOffice must never erase approved notes.
     markdown_content = render_advanced_markdown(outline).encode("utf-8")
     json_content = (json.dumps(outline, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     docx = folder / "exports" / "notes-advanced.docx"
+    pdf = folder / "exports" / "notes-advanced.pdf"
     docx_content = None
-    if include_docx:
+    if include_docx or include_pdf:
         from .docx_export import render_advanced_docx
         docx_content = render_advanced_docx(outline)
+    pdf_content = None
+    if include_pdf:
+        from .pdf_export import render_pdf_from_docx
+        pdf_content = render_pdf_from_docx(docx_content, office=office)
     atomic_write(markdown, markdown_content)
     atomic_write(structured, json_content)
-    if docx_content is not None:
+    paths = [markdown, structured]
+    if include_docx:
         atomic_write(docx, docx_content)
-        return markdown, structured, docx
-    return markdown, structured
+        paths.append(docx)
+    if pdf_content is not None:
+        atomic_write(pdf, pdf_content)
+        paths.append(pdf)
+    return tuple(paths)

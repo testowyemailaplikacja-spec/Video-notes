@@ -126,5 +126,21 @@ class GuiNotesHeadlessTest(unittest.TestCase):
         self.assertEqual(read_basic_notes(self.folder)[1]["edits"], {})
 
 
+    def test_basic_pdf_button_refuses_unsaved_draft(self):
+        generate_basic_notes(self.folder)
+        self.gui._show_notes()
+        self.root.update()
+        window = self._note_windows()[-1]
+        editor = next(x for x in children(window) if isinstance(x, tk.Text))
+        editor.insert("end", " JESZCZE NIE ZAPISANO")
+        with patch("videonotes.gui.export_basic_notes_pdf") as pdf, \
+             patch("videonotes.gui.messagebox.showwarning") as warning:
+            self._button(window, "Eksportuj PDF (LibreOffice)").invoke()
+            warning.assert_called_once()
+            pdf.assert_not_called()
+        self.assertEqual(read_basic_notes(self.folder)[1]["edits"], {})
+
+
+
 if __name__ == "__main__":
     unittest.main()
