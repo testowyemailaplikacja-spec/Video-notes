@@ -7,6 +7,7 @@ import tempfile
 import zipfile
 from xml.etree import ElementTree as ET
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from tests.test_notes import fixture
@@ -116,6 +117,30 @@ class AdvancedNotesTest(unittest.TestCase):
             self.assertNotIn("vbaProject.bin", names)
         for name, content in before.items():
             self.assertEqual((self.folder / name).read_bytes(), content)
+
+    def test_docx_preflight_failure_does_not_replace_existing_exports(self):
+        exports = self.folder / "exports"
+        exports.mkdir()
+        originals = {
+            "notes-advanced.md": b"Previously reviewed markdown",
+            "notes-advanced.json": b"Previously reviewed JSON",
+            "notes-advanced.docx": b"Previously reviewed DOCX",
+        }
+        for name, content in originals.items():
+            (exports / name).write_bytes(content)
+        with patch("videonotes.docx_export.render_advanced_docx",
+                   side_effect=VideoNotesError("Nie można wyrenderować DOCX.")):
+            with self.assertRaisesRegex(VideoNotesError, "DOCX"):
+                export_advanced_outline(self.folder, include_docx=True)
+        for name, content in originals.items():
+            self.assertEqual((exports / name).read_bytes(), content)
+
+    def test_docx_preflight_failure_creates_no_partial_new_exports(self):
+        with patch("videonotes.docx_export.render_advanced_docx",
+                   side_effect=ValueError("testowy błąd walidacji DOCX")):
+            with self.assertRaisesRegex(ValueError, "walidacji"):
+                export_advanced_outline(self.folder, include_docx=True)
+        self.assertFalse((self.folder / "exports").exists())
 
     def test_docx_keeps_unsafe_source_literal_and_replaces_bad_xml_char(self):
         save_json(self.folder / "edits.json",

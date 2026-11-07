@@ -123,11 +123,19 @@ def export_advanced_outline(folder: Path, *, template: str = "lecture", detail: 
     outline = build_advanced_outline(folder, template=template, detail=detail, section_minutes=section_minutes)
     markdown = folder / "exports" / "notes-advanced.md"
     structured = folder / "exports" / "notes-advanced.json"
-    atomic_write(markdown, render_advanced_markdown(outline).encode("utf-8"))
-    atomic_write(structured, (json.dumps(outline, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
+    # Pre-render and validate *all* requested formats before replacing any
+    # existing output. If optional DOCX encoding fails, the user's older
+    # Markdown and JSON exports must remain byte-for-byte unchanged.
+    markdown_content = render_advanced_markdown(outline).encode("utf-8")
+    json_content = (json.dumps(outline, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    docx = folder / "exports" / "notes-advanced.docx"
+    docx_content = None
     if include_docx:
         from .docx_export import render_advanced_docx
-        docx = folder / "exports" / "notes-advanced.docx"
-        atomic_write(docx, render_advanced_docx(outline))
+        docx_content = render_advanced_docx(outline)
+    atomic_write(markdown, markdown_content)
+    atomic_write(structured, json_content)
+    if docx_content is not None:
+        atomic_write(docx, docx_content)
         return markdown, structured, docx
     return markdown, structured

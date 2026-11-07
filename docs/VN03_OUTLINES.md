@@ -27,3 +27,9 @@ Prywatność: pełna praca offline, brak płatnych API, kont, telemetrii i nowyc
 ## Odbiór
 
 Testy kodu: tests/test_advanced_notes.py, kompletna regresja Linux i podzbiór Windows w CI. Nadal potrzebne: rzeczywiste wykłady, poprawna segmentacja semantyczna, definicje i przykłady ocenione przez człowieka, spójność wielogodzinnych opracowań, testy rozdziałów materiałów CCNA, oddzielny OCR, DOCX/PDF i weryfikacja działania na fizycznym Windows. VN-03 pozostaje W_TRAKCIE, nie DONE.
+
+## Bezpieczny eksport wielu formatów (07.11.2026)
+
+Przy opcji `--docx` program **najpierw generuje w pamięci** Markdown, JSON i DOCX, a dopiero po pomyślnym przygotowaniu całego zestawu zastępuje pliki na dysku. Błąd kodowania DOCX nie usuwa już istniejących, zatwierdzonych eksportów Markdown/JSON ani nie pozostawia nowych, niekompletnych plików. Regresje obejmują oba przypadki.
+
+Każdy zapis pliku korzysta z atomowej wymiany, ale **zestaw trzech plików nadal nie jest jedną transakcją systemu plików**: awaria dysku lub brak miejsca podczas późniejszego zapisu może pozostawić różne wersje plików. Nie traktować tego testu jako pełnego odbioru bezpieczeństwa zapisu lub Windows. VN-03 pozostaje W TRAKCIE.
