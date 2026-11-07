@@ -1,0 +1,37 @@
+name: Video Notes — real FFmpeg 121 minute compressed audio, stub ASR
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - 'scripts/real_2h_media_smoke.py'
+      - 'videonotes/media.py'
+      - 'videonotes/pipeline.py'
+      - '.github/workflows/vn-real-long-media.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-opus-two-hour:
+    name: Actual 121-min OGG/Opus FFmpeg checkpoints with synthetic ASR
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify FFmpeg and Opus encoder locally
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            timeout 240s sudo apt-get update -qq
+            timeout 300s sudo apt-get install -y --no-install-recommends ffmpeg
+          fi
+          ffmpeg -hide_banner -encoders | grep libopus
+          ffmpeg -version | head -n 1
+      - name: Generate and decode 121 minutes of actual compressed audio in bounded chunks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m scripts.real_2h_media_smoke
