@@ -76,3 +76,9 @@ Wszystkie poniższe przebiegi zostały zweryfikowane jako `success` **po odpowie
 ## Regresja długiej sesji, bez fałszywego odbioru sprzętu
 
 Test `tests/test_pipeline_long.py` uruchamia **syntetyczny** projekt 2 godziny 1 minuta w 61 fragmentach po maksymalnie 120 sekund, symuluje anulowanie po 12 zapisanych fragmentach, sprawdza wznowienie bez duplikatów, eksport i idempotentność kolejnego resume. Nie tworzy rzeczywistego nagrania 2h, nie uruchamia Whisper/FFmpeg i nie mierzy RAM ani jakości mowy. Jego PASS nie zmienia `ASR-05` i `HW-01` z `NOT_RUN` — potrzebny jest nadal fizyczny eksperyment z legalnym nagraniem i modelem.
+
+## 7. Rzeczywisty test przeglądarki Chrome/Chromium — wyłącznie Linux CI
+
+[GitHub Actions 42379566243](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42379566243) dla PR #30: **PASS** source Linux, source Windows i rzeczywistego headless Chromium na Ubuntu. Przeglądarka otworzyła `file://web/index.html`; lokalny syntetyczny import JSON, edycja, odmowa eksportu szkicu, poprawny TXT, ochrona przed utratą zmian i brak zasobów HTTP(S) w rejestrze `performance` zakończyły się powodzeniem. Nie przesyłano nagrań i nie uruchamiano ASR.
+
+Jest to potwierdzony podtest przeglądarkowy, **nie całe WEB-01** (Chrome/Edge/Firefox na Windows), nie test dostępności/dużego 50k JSON (WEB-02), nie test Windows offline, nie publikacja beta Wiedora. Statusy w głównej macierzy pozostają NOT_RUN do wykonania wszystkich wymaganych wariantów.
