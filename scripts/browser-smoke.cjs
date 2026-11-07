@@ -104,7 +104,7 @@ async function main() {
     "--headless=new", "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage",
     "--disable-background-networking", "--no-first-run", "--no-default-browser-check",
     "--remote-allow-origins=*", "--remote-debugging-port=0",
-    "--user-data-dir=" + userData, pathToFileURL(root).href
+    "--user-data-dir=" + userData, "about:blank"
   ], {stdio: ["ignore", "ignore", "pipe"]});
   let chromeErrors = "";
   browser.stderr.on("data", chunk => {
@@ -114,7 +114,7 @@ async function main() {
   try {
     let port = null;
     for (let i = 0; i < 300; i++) {
-      if (browser.exitCode !== null) throw new Error("Chromium exited before CDP became ready");
+      if (browser.exitCode !== null || browser.signalCode !== null) throw new Error("Chromium exited before CDP became ready; " + chromeErrors.slice(-1500));
       const portFile = path.join(userData, "DevToolsActivePort");
       if (fs.existsSync(portFile)) {
         port = Number(fs.readFileSync(portFile, "utf8").split(/\r?\n/)[0]);
@@ -124,36 +124,57 @@ async function main() {
     }
     if (!port) throw new Error("Chromium CDP port unavailable; stderr tail: " + chromeErrors.slice(-1500));
     let page = null;
-    for (let i = 0; i < 50; i++) {
-      const pages = await httpJSON("http://127.0.0.1:" + port + "/json/list");
-      page = pages.find(item => item.type === "page" && item.url.startsWith("file:"));
+    for (let i = 0; i < 80; i++) {
+      try {
+        const pages = await httpJSON("http://127.0.0.1:" + port + "/json/list");
+        page = pages.find(item => item.type === "page" && item.url === "about:blank") ||
+               pages.find(item => item.type === "page");
+      } catch (_error) {
+        // The port file can appear before CDP HTTP starts accepting requests.
+      }
       if (page) break;
-      await pause(100);
+      await pause(150);
     }
-    if (!page?.webSocketDebuggerUrl) throw new Error("Cannot locate local KWN browser tab");
+    if (!page?.webSocketDebuggerUrl) throw new Error("Cannot locate browser page CDP target");
     socket = new WebSocket(page.webSocketDebuggerUrl);
     await new Promise((resolve, reject) => {
       socket.addEventListener("open", resolve, {once: true});
       socket.addEventListener("error", reject, {once: true});
     });
-    const payload = await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("CDP evaluation timeout")), 15000);
-      socket.addEventListener("message", event => {
+    const cdp = (id, method, params, timeoutMs = 20000) => new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        socket.removeEventListener("message", onMessage);
+        reject(new Error("CDP request timeout: " + method));
+      }, timeoutMs);
+      function onMessage(event) {
         const data = JSON.parse(String(event.data));
-        if (data.id !== 1) return;
+        if (data.id !== id) return;
         clearTimeout(timeout);
+        socket.removeEventListener("message", onMessage);
         if (data.error) return reject(new Error(JSON.stringify(data.error)));
-        const response = data.result;
-        if (response?.exceptionDetails) {
-          return reject(new Error(response.exceptionDetails.text +
-            " " + (response.exceptionDetails.exception?.description || "")));
+        if (data.result?.exceptionDetails) {
+          return reject(new Error(data.result.exceptionDetails.text + " " +
+            (data.result.exceptionDetails.exception?.description || "")));
         }
-        resolve(response?.result?.value);
-      });
-      socket.send(JSON.stringify({id: 1, method: "Runtime.evaluate",
-        params: {expression: "(" + browserScenario.toString() + ")()",
-                 awaitPromise: true, returnByValue: true}}));
+        resolve(data.result);
+      }
+      socket.addEventListener("message", onMessage);
+      socket.send(JSON.stringify({id, method, params}));
     });
+    await cdp(1, "Page.enable", {});
+    const navigation = await cdp(2, "Page.navigate", {url: pathToFileURL(root).href});
+    if (navigation.errorText) throw new Error("Chrome cannot navigate to local KWN file: " + navigation.errorText);
+    await pause(800);
+    const expression = "(" + browserScenario.toString() + ")()";
+    let evaluated;
+    try {
+      evaluated = await cdp(3, "Runtime.evaluate", {expression, awaitPromise: true, returnByValue: true});
+    } catch (error) {
+      if (!String(error.message).includes("Execution context was destroyed")) throw error;
+      await pause(1200);
+      evaluated = await cdp(4, "Runtime.evaluate", {expression, awaitPromise: true, returnByValue: true});
+    }
+    const payload = evaluated?.result?.value;
     assert.equal(payload.protocol, "file:");
     assert.equal(payload.imported, 2);
     assert.equal(payload.exportContainsEdit, true);
