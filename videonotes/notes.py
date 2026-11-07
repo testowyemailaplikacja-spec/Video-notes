@@ -38,17 +38,33 @@ def _tokens(value: str) -> set[str]:
 
 
 def _select(group: list[dict], limit: int) -> list[dict]:
+    """Choose source quotes in bounded O(n * limit) time.
+
+    Cache terms and lexical weights once, then maintain each segment's distance
+    to the nearest selected quote. The result and tie-breaking order match the
+    original greedy scoring rule; no semantic claim or generated text is added.
+    """
     if len(group) <= limit:
         return group
-    counts = Counter(token for row in group for token in _tokens(row["text"]))
+    terms_by_row = [_tokens(row["text"]) for row in group]
+    counts = Counter(token for terms in terms_by_row for token in terms)
+    lexical = [sum(counts[token] for token in terms) / max(len(terms), 1)
+               for terms in terms_by_row]
+    times = [row["start_ms"] for row in group]
     chosen = {0, len(group) - 1}
+    nearest = [min(abs(time - times[0]), abs(time - times[-1])) for time in times]
     while len(chosen) < limit:
         def score(i: int) -> tuple[float, int]:
-            terms = _tokens(group[i]["text"])
-            lexical = sum(counts[w] for w in terms) / max(len(terms), 1)
-            distance = min(abs(group[i]["start_ms"] - group[j]["start_ms"]) for j in chosen)
-            return (lexical + min(distance / 60_000, 10), distance)
-        chosen.add(max((i for i in range(len(group)) if i not in chosen), key=score))
+            distance = nearest[i]
+            return (lexical[i] + min(distance / 60_000, 10), distance)
+
+        winner = max((i for i in range(len(group)) if i not in chosen), key=score)
+        chosen.add(winner)
+        selected_time = times[winner]
+        for i, time in enumerate(times):
+            distance = abs(time - selected_time)
+            if distance < nearest[i]:
+                nearest[i] = distance
     return [group[i] for i in sorted(chosen)]
 
 

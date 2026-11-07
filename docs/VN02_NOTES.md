@@ -53,3 +53,9 @@ W oknie „Notatka podstawowa” dostępny jest przycisk **Eksportuj DOCX (offli
 Program tworzy `exports/notes-basic.docx` z tytułem, sekcjami, cytatami, identyfikatorami i czasami źródłowymi oraz widocznym oznaczeniem ręcznej poprawki. Każdy eksport przechodzi `read_basic_notes`: jeżeli transkrypcja zmieniła się od stworzenia notatki, operacja zostaje odmówiona bez nadpisania wcześniejszego DOCX. Oryginalne `transcript.json`, `notes.json` i poprawki pozostają nietknięte.
 
 Dokument jest składany wyłącznie przez standardową bibliotekę Python; tekst użytkownika jest zapisany jako zwykły tekst OOXML, bez zewnętrznych relacji, makr i pobierania zasobów. Testy automatyczne weryfikują struktury ZIP/XML, niebezpieczny tekst literalny, Unicode, ręczne zmiany i ochronę przed nieaktualnym źródłem. Nie wykonano jeszcze **ręcznego testu otwierania/drukowania w Word i LibreOffice na fizycznym komputerze**. Nie jest to PDF ani semantyczne streszczenie; VN-02 nadal W TRAKCIE.
+
+## Wydajność wyboru fragmentów przy długich transkrypcjach (07.11.2026)
+
+Optymalizacja wyboru cytatów nie zmienia punktacji ani kolejności pierwszego/ostatniego cytatu. Słowa każdego segmentu oraz jego waga są analizowane raz, a najkrótsza odległość czasowa od już wybranych fragmentów aktualizowana po kolejnym wyborze. Eliminujemy ponowne rozbijanie każdego tekstu i przeliczanie wszystkich wybranych odległości w każdej iteracji.
+
+Złożoność etapu wyboru po przygotowaniu tokenów spada z podejścia wielokrotnie skanującego wybrane fragmenty do O(n × liczba_punktów) i O(n) pamięci pomocniczej. `tests/test_note_selection.py` porównuje wyniki bezpośrednio z poprzednim algorytmem dla wielu losowo wygenerowanych okien, polskich/angielskich słów, powtarzających się czasów i remisów oraz uruchamia syntetyczną próbę **50 000 segmentów, 20 punktów**. To test wydajności algorytmu, nie próba rzeczywistego 2-godzinnego nagrania lub realnego ASR. Status etapu VN-02 nadal W_TRAKCIE.
