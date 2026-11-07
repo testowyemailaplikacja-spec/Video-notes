@@ -69,5 +69,20 @@ class NotesCliTest(unittest.TestCase):
             self.assertTrue((root / "exports/notes-basic.md").exists())
 
 
+    def test_cli_opt_in_docx_keeps_default_markdown_and_does_not_create_txt(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            fixture(root)
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(main(["notes", str(root)]), 0)
+            self.assertFalse((root / "exports/notes-basic.docx").exists())
+            with contextlib.redirect_stdout(io.StringIO()) as capture:
+                self.assertEqual(main(["notes-export", str(root), "--docx"]), 0)
+            self.assertIn("notes-basic.docx", capture.getvalue())
+            self.assertTrue((root / "exports/notes-basic.docx").is_file())
+            self.assertTrue((root / "exports/notes-basic.md").is_file())
+            self.assertFalse((root / "exports/notes-basic.txt").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
