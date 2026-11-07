@@ -33,3 +33,17 @@ W oknie „Notatka podstawowa” przycisk **Historia i przywracanie wersji** pok
 Edytor chroni również **niezapisany tekst**: przejście do innego punktu pyta o świadome odrzucenie szkicu (odmowa zachowuje tekst i poprzedni wybór), a przywracanie, regeneracja, eksport DOCX i zamknięcie okna nie porzucają szkicu bez zgody. Nowy backend historii wykrywa nieprawidłowe daty snapshotów i dowiązania symboliczne katalogu historii. Walidacja odwołania cytatu wymaga teraz identyfikatora `quote-<segment_id>` i całkowitego znacznika czasu, nie wartości logicznej.
 
 Testy automatyczne obejmują kolejność i datę snapshotów, ich manipulację i dowiązania, zgodność ID cytatów oraz wcześniejsze scenariusze restore/undo. **Pełny test interakcji z oknem na fizycznym Windows nadal jest potrzebny**; sam build Windows EXE i testy backendu nie dowodzą działania klikania ani odporności na zaniki zasilania w trakcie przywracania. VN-02 pozostaje W_TRAKCIE.
+
+## Dziennik przerwanej aktualizacji dwóch plików (08.11.2026)
+
+Regeneracja i przywracanie wersji zmieniają parę `notes.json` oraz `notes-edits.json`. Pojedynczy zapis pliku jest atomowy, ale oba pliki nie tworzą jednej transakcji dyskowej. Przed modyfikacją program najpierw zapisuje pełną poprzednią wersję w `notes-history`, a następnie lokalny dziennik `.notes-transaction.json` zawierający identyfikator snapshotu oraz odciski SHA-256 starej i nowej pary. Dziennik nie zawiera tekstu wykładu, lecz pozostaje w katalogu projektu. Po zapisaniu obu plików jest usuwany.
+
+Jeżeli program zostanie przerwany w połowie, kolejne edycje, eksport notatek, backup i regeneracja są blokowane do rozstrzygnięcia stanu. Na komputerze, na którym nie działa już żaden proces edytujący projekt, wykonaj:
+
+    python -m videonotes notes-recover KATALOG_PROJEKTU --confirm
+
+Polecenie porównuje *obie aktualne wersje plików* ze znanymi hashami. Jeśli oba odpowiadają nowej parze, pozostawia ukończony wynik. Jeśli oba odpowiadają starej parze, nie przepisuje niczego. Jeśli para jest częściowa, przywraca dokładnie starą parę ze sprawdzonego snapshotu. Jeżeli po awarii ktoś zapisał nową ręczną poprawkę albo dziennik lub historia są zmodyfikowane, program **odmawia nadpisania danych** i zachowuje stan do ręcznej kontroli. Odzyskanie jest jawne, nie automatyczne.
+
+Ręczne `notes-edit` również wykorzystuje wspólną blokadę `.notes.lock`, co chroni przed zapisaniem poprawki pomiędzy dwoma plikami regeneracji. Jeśli po fizycznej awarii systemu pozostała `.notes.lock`, funkcja odzyskiwania nie usuwa jej automatycznie. Należy upewnić się, że żaden proces nie zapisuje notatek, zachować kopię plików i dopiero ręcznie sprawdzić/usunąć osieroconą blokadę. Program nie potrafi samodzielnie zweryfikować żywego Windows procesu na podstawie starego pustego pliku blokady.
+
+To testowane w automatycznych regresjach przerwanie kolejności zapisów, a **nie gwarancja pełnej odporności na utratę zasilania lub awarię dysku**. Końcowy odbiór wymaga prób sprzętowych, kontroli odczytu i rozpatrzenia trwałości metadanych katalogu po `fsync`. VN-02 pozostaje W_TRAKCIE.
