@@ -45,3 +45,9 @@ To heurystyka porządkująca, **nie semantyczny model AI**: nie weryfikuje popra
 W osobnym workflow `vn-docx-libreoffice.yml` generowany jest lokalny DOCX zaawansowanego konspektu z syntetycznej transkrypcji. LibreOffice Writer w trybie headless konwertuje go do PDF, Poppler sprawdza tekst źródłowy i polskie znaki, a render pierwszej strony do PNG potwierdza możliwość interpretacji strony przez renderer. Ten sam test obejmuje podstawowy DOCX z ręczną poprawką i niezinterpretowanym znacznikiem HTML.
 
 To test kompatybilności pliku z prawdziwym silnikiem LibreOffice, nie ocena typografii ani weryfikacja otwierania w Microsoft Word na fizycznym Windows. Powstały PDF i PNG służą wyłącznie w CI, nie są wysyłane do chmury przez aplikację i nie stanowią dostępnego eksportu PDF. VN-03 pozostaje W_TRAKCIE.
+
+### Wykryta i naprawiona niezgodność pakietu OOXML
+
+Rzeczywisty LibreOffice 24.2 na Ubuntu odmówił wczytania DOCX, mimo że testy ZIP i parser XML zgłaszały poprawny format. Przyczyną było serializowanie znaczników głównych OPC `[Content_Types].xml` oraz `_rels/.rels` z prefiksem `ns0:` zamiast kanonicznej domyślnej przestrzeni nazw. Generator zapisuje teraz oba korzenie w formacie `<Types xmlns="...">` i `<Relationships xmlns="...">`, z ochroną przed równoczesnym przełączaniem przestrzeni nazw w wielu wątkach.
+
+Testy strukturalne sprawdzają tę reprezentację bajtową, a osobny workflow próbuje otworzyć DOCX w realnym LibreOffice i wyrenderować dokument do PDF/PNG. To realna poprawka kompatybilności, ale odbiór ręczny w Word/LibreOffice na sprzęcie Windows pozostaje osobnym wymaganiem.
