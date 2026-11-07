@@ -11,7 +11,7 @@ from .errors import VideoNotesError
 from .exports import edit_segment, export_project
 from .media import probe
 from .microphone import record_microphone, recording_status, list_microphone_devices
-from .notes import generate_basic_notes, edit_note_point, export_basic_notes
+from .notes import generate_basic_notes, edit_note_point, export_basic_notes, export_basic_notes_text
 from .advanced_notes import export_advanced_outline
 from .note_revisions import regenerate_basic_notes, list_note_versions, restore_note_version
 from .quality import compare_text_files
@@ -70,6 +70,7 @@ def parser() -> argparse.ArgumentParser:
     revert.add_argument("--revision", required=True)
     note_export = sub.add_parser("notes-export", help="Zapisz lokalny notes-basic.md")
     note_export.add_argument("project", type=Path)
+    note_export.add_argument("--txt", action="store_true", help="Dodatkowo zapisz notes-basic.txt, bez zmian w źródle")
     advanced = sub.add_parser("advanced-notes", help="Źródłowy konspekt wielopoziomowy bez dopisywania faktów (VN-03)")
     advanced.add_argument("project", type=Path)
     advanced.add_argument("--template", choices=["lecture", "tutorial", "meeting", "study"], default="lecture")
@@ -190,6 +191,8 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"previous_version_backup": previous, "notes_export": str(export_basic_notes(args.project))}, ensure_ascii=False))
         elif args.action == "notes-export":
             print(export_basic_notes(args.project))
+            if args.txt:
+                print(export_basic_notes_text(args.project))
         elif args.action == "advanced-notes":
             for path in export_advanced_outline(args.project, template=args.template, detail=args.detail, section_minutes=args.section_minutes,
                                                 include_docx=args.docx):

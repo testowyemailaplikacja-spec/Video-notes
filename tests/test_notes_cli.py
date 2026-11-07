@@ -52,5 +52,22 @@ class NotesCliTest(unittest.TestCase):
             with contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(main(["benchmark", "--reference", str(path), "--candidate", f"same={path}", "--candidate", f"same={path}"]), 2)
 
+    def test_cli_explicit_txt_export_keeps_default_markdown_compatible(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            fixture(root)
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(main(["notes", str(root)]), 0)
+                self.assertEqual(main(["notes-export", str(root)]), 0)
+            self.assertFalse((root / "exports/notes-basic.txt").exists())
+            with contextlib.redirect_stdout(io.StringIO()) as output:
+                self.assertEqual(main(["notes-export", str(root), "--txt"]), 0)
+            self.assertIn("notes-basic.txt", output.getvalue())
+            text = (root / "exports/notes-basic.txt").read_text("utf-8")
+            self.assertIn("Źródło", text)
+            self.assertIn("Wykład dotyczy sieci", text)
+            self.assertTrue((root / "exports/notes-basic.md").exists())
+
+
 if __name__ == "__main__":
     unittest.main()

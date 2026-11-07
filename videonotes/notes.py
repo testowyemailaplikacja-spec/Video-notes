@@ -147,6 +147,28 @@ def render_basic_markdown(folder: Path) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def render_basic_text(folder: Path) -> str:
+    """Plain TXT companion, sourced from the same verified note and edits."""
+    notes, changes = read_basic_notes(folder)
+    lines = [notes["title"], "", "Notatka ekstrakcyjna: wyłącznie wypowiedzi ze źródła.", ""]
+    for section in notes["sections"]:
+        lines.extend([section["heading"], ""])
+        for point in section["points"]:
+            chosen = changes["edits"].get(point["id"], point["text"]).strip()
+            if not chosen:
+                continue
+            mm, ss = divmod(point["start_ms"] // 1000, 60)
+            label = " (poprawka użytkownika)" if point["id"] in changes["edits"] else ""
+            lines.extend([f"Źródło {mm:02d}:{ss:02d} · {point['segment_id']}{label}", chosen, ""])
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def export_basic_notes_text(folder: Path) -> Path:
+    target = Path(folder) / "exports" / "notes-basic.txt"
+    atomic_write(target, render_basic_text(folder).encode("utf-8"))
+    return target
+
+
 def export_basic_notes(folder: Path) -> Path:
     target = Path(folder) / "exports" / "notes-basic.md"
     atomic_write(target, render_basic_markdown(folder).encode("utf-8"))

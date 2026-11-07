@@ -27,3 +27,13 @@ Zależności są wyłącznie lokalne; nie jest potrzebny model językowy ani pł
 Nie wykonano jeszcze oceny pokrycia zagadnień przez człowieka, testu długich rzeczywistych nagrań, podsumowania abstrakcyjnego, wycofania/ponownego wygenerowania z historią wersji, ani eksportu DOCX/PDF. Silnik lokalny AI z porównaniem do reguł to dalszy zakres. Wymagana jest ocena nazwisk, dat i liczb na prawdziwych materiałach.
 
 **Testy automatyczne:** tests/test_notes.py i tests/test_notes_cli.py — poprawne cytaty, czasy, trwałość edycji, stale detection, brak halucynacji w wynikach regułowych, odporność na uszkodzone dane. Wyniki CI należy podawać osobno, bez uznawania całego VN-02 za DONE.
+
+## Lokalny eksport TXT (07.11.2026)
+
+Aby oprócz Markdown pobrać czytelny plik tekstowy, użyj:
+
+```bash
+python -m videonotes notes-export KATALOG_PROJEKTU --txt
+```
+
+Domyślne `notes-export` nadal zapisuje tylko `exports/notes-basic.md`. Opcja `--txt` zapisuje dodatkowo `exports/notes-basic.txt` z identyfikatorami segmentów, czasami i jawnym oznaczeniem ręcznych poprawek. Oba formaty korzystają z tej samej walidacji zgodności cytatów ze źródłem; zapis TXT nie nadpisuje transkrypcji ani edycji. Nie jest to automatyczne streszczenie semantyczne, ocena jakości rzeczywistych wykładów pozostaje otwarta.

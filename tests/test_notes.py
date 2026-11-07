@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from videonotes.errors import VideoNotesError
-from videonotes.notes import generate_basic_notes, read_basic_notes, edit_note_point, render_basic_markdown, export_basic_notes
+from videonotes.notes import generate_basic_notes, read_basic_notes, edit_note_point, render_basic_markdown, export_basic_notes, render_basic_text, export_basic_notes_text
 from videonotes.storage import read_project, save_json
 
 
@@ -131,6 +131,28 @@ class BasicNotesTest(unittest.TestCase):
                 with self.subTest(minutes=minutes, count=count), self.assertRaises(VideoNotesError):
                     generate_basic_notes(root, window_minutes=minutes, points_per_section=count)
             self.assertFalse((root / "notes.json").exists())
+
+
+    def test_plain_text_export_keeps_citations_manual_edits_and_raw_source(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            fixture(root)
+            original = (root / "transcript.json").read_bytes()
+            generated = generate_basic_notes(root)
+            point = generated["sections"][0]["points"][0]["id"]
+            edit_note_point(root, point, "Mój wniosek\n<script>dosłowny tekst</script>")
+            text = render_basic_text(root)
+            self.assertIn("Źródło 00:00", text)
+            self.assertIn(point.removeprefix("quote-"), text)
+            self.assertIn("Mój wniosek\n<script>dosłowny tekst</script>", text)
+            self.assertIn("poprawka użytkownika", text)
+            self.assertEqual(export_basic_notes_text(root).read_text("utf-8"), text)
+            self.assertEqual((root / "transcript.json").read_bytes(), original)
+            edits = {"schema": "videonotes-edits-v1", "edits": {"c0000000-s00000": "Nowy tekst"}}
+            save_json(root / "edits.json", edits)
+            with self.assertRaisesRegex(VideoNotesError, "zmieniła"):
+                export_basic_notes_text(root)
+
 
 
 if __name__ == "__main__":
