@@ -27,3 +27,13 @@ Ustawienia modeli **nie są w pełni równoważne** (np. CTranslate2 int8 wobec 
 Teksty wyniku i tymczasowe WAV są w katalogu tymczasowym systemu i usuwane po wykonaniu. Wyjście/stderr procesów są kierowane poza log publiczny. JSON raportu zawiera liczby, hashe, czas, RAM (jeśli mierzono), bez nazw ani zawartości nagrań. Nie commituj referencyjnych wykładów i plików *.txt z prywatnymi rozmowami do publicznego repo. Benchmark uruchamia lokalny kod, ale nazwa/wersja binariów nie jest niezależnie atestowana: `engine_binary_identity_independently_verified=false`.
 
 **Blokada odbioru VN-00:** brak próbek PL/EN i kompatybilnych realnych modeli w autoryzowanym środowisku testowym, brak pomiaru na rzeczywistym Windows i zweryfikowanych licencji redystrybucji. Testy CI testują adaptery z atrapami, a nie rzeczywiste modele.
+
+## Osobny test z rzeczywistym whisper.cpp na syntetycznej mowie PL/EN (08.11.2026)
+
+Workflow `.github/workflows/vn-real-asr-smoke.yml` służy do sprawdzenia prawdziwego wywołania silnika ASR, ale wyłącznie na **dwóch oryginalnych, syntetycznych nagraniach TTS**, wygenerowanych lokalnie przez eSpeak NG w CI. Nie używa wykładów użytkowników ani prywatnych plików. W jednorazowym środowisku GitHub Actions pobiera i buduje konkretny commit `ggml-org/whisper.cpp` (`6a8addd258eadd6563f8c582e8acc535e6325364`), pobiera wielojęzyczny model `ggerganov/whisper.cpp/ggml-tiny.bin` z SHA-256 `be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21`, a następnie sprawdza ścieżkę `create_project → FFmpeg PCM → prawdziwy whisper-cli CPU → JSON → checkpoint → eksport TXT/SRT/VTT/JSON → notatka → DOCX` osobno dla PL i EN.
+
+Model oraz binaria są pobierane **tylko przez workflow testowy** i nie trafiają do repozytorium ani do publicznych artefaktów. Produkt nadal nie pobiera modeli automatycznie. Wynik CI zapisuje wyłącznie liczbę fragmentów i czas, nie wypowiadaną/rozpoznaną treść. Test nie stosuje sztucznego progu WER/CER, bo nie jest to ręcznie zweryfikowane nagranie naturalnej mowy.
+
+Źródła komponentów: [whisper.cpp](https://github.com/ggml-org/whisper.cpp), [model multilingual tiny](https://huggingface.co/ggerganov/whisper.cpp/blob/main/ggml-tiny.bin) i [MIT dla Whisper oraz wag](https://github.com/openai/whisper/blob/main/README.md#license). Licencję i warunki całej przyszłej dystrybucji należy osobno skontrolować przed wydaniem.
+
+**Nie zamyka VN-00 ani VN-01:** prawdziwe PL/EN wykłady, ocena WER/CER przez człowieka, porównanie faster-whisper, pomiar na docelowym komputerze Windows, 2h, stabilny instalator i licencje redystrybucji nadal są wymagane. Wynik workflow trzeba zweryfikować przed zmianą statusu.
