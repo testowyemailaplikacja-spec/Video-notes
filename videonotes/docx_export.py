@@ -144,6 +144,11 @@ def render_advanced_docx(outline: dict) -> bytes:
     _w(section, "pgMar", top="1200", right="1300", bottom="1200", left="1300",
        header="500", footer="500", gutter="0")
 
+    return _package_document(document)
+
+
+def _package_document(document: ET.Element) -> bytes:
+    """Package standard OOXML parts with reproducible ZIP metadata and no links."""
     parts = {
         "[Content_Types].xml": _content_types(),
         "_rels/.rels": _relationships(False),
@@ -158,3 +163,38 @@ def render_advanced_docx(outline: dict) -> bytes:
             info.compress_type = ZIP_DEFLATED
             archive.writestr(info, content)
     return output.getvalue()
+
+
+def render_basic_docx(notes: dict, changes: dict) -> bytes:
+    """Offline DOCX for validated source-bound basic notes and manual edits.
+
+    The caller must first run read_basic_notes() to verify the current
+    transcript digest and every source citation before producing this file.
+    No external links, fonts, media, macros or network APIs are involved.
+    """
+    if (not isinstance(notes, dict) or notes.get("schema") != "videonotes-basic-notes-v1" or
+            not isinstance(changes, dict) or changes.get("schema") != "videonotes-note-edits-v1" or
+            not isinstance(changes.get("edits"), dict)):
+        raise VideoNotesError("Nieobsługiwana notatka podstawowa DOCX.")
+    edits = changes["edits"]
+    document = ET.Element("{" + W + "}document")
+    body = _w(document, "body")
+    _paragraph(body, notes["title"], "Title")
+    _paragraph(body, "Notatka ekstrakcyjna — wypowiedzi z transkrypcji. Sprawdź treść z nagraniem.")
+    for section in notes["sections"]:
+        _paragraph(body, section["heading"], "Heading1")
+        for point in section["points"]:
+            is_manual = point["id"] in edits
+            text = (edits[point["id"]] if is_manual else point["text"]).strip()
+            if not text:
+                continue
+            suffix = " · poprawka użytkownika" if is_manual else " · cytat źródłowy"
+            _paragraph(body, "Źródło " + _clock(point["start_ms"]) +
+                       " · " + point["segment_id"] + suffix, "Caption")
+            _paragraph(body, text, "Quote")
+    _paragraph(body, "Materiał zawiera wybrane fragmenty, nie automatyczne streszczenie semantyczne.")
+    section = _w(body, "sectPr")
+    _w(section, "pgSz", w="11906", h="16838")
+    _w(section, "pgMar", top="1200", right="1300", bottom="1200", left="1300",
+       header="500", footer="500", gutter="0")
+    return _package_document(document)
