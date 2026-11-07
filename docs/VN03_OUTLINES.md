@@ -33,3 +33,9 @@ Testy kodu: tests/test_advanced_notes.py, kompletna regresja Linux i podzbiór W
 Przy opcji `--docx` program **najpierw generuje w pamięci** Markdown, JSON i DOCX, a dopiero po pomyślnym przygotowaniu całego zestawu zastępuje pliki na dysku. Błąd kodowania DOCX nie usuwa już istniejących, zatwierdzonych eksportów Markdown/JSON ani nie pozostawia nowych, niekompletnych plików. Regresje obejmują oba przypadki.
 
 Każdy zapis pliku korzysta z atomowej wymiany, ale **zestaw trzech plików nadal nie jest jedną transakcją systemu plików**: awaria dysku lub brak miejsca podczas późniejszego zapisu może pozostawić różne wersje plików. Nie traktować tego testu jako pełnego odbioru bezpieczeństwa zapisu lub Windows. VN-03 pozostaje W TRAKCIE.
+
+## Nagłówki oparte na słowach ze źródła (07.11.2026)
+
+Dotychczasowe ogólne nagłówki „Zagadnienie 1”, „Zagadnienie 2” uzupełniono o krótkie wskazówki tematyczne: program wybiera słowa **dosłownie występujące w cytowanych fragmentach**, preferując te powtarzające się w kilku różnych wypowiedziach. W razie braku powtarzalnych słów stosuje początek cytatu z pominięciem słów funkcyjnych. Nagłówki nie mogą zawierać znaczników Markdown/HTML, a oryginalne cytaty nadal zachowują pełną treść i odnośniki do czasu.
+
+To heurystyka porządkująca, **nie semantyczny model AI**: nie weryfikuje poprawności ASR, nie rozumie znaczenia wypowiedzi i może wskazać słowo niebędące faktycznym tematem. Wymagana jest nadal ocena człowieka na rzeczywistych wykładach/CCNA. Format JSON i Markdown nadal używa dotychczasowego schematu `videonotes-source-outline-v1`.
