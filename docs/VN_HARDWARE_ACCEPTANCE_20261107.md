@@ -82,3 +82,12 @@ Test `tests/test_pipeline_long.py` uruchamia **syntetyczny** projekt 2 godziny 1
 [GitHub Actions 42379566243](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42379566243) dla PR #30: **PASS** source Linux, source Windows i rzeczywistego headless Chromium na Ubuntu. Przeglądarka otworzyła `file://web/index.html`; lokalny syntetyczny import JSON, edycja, odmowa eksportu szkicu, poprawny TXT, ochrona przed utratą zmian i brak zasobów HTTP(S) w rejestrze `performance` zakończyły się powodzeniem. Nie przesyłano nagrań i nie uruchamiano ASR.
 
 Jest to potwierdzony podtest przeglądarkowy, **nie całe WEB-01** (Chrome/Edge/Firefox na Windows), nie test dostępności/dużego 50k JSON (WEB-02), nie test Windows offline, nie publikacja beta Wiedora. Statusy w głównej macierzy pozostają NOT_RUN do wykonania wszystkich wymaganych wariantów.
+
+## 8. Automatyczna macierz przeglądarkowa PR #32 i #33 (07.11.2026)
+
+- [PR #32, Actions 42380043594](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42380043594): rzeczywisty headless Chrome i Edge w GitHub-hosted Windows oraz Chromium w Ubuntu, `file://` i lokalny import/edycja/eksport bez sieci — wszystkie wymagane joby PASS.
+- [PR #33, Actions 42415998182](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42415998182): wszystkie cztery joby PASS (Python/Node Linux, Python/Node Windows, headless Chromium Ubuntu, headless Chrome i Edge Windows). Dodatkowo syntetyczna transkrypcja 50 000 segmentów, render maksymalnie 75 wierszy, wyszukanie ostatniego segmentu, stronicowanie i zachowanie fokusu po wyborze segmentu.
+- Mierzone `50k synthetic browser interactions` w CI: Chromium Ubuntu **207 ms**, Chrome Windows **160 ms**, Edge Windows **109 ms**. To pomiary jednej próbki na współdzielonych runnerach, a nie gwarantowane wyniki urządzeń użytkowników.
+- Tabela ma podpis dla czytnika, edytor nazwę regionu, aktywny przycisk `aria-pressed`, a fokus jest przywracany po odrysowaniu listy. To **automatyczny podtest**, nie odbiór przez użytkownika czytnika ekranu.
+
+**Pozostają NOT_RUN:** Firefox na rzeczywistym Windows (`WEB-01`), test ręczny klawiatury i czytnika ekranu na fizycznym Windows oraz pomiary pamięci i responsywności na docelowym sprzęcie (`WEB-02`). Nie zmienia to pełnych statusów tych kryteriów w tabeli ani żadnego statusu etapu VN. Integracja hosta `HOST-01` wciąż wymaga osobnej bramki.
