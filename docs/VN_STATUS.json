@@ -130,10 +130,12 @@
         "PR #20: safe restore from imported transcript, per-format reduced-memory export and previously omitted web-controller tests in Linux/Windows CI PASS",
         "PR #21: WebVTT markup escape and cue-boundary protection; Linux/Windows CI and DEV EXE PASS",
         "PR #24: block browser export with uncommitted draft, re-confirm edits made during asynchronous file import; Linux/Windows controller CI PASS",
-        "PR #30: headless real Chromium file:// import/edit/TXT export and deny-replace smoke on GitHub Ubuntu runner PASS, without npm/network; Windows/Edge/Firefox/a11y still open"
+        "PR #30: headless real Chromium file:// import/edit/TXT export and deny-replace smoke on GitHub Ubuntu runner PASS, without npm/network; Windows/Edge/Firefox/a11y still open",
+        "PR #32: actual headless Chrome and Edge file:// smoke on Windows GitHub Actions runner, alongside Linux Chromium/source CI PASS; no physical Windows accessibility/Firefox acceptance.",
+        "PR #33: 50,000 synthetic segments imported/searched/paginated in real Chromium Linux, Chrome and Edge Windows CI, keyboard focus/ARIA and no HTTP(S) resource requests PASS; 207ms Linux, 160ms Chrome Windows, 109ms Edge Windows CI; not physical screen-reader or full WEB-02 acceptance."
       ],
       "blockers": [
-        "Real desktop browser acceptance Chrome/Edge/Firefox and accessibility testing",
+        "Firefox file:// browser testing; physical Windows keyboard/screen-reader accessibility acceptance; Chrome/Edge CI smoke is not physical acceptance",
         "Full real web ASR/recording adapter with matching desktop results",
         "Wiedora isolated integration behind KWN gate and host regression",
         "Separate authorization for Netlify staging / any portal deployment"
@@ -358,6 +360,32 @@
       "chromium_headless_linux": "PASS",
       "physical_windows_browser": false,
       "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42380043594",
+      "scope": "PR #32 real file:// Windows Chrome and Edge and Linux Chromium browser smoke; CI-only",
+      "source_linux_windows": "PASS",
+      "chromium_headless_linux": "PASS",
+      "windows_chrome_headless": "PASS",
+      "windows_edge_headless": "PASS",
+      "firefox": false,
+      "physical_windows_browser": false,
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42415998182",
+      "scope": "PR #33 50k segment local import, last-segment search, 75-row page size, pagination and keyboard focus / ARIA smoke in actual Linux Chrome and Windows Chrome+Edge; all four CI jobs PASS",
+      "source_linux_windows": "PASS",
+      "chromium_headless_linux": "PASS",
+      "windows_chrome_headless": "PASS",
+      "windows_edge_headless": "PASS",
+      "synthetic_large_segments": 50000,
+      "linux_browser_ms": 207,
+      "windows_chrome_ms": 160,
+      "windows_edge_ms": 109,
+      "firefox": false,
+      "screen_reader_tested": false,
+      "real_asr": false
     }
   ],
   "notes": [
@@ -372,7 +400,8 @@
     "PR #24–#28 merged to develop on 2026-11-07 after applicable Linux/Windows source CI and Windows development EXE checks passed; none proved physical Windows or ASR model acceptance.",
     "PR #27 safety: Windows PID liveness is checked with OpenProcess, never os.kill(pid,0); user must explicitly confirm stale-lock cleanup.",
     "PR #28 synthetic 2h+ checkpoint test does not satisfy HW-01 or ASR-05; physical long-run time/RAM and microphone tests still NOT_RUN.",
-    "Real headless Chromium on Ubuntu PASS in PR #30 does not close WEB-01 (Windows Chrome/Edge/Firefox) or WEB-02 (large JSON, a11y), nor VN-07 host beta gate."
+    "Real headless Chromium on Ubuntu PASS in PR #30 does not close WEB-01 (Windows Chrome/Edge/Firefox) or WEB-02 (large JSON, a11y), nor VN-07 host beta gate.",
+    "PR #32/33 CI verified native headless Chrome and Edge on hosted Windows and Chromium on Linux, plus synthetic 50k browser workflow; WEB-01/WEB-02 remain NOT_RUN in full acceptance matrix without Firefox and physical keyboard/screen-reader testing. VN-07 remains W_TRAKCIE; no Constant_app or Netlify changes."
   ],
   "last_verified_develop_before_pr8": "344e227571ba09802da8a8bea7c50498473dc2e6"
 }
