@@ -19,12 +19,26 @@ Uwaga: to przykład. Ścieżki muszą odpowiadać rzeczywistym lokalnym plikom, 
 
 Tworzone pliki: VideoNotes-DEV.exe, bin/ffmpeg.exe, bin/ffprobe.exe, bin/whisper-cli.exe, bin/model.bin, START-VIDEO-NOTES.cmd, INTERNAL-ONLY.txt oraz bundle-manifest.json. Manifest zawiera wyłącznie względne nazwy, rozmiary i SHA-256. Brak ścieżek źródłowych, nagrań i prywatnych danych.
 
+## Kontrola integralności przed uruchomieniem
+
+Po utworzeniu katalogu wykonaj lokalnie:
+
+    python -m videonotes bundle-verify C:\staging\VideoNotes-LOCAL-TEST
+
+W prywatnej paczce można również uruchomić:
+
+    C:\staging\VideoNotes-LOCAL-TEST\VideoNotes-DEV.exe bundle-verify C:\staging\VideoNotes-LOCAL-TEST
+
+Polecenie weryfikuje stały zestaw pięciu składników, SHA-256 i rozmiary z manifestu, brak dodatkowych plików i symlinków, format manifestu (włącznie z powielonymi kluczami) oraz niezmienione pliki startowe. `START-VIDEO-NOTES.cmd` uruchamia ten test automatycznie **przed** włączeniem GUI i odmawia startu po wykryciu różnicy. Testy działają lokalnie bez internetu.
+
+**Uwaga:** sumy SHA-256 chronią przed przypadkowym uszkodzeniem, ale manifest i plik EXE nie są podpisane. Osoba mająca możliwość zamiany całego pakietu może podmienić jednocześnie manifest i program. `verified: true` oznacza jedynie spójność lokalną, **nie** zatwierdzenie licencji, pochodzenia, bezpieczeństwa lub gotowości dystrybucyjnej. Takie bramki pozostają otwarte.
+
 ## Uruchomienie i test
 
 Na fizycznym komputerze Windows, po skopiowaniu katalogu i odcięciu sieci, uruchom START-VIDEO-NOTES.cmd. Skrypt ustawia PATH na lokalny katalog bin i wskazuje domyślny model, więc użytkownik nie musi instalować osobnego Pythona ani szukać modelu ręcznie. Następnie trzeba wykonać rzeczywisty test transkrypcji MP4/MKV, eksportu i mikrofonu; samo uruchomienie GUI NIE potwierdza, że cały pakiet działa.
 
 ## Ograniczenia bezpieczeństwa i odbioru
 
-To testowa, NIEPODPISANA paczka lokalna, a nie instalator .exe/.msi ani wydanie użytkowe. Kod sprawdza SHA-256 skopiowanych danych, ale nie poświadcza zgodności wersji bibliotek, integralności pochodzenia plików zewnętrznych ani licencji. Z tego powodu manifest jawnie oznacza license_verified=false, signature_verified=false, hardware_tested=false. Nie wolno rozpowszechniać bez dalszej kontroli i praw do redystrybucji.
+To testowa, NIEPODPISANA paczka lokalna, a nie instalator .exe/.msi ani wydanie użytkowe. Kod sprawdza SHA-256 skopiowanych danych i ponownie je weryfikuje przed startem, ale nie poświadcza zgodności wersji bibliotek, integralności pochodzenia plików zewnętrznych ani licencji. Z tego powodu manifest jawnie oznacza license_verified=false, signature_verified=false, hardware_tested=false. Nie wolno rozpowszechniać bez dalszej kontroli i praw do redystrybucji.
 
 Automatyczne tests/test_bundle.py korzystają z syntetycznych plików i nie testują rzeczywistego modelu Whisper. Dalsze bramki: prawdziwe ASR PL/EN, instalacja bez sieci na czystym Windows, logi AV/SmartScreen, ocena prawna/licencji, odtwarzanie po błędzie, testy długich nagrań oraz podpisywanie wydania.
