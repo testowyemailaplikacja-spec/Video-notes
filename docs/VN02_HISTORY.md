@@ -47,3 +47,11 @@ Polecenie porównuje *obie aktualne wersje plików* ze znanymi hashami. Jeśli o
 Ręczne `notes-edit` również wykorzystuje wspólną blokadę `.notes.lock`, co chroni przed zapisaniem poprawki pomiędzy dwoma plikami regeneracji. Jeśli po fizycznej awarii systemu pozostała `.notes.lock`, funkcja odzyskiwania nie usuwa jej automatycznie. Należy upewnić się, że żaden proces nie zapisuje notatek, zachować kopię plików i dopiero ręcznie sprawdzić/usunąć osieroconą blokadę. Program nie potrafi samodzielnie zweryfikować żywego Windows procesu na podstawie starego pustego pliku blokady.
 
 To testowane w automatycznych regresjach przerwanie kolejności zapisów, a **nie gwarancja pełnej odporności na utratę zasilania lub awarię dysku**. Końcowy odbiór wymaga prób sprzętowych, kontroli odczytu i rozpatrzenia trwałości metadanych katalogu po `fsync`. VN-02 pozostaje W_TRAKCIE.
+
+## Przywracanie po awarii także w GUI oraz test prawdziwych widżetów Tk (08.11.2026)
+
+Jeśli panel „Notatka podstawowa” wykryje dziennik przerwanej aktualizacji, wyświetli osobne okno potwierdzenia odzyskania. Ostrzega przed równoczesną pracą na katalogu i sugeruje zachowanie kopii. Odmowa nic nie zmienia. Po świadomym potwierdzeniu uruchamia bezpieczne `recover_interrupted_note_update(confirm=True)`, pokazuje wynik i otwiera notatkę ponownie; jeśli cytaty są nieaktualne, pozostaje dotychczasowa niezależna zgoda na regenerację ze źródła.
+
+Do CI dodano osobny test interfejsu w **rzeczywistych widżetach Tkinter** uruchamianych na wirtualnym ekranie Xvfb (`scripts/gui_headless_test.py`, workflow `vn-tk-headless.yml`). Scenariusze testowe: otwieranie i przywrócenie wersji przez przyciski, odmowa i zgoda na odzyskanie przerwanego zapisu, ochrona szkicu przy wyborze innego punktu. Dialogi potwierdzające są zastąpione kontrolowanymi odpowiedziami testowymi; reszta elementów Tk działa w rzeczywistym interpreterze i ekranie wirtualnym.
+
+Nie jest to weryfikacja fizycznego Windows, obsługi czytnika ekranowego ani pełny test ergonomii człowieka. VN-02 pozostaje W_TRAKCIE.
