@@ -15,7 +15,7 @@ from .media import probe
 from .microphone import record_microphone, list_microphone_devices
 from .notes import generate_basic_notes, read_basic_notes, edit_note_point, export_basic_notes, export_basic_notes_docx
 from .advanced_notes import export_advanced_outline
-from .note_revisions import regenerate_basic_notes, list_note_versions
+from .note_revisions import regenerate_basic_notes, list_note_versions, restore_note_version
 from .pipeline import create_project, transcribe_project
 from .storage import read_project
 
@@ -462,15 +462,42 @@ class VideoNotesWindow:
         editor.pack(fill="both", expand=True, pady=(4, 8))
         status = tk.StringVar(value="Wybierz punkt, aby odczytać i ewentualnie poprawić tekst.")
         ttk.Label(right, textvariable=status, wraplength=320).pack(anchor="w")
+        selected_point: list[str | None] = [None]
+
+        def has_unsaved_draft() -> bool:
+            key = selected_point[0]
+            if key is None:
+                return False
+            saved = changes["edits"].get(key, content_by_id[key]["text"])
+            return editor.get("1.0", "end-1c") != saved
+
         def selected(_event=None) -> None:
             ids = view.selection()
-            if ids:
-                key = ids[0]
-                value = changes["edits"].get(key, content_by_id[key]["text"])
-                editor.delete("1.0", "end")
-                editor.insert("1.0", value)
-                status.set("Źródło: " + content_by_id[key]["segment_id"])
+            if not ids:
+                return
+            key = ids[0]
+            if key == selected_point[0]:
+                return
+            if has_unsaved_draft() and not messagebox.askyesno(
+                "Niezapisana poprawka",
+                "Zmienić punkt i odrzucić niezapisany tekst? Wybierz Nie, by zachować szkic."
+            ):
+                view.selection_set(selected_point[0])
+                return
+            selected_point[0] = key
+            value = changes["edits"].get(key, content_by_id[key]["text"])
+            editor.delete("1.0", "end")
+            editor.insert("1.0", value)
+            status.set("Źródło: " + content_by_id[key]["segment_id"])
+
         view.bind("<<TreeviewSelect>>", selected)
+        def close_notes() -> None:
+            if has_unsaved_draft() and not messagebox.askyesno(
+                "Niezapisana poprawka", "Zamknąć notatkę i odrzucić niezapisany tekst?"
+            ):
+                return
+            window.destroy()
+        window.protocol("WM_DELETE_WINDOW", close_notes)
         def save_edit() -> None:
             ids = view.selection()
             if not ids:
@@ -488,13 +515,9 @@ class VideoNotesWindow:
                 messagebox.showerror("Notatka", str(error))
         ttk.Button(right, text="Zapisz poprawkę i Markdown", command=save_edit).pack(anchor="e", pady=7)
         def export_docx() -> None:
-            ids = view.selection()
-            if ids:
-                key = ids[0]
-                current = changes["edits"].get(key, content_by_id[key]["text"])
-                if editor.get("1.0", "end-1c") != current:
-                    messagebox.showwarning("Eksport DOCX", "Najpierw zapisz poprawkę w edytorze.")
-                    return
+            if has_unsaved_draft():
+                messagebox.showwarning("Eksport DOCX", "Najpierw zapisz poprawkę w edytorze.")
+                return
             try:
                 path = export_basic_notes_docx(folder)
                 status.set("Zapisano lokalny DOCX: " + str(path))
@@ -502,6 +525,9 @@ class VideoNotesWindow:
                 messagebox.showerror("Eksport DOCX", str(error))
         ttk.Button(right, text="Eksportuj DOCX (offline)", command=export_docx).pack(anchor="e", pady=4)
         def regenerate() -> None:
+            if has_unsaved_draft():
+                messagebox.showwarning("Odbudowa", "Najpierw zapisz niezapisaną poprawkę.")
+                return
             if not messagebox.askyesno(
                 "Odbudowa notatki",
                 "Ponownie wybierać cytaty z transkrypcji? Poprzednia wersja zostanie zapisana w historii. Ręczne poprawki do istniejących segmentów pozostaną."
@@ -517,7 +543,70 @@ class VideoNotesWindow:
             except VideoNotesError as error:
                 messagebox.showerror("Odbudowa", str(error))
         ttk.Button(right, text="Odbuduj notatkę z historią", command=regenerate).pack(anchor="e")
-        ttk.Label(right, text=f"Wcześniejsze wersje: {len(list_note_versions(folder))}", wraplength=290).pack(anchor="w", pady=4)
+
+        def show_history() -> None:
+            if has_unsaved_draft():
+                messagebox.showwarning("Historia", "Najpierw zapisz niezapisaną poprawkę.")
+                return
+            try:
+                versions = list_note_versions(folder)
+            except VideoNotesError as error:
+                messagebox.showerror("Historia notatek", str(error))
+                return
+            if not versions:
+                messagebox.showinfo("Historia notatek", "Nie zapisano jeszcze wcześniejszych wersji.")
+                return
+            history = tk.Toplevel(window)
+            history.title("Historia notatek — wybierz wersję do przywrócenia")
+            history.geometry("880x380")
+            history.transient(window)
+            panel = ttk.Frame(history, padding=12)
+            panel.pack(fill="both", expand=True)
+            ttk.Label(
+                panel, text="Najpierw wybierz wersję. Przywracanie działa tylko wtedy, gdy cytaty odpowiadają aktualnej transkrypcji.",
+                wraplength=830
+            ).pack(anchor="w", pady=(0, 8))
+            table = ttk.Treeview(panel, columns=("date", "edits", "revision"),
+                                 show="headings", selectmode="browse")
+            for col, label, width in (("date", "Data UTC", 200),
+                                      ("edits", "Ręczne poprawki", 130),
+                                      ("revision", "Identyfikator wersji", 440)):
+                table.heading(col, text=label)
+                table.column(col, width=width, stretch=col == "revision")
+            table.pack(fill="both", expand=True)
+            for version in versions:
+                table.insert("", "end", iid=version["revision"],
+                             values=(version["created_at"], version["manual_edits"], version["revision"]))
+            def restore_selected() -> None:
+                selected_versions = table.selection()
+                if not selected_versions:
+                    messagebox.showinfo("Historia notatek", "Wybierz wersję do przywrócenia.")
+                    return
+                if has_unsaved_draft():
+                    messagebox.showwarning("Historia notatek", "Najpierw zapisz niezapisaną poprawkę.")
+                    return
+                revision = selected_versions[0]
+                if not messagebox.askyesno(
+                    "Przywróć notatkę",
+                    "Przywrócić wybraną wersję? Aktualna notatka i jej ręczne poprawki zostaną wcześniej zapisane w historii."
+                ):
+                    return
+                try:
+                    restore_note_version(folder, revision)
+                    export_basic_notes(folder)
+                except VideoNotesError as error:
+                    messagebox.showerror("Przywracanie notatki", str(error))
+                    return
+                history.destroy()
+                window.destroy()
+                self._show_notes()
+            ttk.Button(panel, text="Przywróć wybraną wersję", command=restore_selected).pack(anchor="e", pady=(8, 0))
+        ttk.Button(right, text="Historia i przywracanie wersji", command=show_history).pack(anchor="e", pady=4)
+        try:
+            number_of_versions = len(list_note_versions(folder))
+        except VideoNotesError:
+            number_of_versions = "do sprawdzenia"
+        ttk.Label(right, text=f"Wcześniejsze wersje: {number_of_versions}", wraplength=290).pack(anchor="w", pady=4)
         if content_by_id:
             first = next(iter(content_by_id))
             view.selection_set(first)
