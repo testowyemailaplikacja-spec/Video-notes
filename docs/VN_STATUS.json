@@ -53,7 +53,10 @@
         "PR #6: versioned note regeneration with edits preservation and safe source-bound history",
         "PR #26: optional source-grounded basic notes TXT export with manual corrections, CLI and stale-source refusal; Linux/Windows CI and Windows DEV EXE PASS",
         "PR #37: interrupted pristine note-edits journal can be safely resumed without overwriting completed notes or nonempty/orphaned user corrections; Linux/Windows source and real-browser CI plus Windows DEV EXE PASS, synthetic tests only.",
-        "PR #44: opt-in offline notes-basic.docx in CLI/GUI using standard-library OOXML and existing basic-note provenance validation; manual edits and source timestamps, no links/macros; stale-transcript refuses overwriting old export. Linux 123 tests, 5/5 cross-platform source/browser CI and Windows DEV EXE PASS; no Word/LibreOffice physical acceptance."
+        "PR #44: opt-in offline notes-basic.docx in CLI/GUI using standard-library OOXML and existing basic-note provenance validation; manual edits and source timestamps, no links/macros; stale-transcript refuses overwriting old export. Linux 123 tests, 5/5 cross-platform source/browser CI and Windows DEV EXE PASS; no Word/LibreOffice physical acceptance.",
+        "PR #47: cached lexical weights and nearest selected-time distances for source-only note selection, reference-equivalent greedy scoring, deterministic 50,000 segment/20 citation stress; Linux 127 tests, five Linux/Windows source/browser jobs PASS and Windows DEV EXE PASS. No actual long media.",
+        "PR #48: GUI browse/restore source-compatible note versions with UTC timestamps, selected-quote draft-loss guard, canonical source quote ID verification, symlink-safe history folder and snapshot API backward compatibility with backup. Initial PR run found backup incompatibility and was repaired before merge. Final Linux 132 tests, 5/5 source/browser and Windows DEV EXE PASS; physical Windows GUI untested.",
+        "PR #49: real LibreOffice Writer 24.2 Ubuntu headless import/render of synthetic basic DOCX + Polish citations/manual notes, converted to test-only PDF and PNG; canonical default OPC namespace fix, parallel-export namespace regression, dedicated LibreOffice workflow PASS, source/browser 5/5 PASS and DEV EXE PASS; Microsoft Word and manual visual Windows acceptance still pending."
       ],
       "blockers": [
         "Human assessment on real lectures",
@@ -69,12 +72,13 @@
         "PR #10: versioned extractive source-linked outline, Markdown/JSON, CLI/GUI, passed Linux and Windows source CI, dev EXE CI",
         "PR #18: optional offline DOCX source-linked outline, text escaped as OOXML; Linux/Windows source CI and Windows DEV EXE PASS",
         "PR #39: pre-render Markdown/JSON/DOCX before replacing prior exports; simulated DOCX failure preserves all existing files and creates no new partial exports; Linux/Windows source+browser CI PASS and Windows DEV EXE PASS, no physical Word/LibreOffice test.",
-        "PR #41: source-word-only topic hints replace generic heading labels, prioritize repeated terms across distinct quotes; untrusted HTML/Markdown stripped from headings but original citations preserved; Linux/Windows source+browser CI and Windows DEV EXE PASS. Not semantic AI."
+        "PR #41: source-word-only topic hints replace generic heading labels, prioritize repeated terms across distinct quotes; untrusted HTML/Markdown stripped from headings but original citations preserved; Linux/Windows source+browser CI and Windows DEV EXE PASS. Not semantic AI.",
+        "PR #49: real LibreOffice Writer Ubuntu headless imports advanced DOCX, renders PDF and verifies Polish text via Poppler; canonical default namespace in [Content_Types].xml and _rels/.rels fixed true previous failure; 48 concurrent DOCX export namespace regression; dedicated workflow, 5/5 source/browser and DEV EXE PASS. Not physical Microsoft Word/LibreOffice manual GUI acceptance."
       ],
       "blockers": [
         "Real lectures/tutorials/CCNA human acceptance",
         "Semantic headings, definitions and long-document synthesis",
-        "Real Word/LibreOffice GUI acceptance for DOCX; PDF, slide/OCR and semantic source-grounding tests remain"
+        "Physical Windows Microsoft Word/LibreOffice GUI and human layout acceptance remains; headless LibreOffice Linux source-document render now PASS. PDF user export, slide/OCR and semantic grounding remain pending"
       ]
     },
     {
@@ -521,6 +525,61 @@
       "windows_executable": "PASS",
       "offline_installer": false,
       "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42420484514",
+      "scope": "PR #47: 50k synthetic segment note selection and exact old-selection equivalence; 127 Linux source tests, 5/5 Linux/Windows source/browser jobs PASS",
+      "source_linux_windows": "PASS",
+      "chromium_headless_linux": "PASS",
+      "firefox_headless_linux": "PASS",
+      "windows_chrome_headless": "PASS",
+      "windows_edge_headless": "PASS",
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42420484473",
+      "scope": "PR #47 Windows DEV EXE build and smoke PASS; no offline installer",
+      "windows_executable": "PASS",
+      "offline_installer": false,
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42420925521",
+      "scope": "PR #48 after fixing previously detected backup API regression: 132 Linux tests, 5/5 Linux/Windows source/browser CI jobs PASS; GUI restoration needs physical acceptance",
+      "source_linux_windows": "PASS",
+      "chromium_headless_linux": "PASS",
+      "firefox_headless_linux": "PASS",
+      "windows_chrome_headless": "PASS",
+      "windows_edge_headless": "PASS",
+      "physical_windows_gui": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42420925524",
+      "scope": "PR #48 Windows DEV EXE build PASS; no physical Windows GUI acceptance",
+      "windows_executable": "PASS",
+      "offline_installer": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42421571945",
+      "scope": "PR #49 canonical OPC namespace fix for Word/LibreOffice basic+advanced DOCX; 5/5 Linux/Windows source/browser CI PASS, concurrent XML export tests",
+      "source_linux_windows": "PASS",
+      "chromium_headless_linux": "PASS",
+      "firefox_headless_linux": "PASS",
+      "windows_chrome_headless": "PASS",
+      "windows_edge_headless": "PASS"
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42421571876",
+      "scope": "PR #49 real LibreOffice 24.2.7.2 Ubuntu headless DOCX import of basic and advanced source-cited documents, PDF render/PDF text extraction and first page PNG PASS with Polish Unicode; no physical Windows Word GUI",
+      "libreoffice_headless_linux": "PASS",
+      "physical_windows_word": false,
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42421571863",
+      "scope": "PR #49 Windows DEV EXE build/smoke PASS with DOCX OPC namespace fix, not final installer",
+      "windows_executable": "PASS",
+      "offline_installer": false
     }
   ],
   "notes": [
@@ -540,7 +599,8 @@
     "PR #35 Firefox Linux headless CI passed for real file:// viewer and 50k synthetic input; WEB-01/WEB-02 remain NOT_RUN in full physical and screen-reader acceptance matrix. No Firefox physical Windows test and no host deployment.",
     "PR #37 note-creation interruption recovery with empty journal regressions PASS in Actions 42416723873/42416723714. VN-02 remains W_TRAKCIE without real-lecture semantic/human quality acceptance.",
     "PR #39/40/41 merged after passing post-head Linux/Windows source, real-browser CI and Windows DEV EXE checks on 2026-11-07. They address export preflight, no-clobber private bundle publication, and literal source-derived topic hints. No complete physical Windows/ASR/human semantics acceptance; 0/9 VN DONE unchanged.",
-    "PR #43–45 merged on 2026-11-07 after applicable Linux/Windows source/browser and Windows DEV EXE checks. MP4/MKV real FFmpeg + fake subprocess CLI does not verify true PL/EN ASR; DOCX OOXML tests do not verify Word GUI; recording crash report test is synthetic, not physical device recovery."
+    "PR #43–45 merged on 2026-11-07 after applicable Linux/Windows source/browser and Windows DEV EXE checks. MP4/MKV real FFmpeg + fake subprocess CLI does not verify true PL/EN ASR; DOCX OOXML tests do not verify Word GUI; recording crash report test is synthetic, not physical device recovery.",
+    "2026-11-07 PR #47–49 accepted on verified CI only: 50k extractive selection equivalence; GUI history restoration with backup API compatibility; crucial real LibreOffice DOCX import bug was reproduced and fixed via canonical default OPC namespaces. None of these verifies real ASR, full physical Windows UI, licensed offline installer, or human semantic-note quality."
   ],
   "last_verified_develop_before_pr8": "344e227571ba09802da8a8bea7c50498473dc2e6"
 }
