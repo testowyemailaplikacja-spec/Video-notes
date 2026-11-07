@@ -77,7 +77,7 @@ def _write_snapshot(folder: Path, notes: dict, changes: dict) -> str:
     return revision
 
 
-def _load_snapshot(folder: Path, revision: str) -> tuple[dict, dict, str]:
+def _load_snapshot(folder: Path, revision: str, *, include_created_at: bool = False) -> tuple[dict, dict] | tuple[dict, dict, str]:
     if not isinstance(revision, str) or not ID_PATTERN.fullmatch(revision):
         raise VideoNotesError("Nieprawidłowy identyfikator wersji.")
     history = _history_folder(folder)
@@ -101,7 +101,9 @@ def _load_snapshot(folder: Path, revision: str) -> tuple[dict, dict, str]:
         timestamp = None
     if timestamp is None or timestamp.tzinfo is None:
         raise VideoNotesError("Historia notatek ma niepoprawną datę wersji.")
-    return notes, edits, created_at
+    if include_created_at:
+        return notes, edits, created_at
+    return notes, edits
 
 
 def list_note_versions(folder: Path) -> list[dict]:
@@ -115,7 +117,7 @@ def list_note_versions(folder: Path) -> list[dict]:
         raise VideoNotesError("Katalog historii przekracza limit.")
     items = []
     for path in names:
-        notes, edits, created_at = _load_snapshot(folder, path.stem)
+        notes, edits, created_at = _load_snapshot(folder, path.stem, include_created_at=True)
         items.append({"revision": path.stem, "project_id": notes["project_id"],
                       "created_at": created_at, "manual_edits": len(edits["edits"]),
                       "source_sha256": notes.get("source_sha256")})
@@ -205,7 +207,7 @@ def restore_note_version(folder: Path, revision: str) -> str:
     project, source = _checked_source(folder)
     old_notes, old_edits = load_json(folder / "notes.json"), load_json(folder / "notes-edits.json")
     _valid_pair(old_notes, old_edits, project["id"])
-    prior_notes, prior_edits, _created_at = _load_snapshot(folder, revision)
+    prior_notes, prior_edits = _load_snapshot(folder, revision)
     _valid_pair(prior_notes, prior_edits, project["id"])
     if prior_notes.get("source_sha256") != _hash(source):
         raise VideoNotesError("Stara wersja nie odpowiada bieżącej transkrypcji. Nie można bezpiecznie przywrócić.")
