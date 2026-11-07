@@ -1,6 +1,6 @@
 {
   "schema": "videonotes-progress-v1",
-  "updated_date": "2026-11-06",
+  "updated_date": "2026-11-07",
   "owner_repo": "testowyemailaplikacja-spec/Video-notes",
   "integration_policy": "Develop KWN/Video-notes only. Constant_app and Netlify get only later, independently accepted larger batches.",
   "main_unchanged": "4da53b3bff580e07a16218e5f7017cecf8ff7aed",
@@ -59,12 +59,13 @@
       "id": "VN-03",
       "status": "W_TRAKCIE",
       "evidence": [
-        "PR #10: versioned extractive source-linked outline, Markdown/JSON, CLI/GUI, passed Linux and Windows source CI, dev EXE CI"
+        "PR #10: versioned extractive source-linked outline, Markdown/JSON, CLI/GUI, passed Linux and Windows source CI, dev EXE CI",
+        "PR #18: optional offline DOCX source-linked outline, text escaped as OOXML; Linux/Windows source CI and Windows DEV EXE PASS"
       ],
       "blockers": [
         "Real lectures/tutorials/CCNA human acceptance",
         "Semantic headings, definitions and long-document synthesis",
-        "DOCX/PDF exports and separate slide/OCR acceptance"
+        "Real Word/LibreOffice GUI acceptance for DOCX; PDF, slide/OCR and semantic source-grounding tests remain"
       ]
     },
     {
@@ -72,7 +73,8 @@
       "status": "W_TRAKCIE",
       "evidence": [
         "PR #11: consent-gated FFmpeg/DirectShow Windows microphone recorder, segmented WAV, crash journal; Linux/Windows mock tests and development EXE CI PASS",
-        "Device discovery and GUI controls in next PR, pending CI"
+        "PR #12: device discovery and GUI start/stop integrated into develop, automated Windows/Linux contract tests PASS",
+        "PR #16: bounded FFmpeg stop/terminate/kill and preserved recording journal when recorder stalls, Linux/Windows CI and DEV EXE PASS"
       ],
       "blockers": [
         "Physical Windows microphone permission and recording",
@@ -87,7 +89,7 @@
       "evidence": [
         "PR #8: FFprobe/FFmpeg import MP3/M4A/FLAC/OGG/OPUS/MOV, common transcription pipeline",
         "GitHub Actions 42295088894: 66 Linux and 53 Windows source tests PASS, actual audio codecs on Linux",
-        "Optional DirectShow mic+loopback two-input mixing with explicit per-source consent, CLI and GUI (PR pending CI)"
+        "Optional DirectShow mic+loopback two-input mixing with explicit per-source consent, CLI and GUI (PR #14 merged, mock Linux/Windows tests passed)"
       ],
       "blockers": [
         "Hardware Windows DirectShow loopback availability and explicit permissions",
@@ -101,21 +103,24 @@
       "status": "W_TRAKCIE",
       "evidence": [
         "PR #4: project-only backup/restore with archive SHA-256 and path redaction",
-        "PR #9: actual Windows runner PyInstaller 6.16 development EXE smoke checks PASS, short-lived .exe + .sha256 artifact, workflow #42296659497"
+        "PR #9: actual Windows runner PyInstaller 6.16 development EXE smoke checks PASS, short-lived .exe + .sha256 artifact, workflow #42296659497",
+        "PR #13: internal-only portable bundle from user-supplied Windows binaries + model, SHA-256 manifest, no distribution approval",
+        "PR #17: bundle-verify preflight before GUI and manifest integrity tests; Linux/Windows CI + Windows DEV EXE PASS"
       ],
       "blockers": [
         "Installer .exe/.msi with model/runtime",
         "Windows installation offline, antivirus, licensing and SBOM",
         "Recovery and long-run performance",
         "Signed release policy",
-        "Internal DEV executable contains no FFmpeg, Whisper CLI or model; full offline installation remains unverified"
+        "DEV EXE alone lacks dependencies; internal portable bundle can include supplied FFmpeg/Whisper/model but is unsigned and untested on a physical offline Windows machine"
       ]
     },
     {
       "id": "VN-07",
       "status": "W_TRAKCIE",
       "evidence": [
-        "Separate web/index.html offline transcript viewer with source-linked JSON import/export and local editing, tests/web-core.test.cjs on Linux/Windows CI (pending PR checks)"
+        "Separate web/index.html offline transcript viewer with source-linked JSON import/export and local editing, tests/web-core.test.cjs on Linux/Windows CI (PR #15 merged, source CI PASS)",
+        "PR #16: browser warning on unsaved edit/reimport/unload and stale import rejection; Node Linux/Windows tests PASS"
       ],
       "blockers": [
         "Real desktop browser acceptance Chrome/Edge/Firefox and accessibility testing",
@@ -216,13 +221,51 @@
       "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42302509070",
       "scope": "VN-04 microphone FFmpeg mock source tests; Windows+Linux PASS (not physical capture)",
       "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42368507204",
+      "scope": "PR #16 Windows+Linux source and browser edit-safety regressions PASS",
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42368507271",
+      "scope": "PR #16 Windows development EXE build/smoke PASS; no bundled model",
+      "windows_executable": "PASS",
+      "real_asr": false,
+      "offline_installer": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42368853708",
+      "scope": "PR #17 Windows+Linux bundle-verify and tamper-detection source CI PASS",
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42368853718",
+      "scope": "PR #17 Windows development EXE build/smoke PASS; no real bundle ASR",
+      "windows_executable": "PASS",
+      "real_asr": false,
+      "offline_installer": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42369251501",
+      "scope": "PR #18 Windows+Linux source and offline DOCX ZIP/XML regression PASS",
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42369251604",
+      "scope": "PR #18 Windows development EXE build/smoke PASS; no real model",
+      "windows_executable": "PASS",
+      "real_asr": false,
+      "offline_installer": false
     }
   ],
   "notes": [
     "CI is not physical Windows acceptance or actual speech model benchmarking.",
     "No recorded user media, private transcripts or ASR model files were uploaded.",
     "Do not change Constant_app/Netlify as part of VN-00..VN-06.",
-    "Final compressed encoder padding <250ms is explicitly recorded as a warning, not silently attributed to ASR."
+    "Final compressed encoder padding <250ms is explicitly recorded as a warning, not silently attributed to ASR.",
+    "PR #16, #17, #18 were merged to develop on 2026-11-07 after respective GitHub Actions checks succeeded. None closes a full VN phase.",
+    "Status accounting 0/9 VN phases DONE is separate from historical Constant_app KWN ledger 100/189."
   ],
   "last_verified_develop_before_pr8": "344e227571ba09802da8a8bea7c50498473dc2e6"
 }
