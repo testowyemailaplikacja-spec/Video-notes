@@ -50,7 +50,8 @@
       "evidence": [
         "PR #3: verbatim source-linked basic notes, independent edits and Markdown, CLI/GUI",
         "PR #6: versioned note regeneration with edits preservation and safe source-bound history",
-        "PR #26: optional source-grounded basic notes TXT export with manual corrections, CLI and stale-source refusal; Linux/Windows CI and Windows DEV EXE PASS"
+        "PR #26: optional source-grounded basic notes TXT export with manual corrections, CLI and stale-source refusal; Linux/Windows CI and Windows DEV EXE PASS",
+        "PR #37: interrupted pristine note-edits journal can be safely resumed without overwriting completed notes or nonempty/orphaned user corrections; Linux/Windows source and real-browser CI plus Windows DEV EXE PASS, synthetic tests only."
       ],
       "blockers": [
         "Human assessment on real lectures",
@@ -400,6 +401,23 @@
       "physical_windows_browser": false,
       "screen_reader_tested": false,
       "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42416723873",
+      "scope": "PR #37 safe basic-note creation retry regression plus all 5 Linux/Windows source and browser jobs PASS",
+      "source_linux_windows": "PASS",
+      "chromium_headless_linux": "PASS",
+      "firefox_headless_linux": "PASS",
+      "windows_chrome_headless": "PASS",
+      "windows_edge_headless": "PASS",
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42416723714",
+      "scope": "PR #37 Windows DEV executable build and smoke PASS, no offline installer or licensed model",
+      "windows_executable": "PASS",
+      "offline_installer": false,
+      "real_asr": false
     }
   ],
   "notes": [
@@ -416,7 +434,8 @@
     "PR #28 synthetic 2h+ checkpoint test does not satisfy HW-01 or ASR-05; physical long-run time/RAM and microphone tests still NOT_RUN.",
     "Real headless Chromium on Ubuntu PASS in PR #30 does not close WEB-01 (Windows Chrome/Edge/Firefox) or WEB-02 (large JSON, a11y), nor VN-07 host beta gate.",
     "PR #32/33 CI verified native headless Chrome and Edge on hosted Windows and Chromium on Linux, plus synthetic 50k browser workflow; WEB-01/WEB-02 remain NOT_RUN in full acceptance matrix without Firefox and physical keyboard/screen-reader testing. VN-07 remains W_TRAKCIE; no Constant_app or Netlify changes.",
-    "PR #35 Firefox Linux headless CI passed for real file:// viewer and 50k synthetic input; WEB-01/WEB-02 remain NOT_RUN in full physical and screen-reader acceptance matrix. No Firefox physical Windows test and no host deployment."
+    "PR #35 Firefox Linux headless CI passed for real file:// viewer and 50k synthetic input; WEB-01/WEB-02 remain NOT_RUN in full physical and screen-reader acceptance matrix. No Firefox physical Windows test and no host deployment.",
+    "PR #37 note-creation interruption recovery with empty journal regressions PASS in Actions 42416723873/42416723714. VN-02 remains W_TRAKCIE without real-lecture semantic/human quality acceptance."
   ],
   "last_verified_develop_before_pr8": "344e227571ba09802da8a8bea7c50498473dc2e6"
 }
