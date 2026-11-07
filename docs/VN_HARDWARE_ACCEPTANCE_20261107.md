@@ -97,3 +97,13 @@ Jest to potwierdzony podtest przeglądarkowy, **nie całe WEB-01** (Chrome/Edge/
 [Actions 42416372511](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42416372511): pięć jobów **PASS**, w tym nowy Firefox w trybie headless na Ubuntu 24.04 z preinstalowanym geckodriver. Nowy test korzysta z W3C WebDriver przez lokalny port, bez zależności npm i z tym samym scenariuszem importu/edycji/eksportu co Chromium, Chrome i Edge. Import i obsługa 50 000 syntetycznych segmentów w Firefoksie w CI: **125 ms** (jedna próbka, bez gwarancji czasu na fizycznym komputerze). Weryfikacja obejmuje fokus, etykiety ARIA i brak żądań sieciowych z lokalnego interfejsu.
 
 **Nie zamyka:** pełnego `WEB-01` na fizycznym Windows w Firefoksie, odbioru dostępności czytnikiem ekranu ani `WEB-02`; nie ma realnej transkrypcji WWW ani publikacji Wiedora. Status VN-07 nadal `W_TRAKCIE`.
+
+## 10. Dodatkowe dowody VN-03 i VN-06 (07.11.2026)
+
+| PR | Linux/Windows source + przeglądarki | Windows DEV EXE | Co naprawdę sprawdzono |
+| --- | --- | --- | --- |
+| [#39](https://github.com/testowyemailaplikacja-spec/Video-notes/pull/39) | [42417618740](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42417618740) — 5/5 PASS | [42417618732](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42417618732) — PASS | Brak nadpisania poprzednich eksportów MD/JSON, jeśli opcjonalny DOCX nie powstanie |
+| [#40](https://github.com/testowyemailaplikacja-spec/Video-notes/pull/40) | [42417855851](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42417855851) — 5/5 PASS | [42417856076](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42417856076) — PASS | Atomowe no-clobber publikowanie prywatnego katalogu pakietu także przy kolizji |
+| [#41](https://github.com/testowyemailaplikacja-spec/Video-notes/pull/41) | [42418076484](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42418076484) — 5/5 PASS | [42418076494](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42418076494) — PASS | Heurystyczne nagłówki z cytowanych słów bez wstrzykiwania nieufnego znacznika HTML/Markdown |
+
+Te testy nie zastępują całego `NOTE-01`/`NOTE-02`, `HW-01`, `PKG-01`/`PKG-02`. Nie przeprowadzono odbioru jakości na rzeczywistych wykładach, rzeczywistego modelu Whisper na Windows ani testu instalacji i licencji offline. **Nie zmieniono pełnej tabeli NOT_RUN ani statusu któregokolwiek etapu na DONE.**
