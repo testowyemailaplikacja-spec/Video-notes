@@ -1,7 +1,9 @@
 """OBS -> bounded WAV chunks -> local ASR -> atomic checkpoint, fully offline."""
 from __future__ import annotations
 
+import errno
 import os
+import re
 import tempfile
 import uuid
 from datetime import datetime, timezone
@@ -60,6 +62,64 @@ def _check_resume_source(project: dict, *, ffprobe: str) -> Path:
     if info["duration_ms"] != project["source"]["duration_ms"] or not any(s["index"] == project["source"]["stream_index"] for s in info["audio_streams"]):
         raise VideoNotesError("Zmieniły się metadane ścieżki audio.")
     return path
+
+
+def transcription_lock_status(folder: Path) -> dict:
+    """Inspect an interrupted run without changing the project or signaling its process."""
+    lock = Path(folder) / ".processing.lock"
+    if not lock.exists() and not lock.is_symlink():
+        return {"state": "missing"}
+    if lock.is_symlink() or not lock.is_file():
+        return {"state": "invalid"}
+    try:
+        if lock.stat().st_size > 80:
+            return {"state": "invalid"}
+        match = re.fullmatch(rb"pid=([1-9][0-9]{0,9})\n", lock.read_bytes())
+    except OSError:
+        return {"state": "unknown"}
+    if match is None:
+        return {"state": "invalid"}
+    pid = int(match.group(1))
+    try:
+        os.kill(pid, 0)  # Existence check only; never terminate a process.
+    except ProcessLookupError:
+        return {"state": "stale", "pid": pid}
+    except PermissionError:
+        return {"state": "unknown", "pid": pid}
+    except OSError as error:
+        return {"state": "stale" if error.errno == errno.ESRCH else "unknown", "pid": pid}
+    return {"state": "active", "pid": pid}
+
+
+def recover_stale_transcription_lock(folder: Path, *, confirm: bool = False) -> dict:
+    """Remove only a verified dead-PID lock with an explicit operator confirmation."""
+    if confirm is not True:
+        raise VideoNotesError("Odzyskiwanie blokady wymaga jawnej flagi --confirm.")
+    folder = Path(folder).expanduser().resolve()
+    read_project(folder)  # Never remove arbitrary files outside a valid project.
+    lock = folder / ".processing.lock"
+    try:
+        before = lock.lstat()
+        payload = lock.read_bytes()
+    except OSError as error:
+        raise VideoNotesError("Nie znaleziono istniejącej blokady transkrypcji.") from error
+    status = transcription_lock_status(folder)
+    if status["state"] != "stale":
+        raise VideoNotesError("Blokada nie jest potwierdzona jako osierocona; nie można jej usunąć.")
+    # Reject any changed/replaced lock immediately before unlinking.
+    try:
+        after = lock.lstat()
+        if (before.st_ino != after.st_ino or before.st_dev != after.st_dev or
+                before.st_mtime_ns != after.st_mtime_ns or before.st_size != after.st_size or
+                payload != lock.read_bytes()):
+            raise VideoNotesError("Blokada zmieniła się podczas sprawdzania; przerwano odzyskiwanie.")
+    except OSError as error:
+        raise VideoNotesError("Nie można bezpiecznie potwierdzić tożsamości blokady.") from error
+    # A PID may have been reused; a newly live process makes recovery unsafe.
+    if transcription_lock_status(folder) != status:
+        raise VideoNotesError("Stan procesu zmienił się; nie usuwam blokady.")
+    lock.unlink()
+    return {"recovered": True, "previous_pid": status["pid"]}
 
 
 def transcribe_project(folder: Path, *, ffmpeg: str = "ffmpeg", ffprobe: str = "ffprobe", asr_factory: Callable[..., object] = WhisperCpp,
