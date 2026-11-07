@@ -22,6 +22,9 @@ from .storage import load_json, read_project, save_json
 VERSION_SCHEMA = "videonotes-note-revision-v1"
 MAX_HISTORY = 1000
 ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
+HASH_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+TRANSACTION_SCHEMA = "videonotes-note-transaction-v1"
+TRANSACTION_FILE = ".notes-transaction.json"
 
 
 def _valid_pair(notes: object, changes: object, project_id: str) -> dict[str, str]:
@@ -166,15 +169,123 @@ def _render_notes(project: dict, source: list[dict], prior_edits: dict[str, str]
     return note, {"schema": EDITS_SCHEMA, "edits": used_edits}, unmatched
 
 
-def regenerate_basic_notes(folder: Path, *, window_minutes: int = 5, points_per_section: int = 6) -> dict:
-    """Safely rebuild citations after transcript correction, preserving manual edits.
+def _transaction_path(folder: Path) -> Path:
+    return Path(folder) / TRANSACTION_FILE
 
-    Old versions are immutable in notes-history. An interrupted two-file update
-    can be restored from the new snapshot with restore_note_version().
+
+def _begin_transaction(folder: Path, project_id: str, revision: str,
+                       old_notes: dict, old_edits: dict,
+                       new_notes: dict, new_edits: dict) -> None:
+    """Write an fsynced intent after the immutable old-version snapshot.
+
+    Two independent JSON files cannot be atomically swapped as one on disk.
+    The compact intent records both expected pairs, making interrupted writes
+    detectable and recoverable without trusting partially written user data.
     """
+    path = _transaction_path(folder)
+    if path.exists() or path.is_symlink():
+        raise VideoNotesError("Poprzednia aktualizacja notatki wymaga odzyskania przed kolejną zmianą.")
+    if not ID_PATTERN.fullmatch(revision):
+        raise VideoNotesError("Nieprawidłowa wersja bezpieczeństwa notatki.")
+    payload = {
+        "schema": TRANSACTION_SCHEMA,
+        "project_id": project_id,
+        "snapshot_revision": revision,
+        "old_notes_sha256": _fingerprint(old_notes),
+        "old_edits_sha256": _fingerprint(old_edits),
+        "new_notes_sha256": _fingerprint(new_notes),
+        "new_edits_sha256": _fingerprint(new_edits),
+    }
+    save_json(path, payload)
+
+
+def _transaction_guard(folder: Path) -> None:
+    path = _transaction_path(folder)
+    if path.exists() or path.is_symlink():
+        raise VideoNotesError(
+            "Wykryto przerwaną aktualizację notatki; najpierw użyj notes-recover --confirm."
+        )
+
+
+def recover_interrupted_note_update(folder: Path, *, confirm: bool = False) -> dict:
+    """Recover only pairs whose exact JSON fingerprints match an old/new state.
+
+    If both writes completed, merely remove the intent. If either file is from
+    the old pair while the other is from the new pair, restore the immutable
+    old snapshot. Refuse any unrelated/modified JSON rather than discard work.
+    This never deletes notes, recordings, history or manually edited content.
+    """
+    folder = Path(folder)
+    path = _transaction_path(folder)
+    if not path.exists() and not path.is_symlink():
+        return {"status": "no_pending_update", "changed": False}
+    if not confirm:
+        raise VideoNotesError("Potwierdź odzyskanie: notes-recover KATALOG --confirm.")
+    if path.is_symlink():
+        raise VideoNotesError("Dziennik aktualizacji notatki jest niebezpiecznym dowiązaniem.")
+    project, _source = _checked_source(folder)
+    lock = folder / ".notes.lock"
+    try:
+        descriptor = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError as error:
+        raise VideoNotesError(
+            "Blokada notatek jest aktywna lub pozostała po awarii. Sprawdź proces przed jej ręcznym usunięciem."
+        ) from error
+    try:
+        os.close(descriptor)
+        intent = load_json(path)
+        required = {"schema", "project_id", "snapshot_revision",
+                    "old_notes_sha256", "old_edits_sha256",
+                    "new_notes_sha256", "new_edits_sha256"}
+        if (not isinstance(intent, dict) or set(intent) != required or
+                intent.get("schema") != TRANSACTION_SCHEMA or
+                intent.get("project_id") != project["id"] or
+                not isinstance(intent.get("snapshot_revision"), str) or
+                not ID_PATTERN.fullmatch(intent["snapshot_revision"]) or
+                any(not isinstance(intent.get(k), str) or
+                    not HASH_PATTERN.fullmatch(intent[k])
+                    for k in required if k.endswith("_sha256"))):
+            raise VideoNotesError("Nieprawidłowy dziennik odzyskiwania. Nie zmieniono danych.")
+        old_notes, old_edits = _load_snapshot(folder, intent["snapshot_revision"])
+        _valid_pair(old_notes, old_edits, project["id"])
+        if (_fingerprint(old_notes) != intent["old_notes_sha256"] or
+                _fingerprint(old_edits) != intent["old_edits_sha256"]):
+            raise VideoNotesError("Historia nie zgadza się z dziennikiem aktualizacji.")
+        present_notes = load_json(folder / "notes.json")
+        present_edits = load_json(folder / "notes-edits.json")
+        current = (_fingerprint(present_notes), _fingerprint(present_edits))
+        before = (intent["old_notes_sha256"], intent["old_edits_sha256"])
+        after = (intent["new_notes_sha256"], intent["new_edits_sha256"])
+        if current == after:
+            status = "completed_before_crash"
+        elif current == before:
+            status = "original_version_intact"
+        elif (current[0] in {before[0], after[0]} and
+              current[1] in {before[1], after[1]}):
+            # Only restore expected halves; refuse unexpected user edits.
+            if current[0] != before[0]:
+                save_json(folder / "notes.json", old_notes)
+            if current[1] != before[1]:
+                save_json(folder / "notes-edits.json", old_edits)
+            status = "restored_previous_version"
+        else:
+            raise VideoNotesError(
+                "Pliki notatki zmieniły się po przerwaniu aktualizacji. "
+                "Nie nadpisuję zmian; zachowaj kopię i sprawdź historię ręcznie."
+            )
+        path.unlink()
+        return {"status": status, "changed": status == "restored_previous_version",
+                "snapshot_revision": intent["snapshot_revision"]}
+    finally:
+        lock.unlink(missing_ok=True)
+
+
+def regenerate_basic_notes(folder: Path, *, window_minutes: int = 5, points_per_section: int = 6) -> dict:
+    """Rebuild source citations with snapshot + explicit crash intent journal."""
     if not 1 <= window_minutes <= 60 or not 2 <= points_per_section <= 20:
         raise VideoNotesError("Nieprawidłowy zakres czasu lub liczba cytatów.")
     folder = Path(folder)
+    _transaction_guard(folder)
     project, source = _checked_source(folder)
     old_notes, old_edits = load_json(folder / "notes.json"), load_json(folder / "notes-edits.json")
     prior = _valid_pair(old_notes, old_edits, project["id"])
@@ -193,9 +304,12 @@ def regenerate_basic_notes(folder: Path, *, window_minutes: int = 5, points_per_
         # Once the guard is held, verify files did not change since reading them.
         if load_json(folder / "notes.json") != old_notes or load_json(folder / "notes-edits.json") != old_edits:
             raise VideoNotesError("Notatki zmieniono równocześnie. Spróbuj ponownie.")
+        _transaction_guard(folder)
         revision = _write_snapshot(folder, old_notes, old_edits)
+        _begin_transaction(folder, project["id"], revision, old_notes, old_edits, updated, changed)
         save_json(folder / "notes.json", updated)
         save_json(folder / "notes-edits.json", changed)
+        _transaction_path(folder).unlink()
         return {"changed": True, "revision": revision, "kept_edits": len(changed["edits"]), "unmatched_edits": unmatched}
     finally:
         lock.unlink(missing_ok=True)
@@ -204,6 +318,7 @@ def regenerate_basic_notes(folder: Path, *, window_minutes: int = 5, points_per_
 def restore_note_version(folder: Path, revision: str) -> str:
     """Restore a previous revision only when its citations match current source."""
     folder = Path(folder)
+    _transaction_guard(folder)
     project, source = _checked_source(folder)
     old_notes, old_edits = load_json(folder / "notes.json"), load_json(folder / "notes-edits.json")
     _valid_pair(old_notes, old_edits, project["id"])
@@ -227,9 +342,12 @@ def restore_note_version(folder: Path, revision: str) -> str:
         os.close(descriptor)
         if load_json(folder / "notes.json") != old_notes or load_json(folder / "notes-edits.json") != old_edits:
             raise VideoNotesError("Notatki zmieniono równocześnie.")
+        _transaction_guard(folder)
         saved = _write_snapshot(folder, old_notes, old_edits)
+        _begin_transaction(folder, project["id"], saved, old_notes, old_edits, prior_notes, prior_edits)
         save_json(folder / "notes.json", prior_notes)
         save_json(folder / "notes-edits.json", prior_edits)
+        _transaction_path(folder).unlink()
         return saved
     finally:
         (folder / ".notes.lock").unlink(missing_ok=True)
