@@ -88,7 +88,15 @@ def create_backup(folder: Path, output: Path) -> Path:
         with zipfile.ZipFile(filename, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
             for name, data in sorted(files.items()):
                 archive.writestr(name, data)
-        os.replace(filename, output)
+        # Atomic no-clobber publication: the temp archive is complete before
+        # another directory entry is created. os.replace() could overwrite a
+        # backup created concurrently after the earlier exists() check.
+        try:
+            os.link(filename, output)
+        except FileExistsError as error:
+            raise VideoNotesError("Plik kopii już istnieje; nie nadpisuję go.") from error
+        except OSError as error:
+            raise VideoNotesError("System plików nie obsługuje bezpiecznego zapisu kopii bez nadpisywania. Wybierz inny dysk.") from error
     finally:
         if filename:
             Path(filename).unlink(missing_ok=True)
