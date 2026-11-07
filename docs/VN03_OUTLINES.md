@@ -51,3 +51,13 @@ To test kompatybilności pliku z prawdziwym silnikiem LibreOffice, nie ocena typ
 Rzeczywisty LibreOffice 24.2 na Ubuntu odmówił wczytania DOCX, mimo że testy ZIP i parser XML zgłaszały poprawny format. Przyczyną było serializowanie znaczników głównych OPC `[Content_Types].xml` oraz `_rels/.rels` z prefiksem `ns0:` zamiast kanonicznej domyślnej przestrzeni nazw. Generator zapisuje teraz oba korzenie w formacie `<Types xmlns="...">` i `<Relationships xmlns="...">`, z ochroną przed równoczesnym przełączaniem przestrzeni nazw w wielu wątkach.
 
 Testy strukturalne sprawdzają tę reprezentację bajtową, a osobny workflow próbuje otworzyć DOCX w realnym LibreOffice i wyrenderować dokument do PDF/PNG. To realna poprawka kompatybilności, ale odbiór ręczny w Word/LibreOffice na sprzęcie Windows pozostaje osobnym wymaganiem.
+
+## Opcjonalny lokalny PDF (08.11.2026)
+
+Program oferuje `--pdf` także dla zaawansowanego konspektu:
+
+    python -m videonotes advanced-notes KATALOG_PROJEKTU --template lecture --detail full --pdf
+
+PDF jest generowany przez osobno zainstalowany **LibreOffice Writer** dostępny lokalnie (`--office "ścieżka-do-soffice.exe"` na Windows). GUI ma dodatkowy przycisk „Eksportuj PDF”. Bez LibreOffice eksport PDF nie będzie dostępny; żadne źródła ani wcześniejsze wyniki nie są usuwane. Flaga `--docx` pozostaje niezależna: można wygenerować sam PDF bez zapisu DOCX albo oba formaty.
+
+Zanim zostanie zastąpiony jakikolwiek z wyników zaawansowanych notatek, generator przygotowuje w pamięci Markdown, JSON, DOCX i (gdy wybrano) PDF. Testy sprawdzają, że awaria PDF zachowuje wcześniej zatwierdzone pliki MD/JSON/DOCX/PDF. Nowy test LibreOffice/Poppler odczytuje polskie cytaty z faktycznego wyjściowego PDF na Ubuntu. Nie jest to natywny generator PDF, ani dowód jakości notatek na prawdziwych wykładach, ani pełny instalator Windows z LibreOffice. VN-03 nadal W_TRAKCIE.
