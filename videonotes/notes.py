@@ -61,8 +61,15 @@ def generate_basic_notes(folder: Path, *, window_minutes: int = 5, points_per_se
     expected = (project["source"]["duration_ms"] + chunk - 1) // chunk
     if len(transcript["completed_chunks"]) != expected:
         raise VideoNotesError("Ukończ transkrypcję przed tworzeniem notatki.")
-    if (folder / "notes.json").exists() or (folder / "notes-edits.json").exists():
+    notes_file = folder / "notes.json"
+    edits_file = folder / "notes-edits.json"
+    if notes_file.exists():
         raise VideoNotesError("Notatka już istnieje; nie nadpisuję wcześniejszych poprawek.")
+    if edits_file.exists():
+        # An interrupted first creation may leave only a pristine empty edit journal.
+        # Never overwrite a non-empty or malformed journal: it might contain user work.
+        if load_json(edits_file) != {"schema": EDITS_SCHEMA, "edits": {}}:
+            raise VideoNotesError("Odnaleziono poprzednie poprawki bez notatki; nie nadpisuję danych.")
     source = _source(transcript, corrections)
     if not source:
         raise VideoNotesError("Transkrypcja jest pusta. Nie można utworzyć notatki.")
@@ -82,9 +89,11 @@ def generate_basic_notes(folder: Path, *, window_minutes: int = 5, points_per_se
              "source_sha256": _hash(source), "method": "extractive-verbatim-v1",
              "complete": True, "title": "Notatka podstawowa — fragmenty wypowiedzi",
              "sections": sections}
-    # Writing edits first means an interruption fails safely on retry.
-    save_json(folder / "notes-edits.json", {"schema": EDITS_SCHEMA, "edits": {}})
-    save_json(folder / "notes.json", notes)
+    # Write the empty journal before the note; a crash may be safely retried only
+    # when that journal is pristine. Existing non-empty edits are never clobbered.
+    if not edits_file.exists():
+        save_json(edits_file, {"schema": EDITS_SCHEMA, "edits": {}})
+    save_json(notes_file, notes)
     return notes
 
 

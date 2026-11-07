@@ -155,5 +155,38 @@ class BasicNotesTest(unittest.TestCase):
 
 
 
+    def test_creation_recovers_from_interrupted_pristine_edit_journal(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            fixture(root)
+            pristine = {"schema": "videonotes-note-edits-v1", "edits": {}}
+            save_json(root / "notes-edits.json", pristine)
+            before = (root / "notes-edits.json").read_bytes()
+            result = generate_basic_notes(root)
+            self.assertTrue(result["sections"])
+            self.assertEqual((root / "notes-edits.json").read_bytes(), before)
+            self.assertIn("Źródło", render_basic_markdown(root))
+            with self.assertRaises(VideoNotesError):
+                generate_basic_notes(root)
+
+    def test_creation_does_not_overwrite_orphaned_or_unexpected_edit_journal(self):
+        journals = [
+            {"schema": "videonotes-note-edits-v1",
+             "edits": {"quote-c0000000-s00000": "Zapisana poprawka użytkownika."}},
+            {"schema": "videonotes-note-edits-v1", "edits": {}, "extra": "unexpected"},
+            {"schema": "invalid-version", "edits": {}},
+        ]
+        for journal in journals:
+            with self.subTest(journal=journal), tempfile.TemporaryDirectory() as folder:
+                root = Path(folder)
+                fixture(root)
+                save_json(root / "notes-edits.json", journal)
+                before = (root / "notes-edits.json").read_bytes()
+                with self.assertRaises(VideoNotesError):
+                    generate_basic_notes(root)
+                self.assertEqual((root / "notes-edits.json").read_bytes(), before)
+                self.assertFalse((root / "notes.json").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
