@@ -58,3 +58,17 @@ Nie wykonano w tych PR-ach prawdziwej transkrypcji na modelach ASR, fizycznego n
 ## 5. Reguła integracji i wydania
 
 `main` jako stabilna baza; codzienny kod KWN na odrębnych gałęziach → PR → sprawdzone CI → `develop`. Integracja z Wiedora jako odrębna beta wymaga pełnego odbioru potrzebnych pakietów, izolowanych testów hosta i odrębnej autoryzacji publikacji. Bez wystarczających licencji, oceny AV/Windows, jakości mowy i testów fizycznych nie tworzyć publicznego wydania 1.0.
+
+## 6. Automatyczna regresja po PR #20–22 (07.11.2026)
+
+Wszystkie poniższe przebiegi zostały zweryfikowane jako `success` **po odpowiednim ostatnim commicie PR**, przed scaleniem z `develop`:
+
+| PR | Przebieg | Zakres | Wynik |
+| --- | --- | --- | --- |
+| [#20](https://github.com/testowyemailaplikacja-spec/Video-notes/pull/20) | [42376117022](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42376117022) | Linux+Windows source CI, kontroler WWW, eksport, cofanie zmian | PASS |
+| [#21](https://github.com/testowyemailaplikacja-spec/Video-notes/pull/21) | [42376444170](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42376444170) | Linux+Windows source CI, napisy SRT/VTT i testy regresji | PASS |
+| [#21](https://github.com/testowyemailaplikacja-spec/Video-notes/pull/21) | [42376444161](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42376444161) | Budowa i smoke test Windows DEV EXE | PASS |
+| [#22](https://github.com/testowyemailaplikacja-spec/Video-notes/pull/22) | [42376671607](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42376671607) | Linux+Windows source CI, zabezpieczenia backupu | PASS |
+| [#22](https://github.com/testowyemailaplikacja-spec/Video-notes/pull/22) | [42376671514](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42376671514) | Budowa i smoke test Windows DEV EXE | PASS |
+
+**Ważne:** te testy syntetyczne nie są fizycznym odbiorem ani testem instalacji offline. Statusy HW-01, ASR-01…06, MIC-01…02, MIX-01…02, WEB-01…02, PKG-01…02, HOST-01 oraz MOB-01 pozostają `NOT_RUN` zgodnie z tabelą. Odbiór rzeczywistego ASR i urządzeń nie może być zastąpiony powodzeniem CI.
