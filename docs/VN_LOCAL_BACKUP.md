@@ -37,3 +37,7 @@ Ważne: **w kopii znajdują się teksty transkrypcji i notatek**, które mogą z
 ## Granice odbioru
 
 Do zamknięcia etapów nadal wymagane są: testy uszkodzenia dysku/zasilania, eksport pełnego pakietu z mediami na życzenie, migracje wersji i zgodność z GUI/instalatorem Windows, test kilkugodzinnego nagrania i bezpieczeństwa zewnętrznych nośników. Oznaczenie tej funkcji jako użytecznej nie zamyka całego VN-01 ani VN-06.
+
+## Uzupełnienie bezpieczeństwa 07.11.2026
+
+Gotowa kopia jest publikowana atomowo z unikalnego pliku tymczasowego przy użyciu lokalnego dowiązania twardego, które **nie może nadpisać** pliku utworzonego równocześnie przez inny proces. Na systemie plików bez obsługi tej operacji program odmawia utworzenia archiwum, usuwa plik tymczasowy i prosi o inny dysk; nie zastępuje tego nieatomową kopią. Dodano regresję symulującą wyścig zapisu i brak obsługi systemu plików. Nie oznacza to przetestowania awarii zasilania ani fizycznych zewnętrznych nośników.
