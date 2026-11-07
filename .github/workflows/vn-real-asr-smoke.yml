@@ -1,0 +1,75 @@
+name: Video Notes — true local whisper.cpp inference on original synthetic speech
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - 'scripts/real_asr_smoke.py'
+      - 'videonotes/asr.py'
+      - 'videonotes/pipeline.py'
+      - '.github/workflows/vn-real-asr-smoke.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-whisper-cpu:
+    name: Real whisper.cpp multilingual tiny CPU PL/EN (synthetic TTS only)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      WHISPER_SHA: 6a8addd258eadd6563f8c582e8acc535e6325364
+      WHISPER_MODEL_SHA256: be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Provide local build, FFmpeg and synthetic TTS tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v espeak-ng >/dev/null || ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            timeout 240s sudo apt-get update -qq
+            timeout 300s sudo apt-get install -y --no-install-recommends espeak-ng ffmpeg
+          fi
+          cmake --version | head -n 1
+          espeak-ng --version
+          ffmpeg -version | head -n 1
+      - name: Fetch and build pinned upstream whisper.cpp without GPU
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/whisper-cpp"
+          git -C "$RUNNER_TEMP/whisper-cpp" init -q
+          git -C "$RUNNER_TEMP/whisper-cpp" remote add origin https://github.com/ggml-org/whisper.cpp.git
+          timeout 240s git -C "$RUNNER_TEMP/whisper-cpp" fetch --depth 1 origin "$WHISPER_SHA"
+          git -C "$RUNNER_TEMP/whisper-cpp" -c advice.detachedHead=false checkout -q --detach FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/whisper-cpp" rev-parse HEAD)" = "$WHISPER_SHA"
+          git -C "$RUNNER_TEMP/whisper-cpp" submodule update --init --recursive --depth 1
+          cmake -S "$RUNNER_TEMP/whisper-cpp" -B "$RUNNER_TEMP/whisper-cpp/build" -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF -DWHISPER_BUILD_TESTS=OFF
+          cmake --build "$RUNNER_TEMP/whisper-cpp/build" --parallel 2 --target whisper-cli
+          test -x "$RUNNER_TEMP/whisper-cpp/build/bin/whisper-cli"
+      - name: Download and SHA-256 verify one MIT multilingual model (ephemeral CI only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --retry 3 --retry-delay 2 \
+            --connect-timeout 30 --max-time 240 \
+            --output "$RUNNER_TEMP/ggml-tiny.bin" \
+            https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
+          echo "$WHISPER_MODEL_SHA256  $RUNNER_TEMP/ggml-tiny.bin" | sha256sum -c -
+      - name: Generate original Polish and English voice clips offline
+        shell: bash
+        run: |
+          set -euo pipefail
+          espeak-ng -v pl -s 120 -w "$RUNNER_TEMP/pl.wav" 'To jest test nagrania wykładu. Router przekazuje pakiety pomiędzy sieciami. Program zamienia mowę na lokalną transkrypcję.'
+          espeak-ng -v en -s 120 -w "$RUNNER_TEMP/en.wav" 'Hello. This is an offline audio test. A router connects two networks. The program converts speech to a local transcript.'
+          test -s "$RUNNER_TEMP/pl.wav"
+          test -s "$RUNNER_TEMP/en.wav"
+      - name: Execute real CPU inference, timestamp checkpoints, exports and DOCX
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m scripts.real_asr_smoke \
+            --whisper "$RUNNER_TEMP/whisper-cpp/build/bin/whisper-cli" \
+            --model "$RUNNER_TEMP/ggml-tiny.bin" \
+            --pl "$RUNNER_TEMP/pl.wav" --en "$RUNNER_TEMP/en.wav"
