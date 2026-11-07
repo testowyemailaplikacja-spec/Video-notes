@@ -54,6 +54,37 @@ class AdvancedNotesTest(unittest.TestCase):
         for name, previous in before.items():
             self.assertEqual((self.folder / name).read_bytes(), previous)
 
+    def test_topic_heading_uses_only_repeated_literal_source_terms(self):
+        transcript = read_project(self.folder)[1]
+        transcript["segments"][0]["text"] = "Serwer DHCP przydziela adres."
+        transcript["segments"][1]["text"] = "Klient DHCP otrzymuje adres."
+        save_json(self.folder / "transcript.json", transcript)
+        result = build_advanced_outline(self.folder, detail="full", section_minutes=1)
+        heading = result["sections"][0]["topics"][0]["heading"]
+        self.assertEqual(heading, "Zagadnienie 1 · DHCP adres")
+        self.assertEqual(
+            [item["text"] for item in result["sections"][0]["topics"][0]["citations"]],
+            ["Serwer DHCP przydziela adres.", "Klient DHCP otrzymuje adres."]
+        )
+        md = render_advanced_markdown(result)
+        self.assertIn("### " + heading, md)
+        self.assertIn("Źródło 00:00:00", md)
+
+    def test_topic_headings_cannot_promote_untrusted_source_markup(self):
+        transcript = read_project(self.folder)[1]
+        transcript["segments"][0]["text"] = "<script>alert(1)</script> # FAŁSZ"
+        transcript["segments"][1]["text"] = "[kliknij](https://example.invalid) & tekst"
+        save_json(self.folder / "transcript.json", transcript)
+        result = build_advanced_outline(self.folder, detail="full", section_minutes=1)
+        heading = result["sections"][0]["topics"][0]["heading"]
+        self.assertTrue(heading.startswith("Zagadnienie 1"))
+        for unsafe in ("<", ">", "#", "[", "]", "(", ")", "&"):
+            self.assertNotIn(unsafe, heading)
+        citations = result["sections"][0]["topics"][0]["citations"]
+        self.assertEqual(citations[0]["text"], "<script>alert(1)</script> # FAŁSZ")
+        self.assertEqual(citations[1]["text"], "[kliknij](https://example.invalid) & tekst")
+        self.assertIn("    <script>alert(1)</script>", render_advanced_markdown(result))
+
     def test_corrections_change_source_digest_and_quotes(self):
         before = build_advanced_outline(self.folder)
         save_json(self.folder / "edits.json",
