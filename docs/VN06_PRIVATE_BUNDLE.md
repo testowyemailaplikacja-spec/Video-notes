@@ -48,3 +48,7 @@ Automatyczne tests/test_bundle.py korzystają z syntetycznych plików i nie test
 Pakiet jest przygotowywany i weryfikowany w osobnym katalogu tymczasowym. Na Windows jego katalog wynikowy jest publikowany przez systemowe `rename`, które odmawia zastąpienia istniejącego katalogu. Na Linux używane jest `renameat2(RENAME_NOREPLACE)` zamiast zwykłego `os.rename`: to zapobiega przejęciu **pustego katalogu utworzonego przez drugi proces w ostatniej chwili**, już po wcześniejszym sprawdzeniu `exists()`. Gdy wymagany mechanizm nie jest dostępny, operacja kończy się odmową i sprzątnięciem katalogu tymczasowego; na innych platformach składanie pakietu z pełną gwarancją no-clobber nie jest obecnie udostępnione.
 
 Regresja celowo symuluje równoległe utworzenie pustego katalogu docelowego tuż przed publikacją i sprawdza, że pozostaje pusty oraz żaden plik źródłowy nie został naruszony. Jest to ochrona przed kolizją zapisów, **nie** test rzeczywistego instalatora, podpisu ani kompatybilności/licencji FFmpeg i modelu.
+
+## Spis składników SBOM do prywatnego pakietu (08.11.2026)
+
+Dostępne jest polecenie `bundle-sbom`, które tworzy poza katalogiem pakietu dokument SPDX 2.3 z weryfikowanymi SHA-256 pięciu składników. Nie wymaga sieci ani dodatkowych bibliotek. Każda licencja ma status `NOASSERTION`, więc powstanie SBOM **nie** oznacza zatwierdzenia redystrybucji ani gotowości wydania. Instrukcja: [VN06_SBOM.md](VN06_SBOM.md).

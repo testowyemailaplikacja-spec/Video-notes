@@ -23,6 +23,7 @@ from .quality import compare_text_files
 from .asr_lab import run_real_benchmark
 from .backup import create_backup, restore_backup, relink_backup
 from .bundle import create_internal_bundle, verify_internal_bundle
+from .sbom import create_internal_sbom
 from .installer import build_internal_installer
 from .pipeline import create_project, transcribe_project, transcription_lock_status, recover_stale_transcription_lock
 from .storage import read_project
@@ -183,6 +184,9 @@ def parser() -> argparse.ArgumentParser:
     setup.add_argument("--internal-only", required=True, action="store_true", help="Wymagana zgoda na prywatny test bez redystrybucji")
     check_bundle = sub.add_parser("bundle-verify", help="Sprawdź lokalne SHA-256 przed uruchomieniem prywatnego pakietu Windows")
     check_bundle.add_argument("folder", type=Path)
+    sbom = sub.add_parser("bundle-sbom", help="Zapisz offline SPDX 2.3: SHA-256 bez deklaracji praw licencyjnych")
+    sbom.add_argument("folder", type=Path)
+    sbom.add_argument("--output", type=Path, required=True)
     sub.add_parser("gui", help="Uruchom prosty interfejs Windows/Tkinter")
     return cmd
 
@@ -347,6 +351,8 @@ def main(argv: list[str] | None = None) -> int:
             ), ensure_ascii=False, indent=2))
         elif args.action == "bundle-verify":
             print(json.dumps(verify_internal_bundle(args.folder), ensure_ascii=False, indent=2))
+        elif args.action == "bundle-sbom":
+            print(json.dumps(create_internal_sbom(args.folder, args.output), ensure_ascii=False, indent=2))
         elif args.action == "gui":
             from .gui import launch
             launch()
