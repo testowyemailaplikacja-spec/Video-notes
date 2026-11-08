@@ -829,9 +829,12 @@ class VideoNotesWindow:
             destination = filedialog.asksaveasfilename(title="Zapisz NOWY niezweryfikowany szkic",
                         defaultextension=".json", filetypes=[("JSON", "*.json")])
             if destination:
+                # Capture Tk variable values on the main GUI thread only.
+                chosen_model = Path(model_path.get())
+                chosen_cli = llama_path.get()
                 self._run_optional_analysis("Szkic semantyczny", lambda: create_semantic_draft(
-                    folder, Path(destination), model=Path(model_path.get()),
-                    llama_cli=llama_path.get()))
+                    folder, Path(destination), model=chosen_model,
+                    llama_cli=chosen_cli))
         ttk.Button(actions_ai, text="Utwórz szkic AI (niezweryfikowany)", command=make_semantic).pack(side="left", padx=4)
 
         def export_draft() -> None:
@@ -863,9 +866,11 @@ class VideoNotesWindow:
             destination = filedialog.asksaveasfilename(title="Zapisz NOWY raport OCR",
                         defaultextension=".json", filetypes=[("JSON", "*.json")])
             if destination:
+                chosen_language = ocr_lang.get()
+                chosen_interval = int(seconds.get())
                 self._run_optional_analysis("OCR slajdów", lambda: extract_slide_ocr(
-                    folder, Path(destination), language=ocr_lang.get(),
-                    interval_seconds=int(seconds.get())))
+                    folder, Path(destination), language=chosen_language,
+                    interval_seconds=chosen_interval))
         ttk.Button(controls, text="Wykonaj OCR slajdów", command=make_ocr).pack(side="left", padx=12)
 
         def check_existing() -> None:
