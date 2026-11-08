@@ -44,6 +44,8 @@ class VideoNotesWindow:
         self.mic_resume = threading.Event()
         self.mic_controls: dict = {}
         self._rows: dict[str, dict] = {}
+        self._current_segment_id: str | None = None
+        self._loaded_project_path: Path | None = None
         self._build()
         self.root.protocol("WM_DELETE_WINDOW", self._on_app_close)
         self.root.after(100, self._drain)
@@ -573,27 +575,108 @@ class VideoNotesWindow:
             pass
         self.root.after(100, self._drain)
 
-    def _load(self, silent: bool = False) -> None:
+    def _has_transcript_draft(self) -> bool:
+        """Do not discard manual ASR edits when notes navigate to a source."""
+        key = self._current_segment_id
+        if not key or key not in self._rows or self._loaded_project_path is None:
+            return False
         try:
-            _project, transcript, edits = read_project(Path(self.project.get()))
+            _project, _transcript, edits = read_project(self._loaded_project_path)
+        except VideoNotesError:
+            # If the project changed on disk, refuse to silently destroy draft.
+            return True
+        original = edits["edits"].get(key, self._rows[key]["text"])
+        return self.edit_text.get("1.0", "end-1c") != original
+
+    def _load(self, silent: bool = False, *, force: bool = False) -> bool:
+        if not force and self._has_transcript_draft():
+            if silent:
+                self.status.set("Zachowano niezapisany szkic; zapisz poprawkę przed ponownym wczytaniem projektu.")
+                return False
+            if not messagebox.askyesno(
+                "Niezapisana poprawka transkrypcji",
+                "Otworzyć projekt i odrzucić niezapisany tekst bieżącego segmentu?"
+            ):
+                return False
+        try:
+            folder = Path(self.project.get()).resolve()
+            _project, transcript, edits = read_project(folder)
+            self._current_segment_id = None
+            self._loaded_project_path = folder
             self.segments.delete(*self.segments.get_children())
             self._rows.clear()
+            self.edit_text.delete("1.0", "end")
             for item in transcript["segments"]:
                 value = edits["edits"].get(item["id"], item["text"])
                 self._rows[item["id"]] = item
-                self.segments.insert("", "end", iid=item["id"], values=(f"{item['start_ms']/1000:.2f}", value.replace("\n", " ")))
-            self.status.set(f"Załadowano {len(transcript['segments'])} segmentów. Poprawki są zapisywane oddzielnie.")
-        except VideoNotesError as error:
+                self.segments.insert(
+                    "", "end", iid=item["id"],
+                    values=(f"{item['start_ms']/1000:.2f}", value.replace("\n", " "))
+                )
+            self.status.set(
+                f"Załadowano {len(transcript['segments'])} segmentów. Poprawki są zapisywane oddzielnie."
+            )
+            return True
+        except (VideoNotesError, OSError) as error:
             if not silent:
                 messagebox.showerror("Video Notes", str(error))
+            return False
 
     def _selected(self, _event=None) -> None:
         selection = self.segments.selection()
-        if selection:
-            _project, _transcript, edits = read_project(Path(self.project.get()))
-            item = self._rows[selection[0]]
-            self.edit_text.delete("1.0", "end")
-            self.edit_text.insert("1.0", edits["edits"].get(item["id"], item["text"]))
+        if not selection:
+            return
+        key = selection[0]
+        if key == self._current_segment_id:
+            return
+        if self._has_transcript_draft():
+            if not messagebox.askyesno(
+                "Niezapisana poprawka transkrypcji",
+                "Zmienić fragment i odrzucić niezapisany tekst? Wybierz Nie, by zachować szkic."
+            ):
+                if self._current_segment_id in self._rows:
+                    self.segments.selection_set(self._current_segment_id)
+                return
+        try:
+            _, _, edits = read_project(self._loaded_project_path or Path(self.project.get()))
+            item = self._rows[key]
+            value = edits["edits"].get(key, item["text"])
+        except (VideoNotesError, KeyError) as error:
+            messagebox.showwarning("Transkrypcja", "Nie można otworzyć wybranego źródła; sprawdź projekt.")
+            return
+        self._current_segment_id = key
+        self.edit_text.delete("1.0", "end")
+        self.edit_text.insert("1.0", value)
+
+    def _jump_to_source(self, segment_id: str) -> bool:
+        """Select source segment in the desktop editor, preserving unsaved work."""
+        if self.active:
+            messagebox.showwarning("Video Notes", "Najpierw zakończ inne przetwarzanie.")
+            return False
+        if not isinstance(segment_id, str) or not segment_id:
+            messagebox.showwarning("Źródło", "Nieprawidłowy identyfikator segmentu.")
+            return False
+        folder = Path(self.project.get()).resolve()
+        if self._loaded_project_path != folder or segment_id not in self._rows:
+            if self._has_transcript_draft() and not messagebox.askyesno(
+                "Niezapisana poprawka transkrypcji",
+                "Zmiana projektu może odrzucić niezapisany tekst. Kontynuować?"
+            ):
+                return False
+            if not self._load(silent=True, force=True):
+                messagebox.showwarning("Źródło", "Nie udało się wczytać transkrypcji projektu.")
+                return False
+        if segment_id not in self._rows:
+            messagebox.showwarning("Źródło", "Nie znaleziono tego fragmentu w aktualnej transkrypcji.")
+            return False
+        self.segments.selection_set(segment_id)
+        self._selected()
+        if self._current_segment_id != segment_id:
+            return False
+        self.segments.focus(segment_id)
+        self.segments.see(segment_id)
+        self.status.set(f"Źródło {segment_id} — możesz odsłuchać oryginał i poprawić tekst.")
+        return True
 
     def _save_edit(self) -> None:
         if self.active:
