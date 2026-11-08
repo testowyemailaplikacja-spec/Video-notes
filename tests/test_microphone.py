@@ -131,9 +131,46 @@ class MicrophoneTest(unittest.TestCase):
             self._record(stop=stop, pause=pause, resume=resume, on_state=observe,
                          process_factory=FailingSecond)
         self.assertEqual(recording_status(self.folder)["status"], "needs_review")
-        self.assertEqual(len(recording_status(self.folder)["segments"]), 2)
+        failed = recording_status(self.folder)
+        self.assertEqual(len(failed["segments"]), 1)
+        self.assertEqual(len(failed["pending_takes"]), 1)
+        self.assertTrue((self.folder / failed["pending_takes"][0] / "part-00001.wav").exists())
         self.assertEqual(calls[1][calls[1].index("-segment_start_number") + 1], "1")
         self.assertTrue((self.folder / "part-00000.wav").is_file())
+
+    def test_resume_race_never_overwrites_existing_destination_or_temporary_recording(self):
+        stop, pause, resume = threading.Event(), threading.Event(), threading.Event()
+        first_bytes = []
+        rival_bytes = []
+        calls = []
+        class TrackingFFmpeg(FakeFFmpeg):
+            def __init__(self, args, **kwargs):
+                super().__init__(args, **kwargs)
+                calls.append(args)
+        def state(status):
+            if status == "recording" and len(calls) == 1:
+                pause.set()
+            elif status == "paused":
+                first_bytes.append((self.folder / "part-00000.wav").read_bytes())
+                resume.set()
+            elif status == "recording" and len(calls) == 2:
+                rival = self.folder / "part-00001.wav"
+                with wave.open(str(rival), "wb") as audio:
+                    audio.setnchannels(1)
+                    audio.setsampwidth(2)
+                    audio.setframerate(16000)
+                    audio.writeframes(b"\x05\x00" * 1600)
+                rival_bytes.append(rival.read_bytes())
+                stop.set()
+        with self.assertRaisesRegex(VideoNotesError, "nie nadpisano"):
+            self._record(stop=stop, pause=pause, resume=resume,
+                         on_state=state, process_factory=TrackingFFmpeg)
+        self.assertEqual((self.folder / "part-00000.wav").read_bytes(), first_bytes[0])
+        self.assertEqual((self.folder / "part-00001.wav").read_bytes(), rival_bytes[0])
+        report = recording_status(self.folder)
+        self.assertEqual(report["status"], "needs_review")
+        self.assertEqual(len(report["pending_takes"]), 1)
+        self.assertTrue((self.folder / report["pending_takes"][0] / "part-00001.wav").is_file())
 
     def test_pause_resume_rejects_bad_controls_before_creating_files(self):
         stop, pause, resume = threading.Event(), threading.Event(), threading.Event()
@@ -157,28 +194,34 @@ class MicrophoneTest(unittest.TestCase):
         self.assertNotIn("-y", resumed)
 
     @unittest.skipUnless(shutil.which("ffmpeg"), "Real FFmpeg executable required")
-    def test_real_ffmpeg_segment_start_and_no_clobber(self):
-        """Actual ffmpeg segment muxer must honor offset and protect old files."""
+    def test_real_ffmpeg_segment_start_isolation_and_atomic_no_clobber(self):
+        """Segment muxers may ignore -n; only exclusive os.link protects parts."""
         self.folder.mkdir(parents=True)
-        out = self.folder / "part-%05d.wav"
-        args = [
-            "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-n",
-            "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=16000:duration=0.3",
-            "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le",
-            "-f", "segment", "-segment_time", "7200",
-            "-segment_start_number", "4", "-segment_format", "wav", str(out)
-        ]
-        first = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                               timeout=30, check=False)
-        self.assertEqual(first.returncode, 0, first.stderr[-500:])
-        original = (self.folder / "part-00004.wav").read_bytes()
-        self.assertGreater(len(original), 1024)
-        self.assertEqual([p.name for p in self.folder.glob("part-*.wav")],
-                         ["part-00004.wav"])
-        repeated = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                  timeout=30, check=False)
-        self.assertNotEqual(repeated.returncode, 0)
-        self.assertEqual((self.folder / "part-00004.wav").read_bytes(), original)
+        hashes = []
+        for freq, take in ((440, "take-first"), (1000, "take-second")):
+            staging = self.folder / take
+            staging.mkdir()
+            path = staging / "part-%05d.wav"
+            args = [
+                "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-n",
+                "-f", "lavfi", "-i", f"sine=frequency={freq}:sample_rate=16000:duration=0.3",
+                "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le",
+                "-f", "segment", "-segment_time", "7200",
+                "-segment_start_number", "4", "-segment_format", "wav", str(path),
+            ]
+            recorded = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                      timeout=30, check=False)
+            self.assertEqual(recorded.returncode, 0, recorded.stderr[-500:])
+            sample = staging / "part-00004.wav"
+            self.assertGreater(sample.stat().st_size, 1024)
+            hashes.append(hashlib.sha256(sample.read_bytes()).hexdigest())
+        self.assertNotEqual(hashes[0], hashes[1])
+        protected = self.folder / "part-00004.wav"
+        (self.folder / "take-first" / "part-00004.wav").link_to(protected)
+        first = protected.read_bytes()
+        with self.assertRaises(FileExistsError):
+            (self.folder / "take-second" / "part-00004.wav").link_to(protected)
+        self.assertEqual(protected.read_bytes(), first)
 
     def test_shell_free_command_and_two_hour_segmentation(self):
         cmd = capture_command("ffmpeg", 'Mic "quoted"', self.folder / "part-%05d.wav", max_seconds=3600)
