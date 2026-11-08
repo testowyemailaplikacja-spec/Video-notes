@@ -14,7 +14,7 @@ from .microphone import record_microphone, recording_status, list_microphone_dev
 from .audio_diagnostics import analyze_finished_recording
 from .recovery_audio import inspect_recoverable_recording, salvage_recording
 from .notes import generate_basic_notes, edit_note_point, export_basic_notes, export_basic_notes_text, export_basic_notes_docx
-from .advanced_notes import export_advanced_outline
+from .advanced_notes import export_advanced_outline, verify_advanced_outline
 from .study_guide import export_study_guide, verify_study_guide
 from .pdf_export import export_basic_notes_pdf
 from .note_revisions import regenerate_basic_notes, list_note_versions, restore_note_version, recover_interrupted_note_update, notes_lock_status, recover_stale_notes_lock
@@ -100,6 +100,9 @@ def parser() -> argparse.ArgumentParser:
     advanced.add_argument("--docx", action="store_true", help="Dodatkowo zapisz lokalny DOCX z cytatami (bez sieci)")
     advanced.add_argument("--pdf", action="store_true", help="Opcjonalny lokalny PDF z zainstalowanym LibreOffice")
     advanced.add_argument("--office", default="libreoffice", help="Ścieżka do lokalnego libreoffice/soffice.exe (tylko PDF)")
+    adv_verify = sub.add_parser("advanced-verify", help="Sprawdź zapisany konspekt i szablon względem poprawionej transkrypcji")
+    adv_verify.add_argument("project", type=Path)
+    adv_verify.add_argument("--file", type=Path, help="Opcjonalny zapisany lokalnie JSON do odczytu")
     study = sub.add_parser("study-guide", help="Przewodnik do nauki: cytaty, powtarzane pojęcia, przykłady i pytania ze źródeł")
     study.add_argument("project", type=Path)
     study.add_argument("--section-minutes", type=int, default=5)
@@ -265,6 +268,9 @@ def main(argv: list[str] | None = None) -> int:
             for path in export_advanced_outline(args.project, template=args.template, detail=args.detail, section_minutes=args.section_minutes,
                                                 include_docx=args.docx, include_pdf=args.pdf, office=args.office):
                 print(path)
+        elif args.action == "advanced-verify":
+            print(json.dumps(verify_advanced_outline(args.project, document=args.file),
+                             ensure_ascii=False, indent=2))
         elif args.action == "study-guide":
             for path in export_study_guide(
                 args.project, section_minutes=args.section_minutes,
