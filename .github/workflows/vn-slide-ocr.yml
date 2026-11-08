@@ -30,4 +30,4 @@ jobs:
       - name: Run genuine FFmpeg and local OCR on generated slide
         run: |
           python -m compileall -q videonotes scripts/real_slide_ocr_smoke.py
-          python scripts/real_slide_ocr_smoke.py
+          python -m scripts.real_slide_ocr_smoke
