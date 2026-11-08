@@ -26,6 +26,7 @@ from .bundle import create_internal_bundle, verify_internal_bundle
 from .sbom import create_internal_sbom
 from .diagnostics import diagnose_local_install
 from .slide_ocr import extract_slide_ocr, verify_slide_ocr
+from .semantic_draft import create_semantic_draft, verify_semantic_draft, export_semantic_markdown
 from .installer import build_internal_installer
 from .pipeline import create_project, transcribe_project, transcription_lock_status, recover_stale_transcription_lock
 from .storage import read_project
@@ -208,6 +209,22 @@ def parser() -> argparse.ArgumentParser:
     slide_check = sub.add_parser("slide-verify", help="Sprawdź pochodzenie i strukturę lokalnego raportu OCR")
     slide_check.add_argument("project", type=Path)
     slide_check.add_argument("--file", required=True, type=Path)
+    semantic = sub.add_parser("semantic-draft", help="Opcjonalny lokalny szkic semantyczny — WYMAGA KONTROLI człowieka")
+    semantic.add_argument("project", type=Path)
+    semantic.add_argument("--model", required=True, type=Path, help="Legalnie pozyskany lokalny model GGUF")
+    semantic.add_argument("--llama-cli", default="llama-cli")
+    semantic.add_argument("--output", required=True, type=Path)
+    semantic.add_argument("--section-minutes", type=int, default=10)
+    semantic.add_argument("--claims", type=int, default=4)
+    semantic.add_argument("--max-sections", type=int, default=24)
+    semantic.add_argument("--timeout-seconds", type=int, default=240)
+    semantic_verify = sub.add_parser("semantic-verify", help="Sprawdź ID i cytaty szkicu, NIE prawdziwość twierdzeń")
+    semantic_verify.add_argument("project", type=Path)
+    semantic_verify.add_argument("--file", required=True, type=Path)
+    semantic_export = sub.add_parser("semantic-export", help="Eksportuj niezweryfikowany szkic do Markdown")
+    semantic_export.add_argument("project", type=Path)
+    semantic_export.add_argument("--file", required=True, type=Path)
+    semantic_export.add_argument("--output", required=True, type=Path)
     sub.add_parser("gui", help="Uruchom prosty interfejs Windows/Tkinter")
     return cmd
 
@@ -386,6 +403,17 @@ def main(argv: list[str] | None = None) -> int:
                         ensure_ascii=False, indent=2))
         elif args.action == "slide-verify":
             print(json.dumps(verify_slide_ocr(args.project, args.file), ensure_ascii=False, indent=2))
+        elif args.action == "semantic-draft":
+            report = create_semantic_draft(args.project, args.output, model=args.model,
+                        llama_cli=args.llama_cli, section_minutes=args.section_minutes,
+                        claim_limit=args.claims, max_sections=args.max_sections,
+                        timeout_seconds=args.timeout_seconds)
+            print(json.dumps(report, ensure_ascii=False, indent=2))
+        elif args.action == "semantic-verify":
+            print(json.dumps(verify_semantic_draft(args.project, args.file), ensure_ascii=False, indent=2))
+        elif args.action == "semantic-export":
+            print(json.dumps(export_semantic_markdown(args.project, args.file, args.output),
+                             ensure_ascii=False, indent=2))
         elif args.action == "gui":
             from .gui import launch
             launch()
