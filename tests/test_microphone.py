@@ -124,6 +124,8 @@ class MicrophoneTest(unittest.TestCase):
                 pause.set()
             elif state == "paused":
                 resume.set()
+            elif state == "recording" and len(calls) == 2:
+                stop.set()  # Finish the failing second fake process deterministically.
         with self.assertRaisesRegex(VideoNotesError, "FFmpeg przerwał"):
             self._record(stop=stop, pause=pause, resume=resume, on_state=observe,
                          process_factory=FailingSecond)
