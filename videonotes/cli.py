@@ -11,6 +11,7 @@ from .errors import VideoNotesError
 from .exports import edit_segment, export_project
 from .media import probe
 from .microphone import record_microphone, recording_status, list_microphone_devices, join_finished_recording
+from .audio_diagnostics import analyze_finished_recording
 from .notes import generate_basic_notes, edit_note_point, export_basic_notes, export_basic_notes_text, export_basic_notes_docx
 from .advanced_notes import export_advanced_outline
 from .study_guide import export_study_guide, verify_study_guide
@@ -150,6 +151,8 @@ def parser() -> argparse.ArgumentParser:
     mic.add_argument("--ffmpeg", default="ffmpeg")
     mic_status = sub.add_parser("record-status", help="Sprawdź lokalne pliki nagrania i dziennik sesji")
     mic_status.add_argument("folder", type=Path)
+    mic_analyze = sub.add_parser("record-analyze", help="Sprawdź lokalnie głośność, ciszę i przesterowanie ukończonego WAV")
+    mic_analyze.add_argument("folder", type=Path, help="Katalog ukończonej sesji mikrofonowej")
     mic_join = sub.add_parser("record-join", help="Połącz ukończoną sesję z wielu części WAV bez nadpisywania")
     mic_join.add_argument("folder", type=Path, help="Katalog zakończonego nagrania z recording.json")
     mic_join.add_argument("--output", required=True, type=Path, help="Nowy wynikowy WAV; wymaga dodatkowego wolnego miejsca")
@@ -301,6 +304,8 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(result, ensure_ascii=False, indent=2))
         elif args.action == "record-status":
             print(json.dumps(recording_status(args.folder), ensure_ascii=False, indent=2))
+        elif args.action == "record-analyze":
+            print(json.dumps(analyze_finished_recording(args.folder), ensure_ascii=False, indent=2))
         elif args.action == "record-join":
             print(join_finished_recording(args.folder, args.output))
         elif args.action == "bundle-dev":
