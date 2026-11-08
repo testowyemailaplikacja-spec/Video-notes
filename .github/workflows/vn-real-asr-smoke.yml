@@ -85,7 +85,7 @@ jobs:
           HF_REV=d90ca5fe260221311c53c58e660288d3deb8d356
           MODEL_DIR="$RUNNER_TEMP/faster-tiny"
           mkdir -p "$MODEL_DIR"
-          for name in model.bin config.json tokenizer.json; do
+          for name in model.bin config.json tokenizer.json vocabulary.txt; do
             curl --fail --location --silent --show-error --retry 3 --retry-delay 2 \
               --connect-timeout 30 --max-time 240 \
               --output "$MODEL_DIR/$name" \
@@ -94,6 +94,7 @@ jobs:
           echo "dcb76c6586fc06cbdac6dd21f14cfd129cc4cdd9dce19bf4ffa62e59cbe6e6d1  $MODEL_DIR/model.bin" | sha256sum -c -
           test -s "$MODEL_DIR/config.json"
           test -s "$MODEL_DIR/tokenizer.json"
+          test -s "$MODEL_DIR/vocabulary.txt"
       - name: Diagnose optional CPU inference with synthetic audio only, redacting transcript and paths
         shell: bash
         run: |
