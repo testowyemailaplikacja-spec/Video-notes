@@ -132,6 +132,51 @@ class BasicNotesTest(unittest.TestCase):
                 with self.assertRaises(VideoNotesError):
                     export_basic_notes_docx(root)
 
+    def test_repeated_source_terms_produce_stable_basic_headings(self):
+        from videonotes.note_revisions import regenerate_basic_notes
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            fixture(root)
+            transcript = read_project(root)[1]
+            transcript["segments"][0]["text"] = "Serwer DHCP przydziela adres."
+            transcript["segments"][1]["text"] = "Klient DHCP otrzymuje adres."
+            save_json(root / "transcript.json", transcript)
+            created = generate_basic_notes(root, window_minutes=1)
+            first = created["sections"][0]
+            self.assertEqual(first["heading"], "Fragment 0–1 min · DHCP adres")
+            self.assertEqual(len(first["points"]), 2)
+            self.assertEqual(read_basic_notes(root)[0]["sections"][0]["heading"], first["heading"])
+            # Regeneration must use exactly the same source-derived heading.
+            self.assertFalse(regenerate_basic_notes(root, window_minutes=1)["changed"])
+            self.assertEqual(read_basic_notes(root)[0]["sections"][0]["heading"], first["heading"])
+
+            # Corrections change the source: no stale thematic keyword survives.
+            save_json(root / "edits.json", {
+                "schema": "videonotes-edits-v1",
+                "edits": {"c0000000-s00000": "Wykład o routerach i adresacji BGP."}
+            })
+            changed = regenerate_basic_notes(root, window_minutes=1)
+            self.assertTrue(changed["changed"])
+            self.assertEqual(read_basic_notes(root)[0]["sections"][0]["heading"], "Fragment 0–1 min")
+            self.assertTrue((root / "notes-history").is_dir())
+
+    def test_source_heading_never_promotes_markup_or_unverified_topic(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            fixture(root)
+            transcript = read_project(root)[1]
+            transcript["segments"][0]["text"] = "<script>alert(1)</script> Router DHCP #fałsz"
+            transcript["segments"][1]["text"] = "<script>alert(2)</script> Router DHCP [link](https://example.invalid)"
+            save_json(root / "transcript.json", transcript)
+            note = generate_basic_notes(root, window_minutes=1)
+            heading = note["sections"][0]["heading"]
+            self.assertTrue(heading.startswith("Fragment 0–1 min · "))
+            for markup in ("<", ">", "[", "]", "(", ")", "#", "&", "://"):
+                self.assertNotIn(markup, heading)
+            self.assertIn("Router", render_basic_markdown(root))
+            self.assertEqual(len(note["sections"][0]["points"]), 2)
+
     def test_untrusted_markdown_is_rendered_as_text(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

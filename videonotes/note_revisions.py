@@ -16,7 +16,7 @@ from pathlib import Path
 
 from .contracts import MAX_TEXT_LENGTH
 from .errors import VideoNotesError
-from .notes import EDITS_SCHEMA, SCHEMA, _hash, _select, _source
+from .notes import EDITS_SCHEMA, SCHEMA, _hash, _select, _source, _section_heading
 from .pipeline import _process_state
 from .storage import load_json, read_project, save_json
 
@@ -219,7 +219,7 @@ def _render_notes(project: dict, source: list[dict], prior_edits: dict[str, str]
             if point_id in prior_edits:
                 used_edits[point_id] = prior_edits[point_id]
         sections.append({"id": f"time-{slot:06d}",
-                         "heading": f"Fragment {slot * window_minutes}–{(slot + 1) * window_minutes} min",
+                         "heading": _section_heading(slot, window_minutes, ordered),
                          "points": points})
     note = {"schema": SCHEMA, "project_id": project["id"], "source_sha256": _hash(source),
             "method": "extractive-verbatim-v1", "complete": True,
