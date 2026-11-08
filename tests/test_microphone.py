@@ -26,12 +26,13 @@ class FakeFFmpeg:
         self.args = args
         self.stdin = io.BytesIO()
         if not self.fail:
-            out = Path(args[-1].replace("%05d", "00000"))
+            start = int(args[args.index("-segment_start_number") + 1]) if "-segment_start_number" in args else 0
+            out = Path(args[-1].replace("%05d", f"{start:05d}"))
             with wave.open(str(out), "wb") as wav:
                 wav.setnchannels(1)
                 wav.setsampwidth(2)
                 wav.setframerate(16000)
-                wav.writeframes(b"\x00\x00" * 1600)
+                wav.writeframes(bytes([start & 0xFF, 0]) * 1600)
 
     def poll(self):
         return None
@@ -52,6 +53,103 @@ class MicrophoneTest(unittest.TestCase):
             factory = kwargs.pop("process_factory", FakeFFmpeg)
             return record_microphone("Mic (USB)", self.folder, consent=True,
                                      process_factory=factory, **kwargs)
+
+    def test_pause_resume_preserves_prior_wav_and_contiguous_part_numbering(self):
+        stop, pause, resume = threading.Event(), threading.Event(), threading.Event()
+        states = []
+        earlier = []
+        def observe(state):
+            states.append(state)
+            if state == "recording" and states.count("recording") == 1:
+                pause.set()
+            elif state == "paused":
+                # Actual FFmpeg is finalized by a 'q' before this notification.
+                status = recording_status(self.folder)
+                self.assertEqual(status["status"], "paused")
+                self.assertEqual(len(status["segments"]), 1)
+                self.assertTrue(status["requires_manual_review"])
+                old = self.folder / "part-00000.wav"
+                earlier.append(old.read_bytes())
+                resume.set()
+            elif state == "recording" and states.count("recording") == 2:
+                stop.set()
+        result = self._record(stop=stop, pause=pause, resume=resume,
+                              max_seconds=120, on_state=observe)
+        self.assertEqual(states, ["recording", "paused", "recording"])
+        self.assertEqual(result["status"], "finished")
+        self.assertTrue(result["sha256_verified"])
+        self.assertEqual(len(result["segments"]), 2)
+        self.assertEqual(result["segments"][0]["name"], "part-00000.wav")
+        self.assertEqual(result["segments"][1]["name"], "part-00001.wav")
+        self.assertEqual((self.folder / "part-00000.wav").read_bytes(), earlier[0])
+        self.assertNotEqual((self.folder / "part-00001.wav").read_bytes(), earlier[0])
+        self.assertEqual(result["requires_manual_review"], False)
+        journal = json.loads((self.folder / "recording.json").read_text("utf-8"))
+        self.assertEqual(journal["pause_count"], 1)
+        self.assertEqual(journal["duration_ms"], 200)
+        self.assertTrue(journal["stopped_by_user"])
+        full = self.folder / "recording-full.wav"
+        join_finished_recording(self.folder, full)
+        with wave.open(str(full), "rb") as audio:
+            self.assertEqual(audio.getnframes(), 3200)
+            self.assertEqual(audio.readframes(1600), b"\x00\x00" * 1600)
+            self.assertEqual(audio.readframes(1600), b"\x01\x00" * 1600)
+
+    def test_stop_during_pause_finishes_first_valid_part_without_extra_take(self):
+        stop, pause, resume = threading.Event(), threading.Event(), threading.Event()
+        def observe(state):
+            if state == "recording":
+                pause.set()
+            elif state == "paused":
+                stop.set()
+        result = self._record(stop=stop, pause=pause, resume=resume, on_state=observe)
+        self.assertEqual(len(result["segments"]), 1)
+        self.assertTrue(result["sha256_verified"])
+        journal = json.loads((self.folder / "recording.json").read_text("utf-8"))
+        self.assertEqual(journal["pause_count"], 1)
+        self.assertTrue(journal["stopped_by_user"])
+        self.assertFalse((self.folder / "part-00001.wav").exists())
+
+    def test_second_capture_failure_preserves_paused_recording_for_review(self):
+        stop, pause, resume = threading.Event(), threading.Event(), threading.Event()
+        calls = []
+        class FailingSecond(FakeFFmpeg):
+            def __init__(self, args, **kwargs):
+                super().__init__(args, **kwargs)
+                calls.append(args)
+            def wait(self, timeout=None):
+                return 1 if len(calls) == 2 else 0
+        def observe(state):
+            if state == "recording" and len(calls) == 1:
+                pause.set()
+            elif state == "paused":
+                resume.set()
+        with self.assertRaisesRegex(VideoNotesError, "FFmpeg przerwał"):
+            self._record(stop=stop, pause=pause, resume=resume, on_state=observe,
+                         process_factory=FailingSecond)
+        self.assertEqual(recording_status(self.folder)["status"], "needs_review")
+        self.assertEqual(len(recording_status(self.folder)["segments"]), 2)
+        self.assertEqual(calls[1][calls[1].index("-segment_start_number") + 1], "1")
+        self.assertTrue((self.folder / "part-00000.wav").is_file())
+
+    def test_pause_resume_rejects_bad_controls_before_creating_files(self):
+        stop, pause, resume = threading.Event(), threading.Event(), threading.Event()
+        for control in (
+            {"pause": pause},
+            {"resume": resume},
+            {"pause": pause, "resume": resume},
+            {"stop": stop, "pause": pause, "resume": pause},
+        ):
+            with self.subTest(control=list(control)), self.assertRaises(VideoNotesError):
+                self._record(**control)
+            self.assertFalse(self.folder.exists())
+        for number in (-1, 100000, True, 1.0):
+            with self.subTest(number=number), self.assertRaises(VideoNotesError):
+                capture_command("ffmpeg", "Mic", self.folder / "part-%05d.wav",
+                                start_number=number)
+        resumed = capture_command("ffmpeg", "Mic", self.folder / "part-%05d.wav",
+                                  start_number=123)
+        self.assertEqual(resumed[resumed.index("-segment_start_number") + 1], "123")
 
     def test_shell_free_command_and_two_hour_segmentation(self):
         cmd = capture_command("ffmpeg", 'Mic "quoted"', self.folder / "part-%05d.wav", max_seconds=3600)
