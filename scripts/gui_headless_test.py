@@ -131,6 +131,26 @@ class GuiNotesHeadlessTest(unittest.TestCase):
         self.assertEqual(read_basic_notes(self.folder)[1]["edits"], {})
 
 
+    def test_actual_tk_crash_salvage_warns_about_incomplete_source(self):
+        self._button(
+            self.root, "Odzyskaj czytelne WAV po awarii (może być niekompletne)"
+        )
+        previous = self.gui.source.get()
+        self.gui.events.put(("mic_salvage_complete", {
+            "output": str(self.folder / "recording-salvaged-INCOMPLETE.wav"),
+            "copied_parts": 2,
+            "truncated_or_incomplete": True,
+            "not_a_complete_lecture": True,
+        }))
+        with patch("videonotes.gui.messagebox.showwarning") as alert:
+            self.gui._drain()
+            alert.assert_called_once()
+        self.assertFalse(self.gui.active)
+        self.assertIn("NIEKOMPLETNY", self.gui.status.get())
+        self.assertIn("INCOMPLETE.wav", self.gui.source.get())
+        self.assertNotEqual(self.gui.source.get(), previous)
+        self.assertEqual(self.gui.project.get(), str(self.folder))
+
     def test_real_tk_audio_quality_report_is_numerical_and_read_only(self):
         button = self._button(
             self.root, "Sprawdź jakość nagrania WAV — cisza i przesterowanie"
