@@ -4,6 +4,8 @@ on:
     branches: [develop]
     paths:
       - 'scripts/real_asr_smoke.py'
+      - 'videonotes/study_guide.py'
+      - 'videonotes/docx_export.py'
       - 'scripts/real_obs_multitrack_asr_smoke.py'
       - 'scripts/real_resume_asr_smoke.py'
       - 'videonotes/asr.py'

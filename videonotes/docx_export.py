@@ -209,3 +209,59 @@ def render_basic_docx(notes: dict, changes: dict) -> bytes:
     _w(section, "pgMar", top="1200", right="1300", bottom="1200", left="1300",
        header="500", footer="500", gutter="0")
     return _package_document(document)
+
+
+def render_study_guide_docx(guide: dict) -> bytes:
+    """Produce a source-cited DOCX study guide without links or external data.
+
+    Quotes are always literal Word text. The caller supplies a guide generated
+    from a validated complete transcript (not arbitrary remote JSON).
+    """
+    if not isinstance(guide, dict) or guide.get("schema") != "videonotes-study-guide-v1":
+        raise VideoNotesError("Nieobsługiwany format przewodnika DOCX.")
+    document = ET.Element("{" + W + "}document")
+    body = _w(document, "body")
+    _paragraph(body, guide["title"], "Title")
+    _paragraph(body, "Wyciąg cytatów źródłowych, nie semantyczne streszczenie.")
+    _paragraph(body, "Spis treści", "Heading1")
+    for section in guide["sections"]:
+        _paragraph(body, section["heading"])
+
+    def quote(item: dict) -> None:
+        _paragraph(
+            body,
+            "Źródło " + _clock(item["start_ms"]) + "–" +
+            _clock(item["end_ms"]) + " · " + item["segment_id"],
+            "Caption",
+        )
+        _paragraph(body, item["text"], "Quote")
+
+    for section in guide["sections"]:
+        _paragraph(body, section["heading"], "Heading1")
+        _paragraph(body, "Krótki fragment źródłowy", "Heading2")
+        quote(section["overview_quote"])
+        if section["common_terms"]:
+            _paragraph(body, "Powtarzające się pojęcia (niezweryfikowane)", "Heading2")
+            for term in section["common_terms"]:
+                _paragraph(
+                    body, term["term"] + " · " + str(term["mentions_in_segments"]) +
+                    " fragmentów · " + term["first_segment_id"]
+                )
+        _paragraph(body, "Kluczowe cytaty", "Heading2")
+        for item in section["key_quotes"]:
+            quote(item)
+        for name, title in (
+            ("definition_hints", "Możliwe definicje w wypowiedzi"),
+            ("examples", "Przykłady w wypowiedzi"),
+            ("questions_or_uncertainties", "Pytania i fragmenty do sprawdzenia"),
+        ):
+            if section[name]:
+                _paragraph(body, title, "Heading2")
+                for item in section[name]:
+                    quote(item)
+    _paragraph(body, "Ograniczenia: ekstrakcyjne cytaty, bez oceny pewności ASR.")
+    page = _w(body, "sectPr")
+    _w(page, "pgSz", w="11906", h="16838")
+    _w(page, "pgMar", top="1200", right="1300", bottom="1200", left="1300",
+       header="500", footer="500", gutter="0")
+    return _package_document(document)
