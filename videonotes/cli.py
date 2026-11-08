@@ -13,6 +13,7 @@ from .media import probe
 from .microphone import record_microphone, recording_status, list_microphone_devices, join_finished_recording
 from .notes import generate_basic_notes, edit_note_point, export_basic_notes, export_basic_notes_text, export_basic_notes_docx
 from .advanced_notes import export_advanced_outline
+from .study_guide import export_study_guide
 from .pdf_export import export_basic_notes_pdf
 from .note_revisions import regenerate_basic_notes, list_note_versions, restore_note_version, recover_interrupted_note_update, notes_lock_status, recover_stale_notes_lock
 from .quality import compare_text_files
@@ -96,6 +97,13 @@ def parser() -> argparse.ArgumentParser:
     advanced.add_argument("--docx", action="store_true", help="Dodatkowo zapisz lokalny DOCX z cytatami (bez sieci)")
     advanced.add_argument("--pdf", action="store_true", help="Opcjonalny lokalny PDF z zainstalowanym LibreOffice")
     advanced.add_argument("--office", default="libreoffice", help="Ścieżka do lokalnego libreoffice/soffice.exe (tylko PDF)")
+    study = sub.add_parser("study-guide", help="Przewodnik do nauki: cytaty, powtarzane pojęcia, przykłady i pytania ze źródeł")
+    study.add_argument("project", type=Path)
+    study.add_argument("--section-minutes", type=int, default=5)
+    study.add_argument("--detail", choices=["brief", "standard", "full"], default="standard")
+    study.add_argument("--docx", action="store_true", help="Dodatkowo lokalny DOCX ze źródłami")
+    study.add_argument("--pdf", action="store_true", help="Opcjonalny PDF przy lokalnym LibreOffice")
+    study.add_argument("--office", default="libreoffice", help="Lokalne LibreOffice (tylko PDF)")
     real = sub.add_parser("benchmark-real", help="Uruchom lokalne whisper.cpp i faster-whisper na tym samym audio OBS (bez chmury)")
     real.add_argument("source", type=Path)
     real.add_argument("--reference", type=Path, required=True, help="Ręcznie sprawdzona transkrypcja wybranego fragmentu")
@@ -236,6 +244,13 @@ def main(argv: list[str] | None = None) -> int:
         elif args.action == "advanced-notes":
             for path in export_advanced_outline(args.project, template=args.template, detail=args.detail, section_minutes=args.section_minutes,
                                                 include_docx=args.docx, include_pdf=args.pdf, office=args.office):
+                print(path)
+        elif args.action == "study-guide":
+            for path in export_study_guide(
+                args.project, section_minutes=args.section_minutes,
+                detail=args.detail, include_docx=args.docx,
+                include_pdf=args.pdf, office=args.office,
+            ):
                 print(path)
         elif args.action == "benchmark-real":
             report = run_real_benchmark(args.source, args.reference, cpp_executable=args.cpp_executable,
