@@ -1,0 +1,81 @@
+name: Video Notes — private Windows installer Inno smoke (synthetic files only)
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - 'videonotes/installer.py'
+      - 'videonotes/bundle.py'
+      - 'videonotes/cli.py'
+      - 'scripts/internal_installer_ci.py'
+      - 'scripts/verify_installed_private_ci.py'
+      - 'tests/test_installer.py'
+      - '.github/workflows/vn-internal-installer.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  internal-installer-windows:
+    name: Real Inno Setup compile, silent install, hash verify and uninstall (synthetic only)
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify installer safeguards with local synthetic fixtures
+        shell: pwsh
+        run: |
+          python -m unittest tests.test_installer -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install Inno Setup compiler in temporary CI only
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          choco install innosetup --yes --no-progress --limit-output
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $candidates = @(
+            'C:\Program Files (x86)\Inno Setup 6\ISCC.exe',
+            'C:\Program Files\Inno Setup 6\ISCC.exe',
+            'C:\ProgramData\chocolatey\lib\innosetup\tools\ISCC.exe'
+          )
+          $compiler = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $compiler) {
+            $compiler = Get-ChildItem 'C:\ProgramData\chocolatey\lib\innosetup' -Recurse -Filter ISCC.exe -ErrorAction SilentlyContinue |
+              Select-Object -First 1 -ExpandProperty FullName
+          }
+          if (-not $compiler) { throw 'ISCC.exe not found after chocolatey install' }
+          "VN_ISCC=$compiler" >> $env:GITHUB_ENV
+      - name: Compile genuine private setup from synthetic test-only model and binaries
+        shell: pwsh
+        env:
+          PYTHONIOENCODING: utf-8
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $fixture = Join-Path $env:RUNNER_TEMP 'vn-private-installer-ci'
+          python -m scripts.internal_installer_ci --iscc "$env:VN_ISCC" --root "$fixture"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $setup = Join-Path $fixture 'VideoNotes-INTERNAL-Setup.exe'
+          if (-not (Test-Path $setup)) { throw 'Compiled setup is missing' }
+          "VN_SETUP=$setup" >> $env:GITHUB_ENV
+          "VN_BUNDLE=$(Join-Path $fixture 'verified-bundle')" >> $env:GITHUB_ENV
+      - name: Silent per-user install, verify exact SHA-256 and uninstall
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $target = Join-Path $env:RUNNER_TEMP 'vn-private-installed'
+          $install = Start-Process -FilePath "$env:VN_SETUP" -ArgumentList @(
+            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$target"
+          ) -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw "Private synthetic setup failed: $($install.ExitCode)" }
+          python -m scripts.verify_installed_private_ci "$env:VN_BUNDLE" "$target"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $uninstaller = Join-Path $target 'unins000.exe'
+          $remove = Start-Process -FilePath "$uninstaller" -ArgumentList @(
+            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'
+          ) -Wait -PassThru
+          if ($remove.ExitCode -ne 0) { throw "Synthetic uninstall failed: $($remove.ExitCode)" }
+          if (Test-Path (Join-Path $target 'bin\model.bin')) {
+            throw 'Installed synthetic model remained after uninstall'
+          }
+          Write-Host 'PASS: real Inno setup, 5 synthetic hashes and uninstall. NO actual Whisper runtime/hardware test.'

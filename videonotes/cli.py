@@ -20,6 +20,7 @@ from .quality import compare_text_files
 from .asr_lab import run_real_benchmark
 from .backup import create_backup, restore_backup, relink_backup
 from .bundle import create_internal_bundle, verify_internal_bundle
+from .installer import build_internal_installer
 from .pipeline import create_project, transcribe_project, transcription_lock_status, recover_stale_transcription_lock
 from .storage import read_project
 
@@ -153,6 +154,11 @@ def parser() -> argparse.ArgumentParser:
     for flag in ("app", "ffmpeg", "ffprobe", "whisper", "model", "output"):
         bundle.add_argument("--" + flag, required=True, type=Path)
     bundle.add_argument("--internal-only", required=True, action="store_true", help="Potwierdź, że nie rozpowszechniasz niezweryfikowanego pakietu")
+    setup = sub.add_parser("installer-dev", help="Zbuduj prywatny pełny offline instalator EXE z wcześniej sprawdzonego pakietu")
+    setup.add_argument("--bundle", required=True, type=Path, help="Lokalny pakiet bundle-dev zawierający model i narzędzia")
+    setup.add_argument("--iscc", required=True, type=Path, help="Ścieżka do zainstalowanego Inno Setup ISCC.exe")
+    setup.add_argument("--output", required=True, type=Path, help="Nowy plik Windows setup .exe")
+    setup.add_argument("--internal-only", required=True, action="store_true", help="Wymagana zgoda na prywatny test bez redystrybucji")
     check_bundle = sub.add_parser("bundle-verify", help="Sprawdź lokalne SHA-256 przed uruchomieniem prywatnego pakietu Windows")
     check_bundle.add_argument("folder", type=Path)
     sub.add_parser("gui", help="Uruchom prosty interfejs Windows/Tkinter")
@@ -296,6 +302,11 @@ def main(argv: list[str] | None = None) -> int:
                                             whisper=args.whisper, model=args.model, output=args.output,
                                             internal_only=args.internal_only)
             print(json.dumps(report, ensure_ascii=False, indent=2))
+        elif args.action == "installer-dev":
+            print(json.dumps(build_internal_installer(
+                bundle=args.bundle, iscc=args.iscc, output=args.output,
+                internal_only=args.internal_only
+            ), ensure_ascii=False, indent=2))
         elif args.action == "bundle-verify":
             print(json.dumps(verify_internal_bundle(args.folder), ensure_ascii=False, indent=2))
         elif args.action == "gui":

@@ -142,3 +142,14 @@ python -m videonotes study-guide C:\\Notatki\\wyklad-001 --section-minutes 10 --
 W interfejsie Windows jest przycisk **„Przewodnik do nauki — cytaty, pojęcia i pytania (VN-02/03)”**, z wyborem szczegółowości i opcjonalnym eksportem PDF przez lokalne LibreOffice. Zapisuje oddzielne `notes-study.md`, `notes-study.json` i opcjonalne DOCX/PDF; nie zastępuje oryginalnego rozpoznania ASR, notatki podstawowej ani historii poprawek. **Nie jest to semantyczne streszczenie AI; każda informacja pozostaje dosłownym cytatem źródłowym i wymaga weryfikacji.**
 
 Instrukcja: [VN_STUDY_GUIDE.md](docs/VN_STUDY_GUIDE.md).
+
+## Prywatny instalator Windows offline (VN-06 — testy wewnętrzne)
+
+Po przygotowaniu legalnych lokalnych plików `VideoNotes-DEV.exe`, `ffmpeg.exe`, `ffprobe.exe`, `whisper-cli.exe` i modelu GGML możesz stworzyć zweryfikowaną prywatną paczkę `bundle-dev`, a następnie **rzeczywisty instalator Inno Setup EXE**, który zawiera te pliki bez automatycznego pobierania podczas instalacji:
+
+```powershell
+python -m videonotes bundle-verify C:\\Test\\VideoNotes-PRIVATE
+python -m videonotes installer-dev --bundle C:\\Test\\VideoNotes-PRIVATE --iscc "C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe" --output C:\\Test\\VideoNotes-PRIVATE-Setup.exe --internal-only
+```
+
+To **wyłącznie niepodpisana wersja do testów wewnętrznych**, bez prawa do publicznej dystrybucji niezweryfikowanych modeli i zależności. Testy Windows CI na syntetycznych plikach nie zastępują fizycznego sprawdzenia całkowicie offline. Instrukcja: [VN06_PRIVATE_INSTALLER.md](docs/VN06_PRIVATE_INSTALLER.md).
