@@ -19,3 +19,7 @@ Połączony plik musi być nowy i nie może znajdować się w katalogu tworzoneg
 Jeśli model przerwie działanie, projekt z dotychczasowymi checkpointami pozostaje na dysku. Wówczas użyj polecenia \`python -m videonotes resume C:\\Notatki\\nowy\`, a NIE ponownie \`record-transcribe\` do tego samego katalogu. Nie dochodzi do automatycznego usuwania nagrań.
 
 Testy Linux CI: realne FFmpeg/FFprobe z syntetycznym PCM, a rozpoznawanie mowy tylko przez atrapę ASR. Nie jest to rzeczywisty mikrofon Windows, dwugodzinny sprzętowy test ani weryfikacja jakości mowy. VN-04 pozostaje w realizacji.
+
+## Uruchamianie z GUI (09.11.2026)
+
+W oknie Windows kliknij **„Zakończone nagranie mikrofonowe → transkrypcja całej sesji”**. Wybierz zakończoną sesję z dziennikiem `recording.json`, następnie pusty folder nowego projektu i — gdy nagranie ma więcej niż jedną część — nieistniejący wynikowy plik WAV. Wskaż wcześniej lokalny model Whisper. Przed rozpoczęciem program wyświetli potwierdzenie, a po uruchomieniu pokaże postęp; przycisk „Przerwij po fragmencie” pozwala zatrzymać nowe przetwarzanie po ukończonym checkpointcie. Po błędzie oryginalne WAV i checkpointy nowego projektu pozostają na dysku; do ponowienia użyj przycisku „Wznów projekt”, nie twórz drugiego projektu w tym samym folderze. CI testuje prawdziwe przyciski Tk na hosted Windows i Linux Xvfb, ale nie mikrofon fizyczny.

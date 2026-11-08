@@ -12,7 +12,8 @@ from tkinter import filedialog, messagebox, ttk
 from .errors import VideoNotesError
 from .exports import edit_segment, export_project
 from .media import probe
-from .microphone import record_microphone, list_microphone_devices, join_finished_recording
+from .microphone import record_microphone, list_microphone_devices, join_finished_recording, recording_status
+from .record_pipeline import transcribe_finished_session
 from .audio_diagnostics import analyze_finished_recording
 from .recovery_audio import salvage_recording
 from .notes import generate_basic_notes, read_basic_notes, edit_note_point, export_basic_notes, export_basic_notes_docx
@@ -87,6 +88,7 @@ class VideoNotesWindow:
         ttk.Button(outer, text="OCR slajdów i lokalne szkice AI (wymagają kontroli)", command=self._show_optional_analysis).pack(anchor="w", pady=(0, 7))
         ttk.Button(outer, text="Nagraj mikrofon — nowa sesja WAV (Windows)", command=self._show_mic_recorder).pack(anchor="w", pady=(0, 7))
         ttk.Button(outer, text="Połącz części ukończonego nagrania WAV do transkrypcji", command=self._join_finished_recording_dialog).pack(anchor="w", pady=(0, 7))
+        ttk.Button(outer, text="Zakończone nagranie mikrofonowe → transkrypcja całej sesji", command=self._transcribe_finished_mic_dialog).pack(anchor="w", pady=(0, 7))
         ttk.Button(outer, text="Odzyskaj czytelne WAV po awarii (może być niekompletne)", command=self._salvage_mic_recording).pack(anchor="w", pady=(0, 7))
         ttk.Button(outer, text="Sprawdź jakość nagrania WAV — cisza i przesterowanie", command=self._inspect_recording_quality).pack(anchor="w", pady=(0, 7))
         self.status = tk.StringVar(value="Gotowe. Wybierz plik i lokalny model.")
@@ -295,6 +297,98 @@ class VideoNotesWindow:
         details.insert("1.0", "\n".join(lines))
         details.configure(state="disabled")
         ttk.Button(frame, text="Zamknij", command=window.destroy).pack(anchor="e")
+
+
+    def _transcribe_finished_mic_dialog(self) -> None:
+        """Explicit, validated GUI flow into the common ASR engine (VN-04)."""
+        if self.active:
+            messagebox.showwarning("Transkrypcja nagrania", "Najpierw zakończ inną operację.")
+            return
+        if self._has_transcript_draft():
+            messagebox.showwarning("Transkrypcja nagrania", "Najpierw zapisz poprawkę transkrypcji.")
+            return
+        if not self.model.get().strip():
+            messagebox.showwarning("Transkrypcja nagrania", "Wskaż wcześniej pobrany model Whisper .bin.")
+            return
+        selected = filedialog.askdirectory(
+            title="Wybierz ZAKOŃCZONĄ sesję mikrofonową (recording.json)"
+        )
+        if not selected:
+            return
+        recording = Path(selected)
+        try:
+            report = recording_status(recording)
+            if report["status"] != "finished" or not report["sha256_verified"]:
+                raise VideoNotesError("Nagranie nie jest zakończone lub nie ma potwierdzonych SHA-256.")
+            count = len(report["segments"])
+            if count < 1:
+                raise VideoNotesError("Sesja nie zawiera ukończonych części WAV.")
+        except VideoNotesError as error:
+            messagebox.showerror("Transkrypcja nagrania", str(error))
+            return
+        destination = filedialog.askdirectory(
+            title="Wybierz PUSTY folder NOWEGO projektu transkrypcji"
+        )
+        if not destination:
+            return
+        project = Path(destination)
+        if project.is_symlink() or (project.exists() and
+                                     (not project.is_dir() or any(project.iterdir()))):
+            messagebox.showwarning(
+                "Transkrypcja nagrania", "Folder projektu musi być pusty. Istniejące dane nie będą nadpisane."
+            )
+            return
+        joined = None
+        if count > 1:
+            filename = filedialog.asksaveasfilename(
+                title="Wybierz NOWY plik do połączenia wszystkich części WAV",
+                initialfile="recording-full.wav", defaultextension=".wav",
+                filetypes=[("WAV", "*.wav")],
+            )
+            if not filename:
+                return
+            joined = Path(filename)
+            if joined.exists() or joined.is_symlink():
+                messagebox.showwarning("Transkrypcja nagrania", "Połączony WAV już istnieje; nie nadpisuję.")
+                return
+        if not messagebox.askyesno(
+            "Transkrypcja całej sesji",
+            f"Przetworzyć {count} zakończonych części WAV do NOWEGO projektu? "
+            "Przy wielu częściach zostanie utworzona dodatkowa kopia połączonego WAV. "
+            "Źródła pozostaną bez zmian; rozpoczęcie może długo obciążać CPU. "
+            "W razie przerwania użyj standardowego Wznów projekt."
+        ):
+            return
+        # Snapshot the values on the main Tk thread; never touch Tk vars from
+        # a background worker or silently mutate a previously loaded project.
+        model = Path(self.model.get())
+        whisper = self.engine.get()
+        language = self.language.get()
+        self.cancel.clear()
+        self.active = True
+        self.start_button.configure(state="disabled")
+        self.resume_button.configure(state="disabled")
+        self.cancel_button.configure(state="normal")
+        self.status.set("Przetwarzanie zakończonego nagrania WAV w tym samym silniku ASR...")
+
+        def worker() -> None:
+            try:
+                result = transcribe_finished_session(
+                    recording, project, model=model, whisper_cli=whisper,
+                    joined_wav=joined, language=language,
+                    progress=lambda done, total: self.events.put(("progress", (done, total))),
+                    cancel=self.cancel.is_set,
+                )
+                self.events.put(("record_to_asr_complete", result))
+            except VideoNotesError as error:
+                self.events.put(("record_to_asr_failure", (str(project), str(error))))
+            except Exception:
+                self.events.put(("record_to_asr_failure", (
+                    str(project),
+                    "Wystąpił błąd lokalnej transkrypcji. Jeśli projekt powstał, "
+                    "nie usuwaj go: sprawdź checkpointy i wznowienie."
+                )))
+        threading.Thread(target=worker, name="vn-finished-mic-asr", daemon=True).start()
 
     def _join_finished_recording_dialog(self) -> None:
         """Opt-in lossless assembly: do not silently transcribe only first 2h."""
@@ -580,6 +674,27 @@ class VideoNotesWindow:
                         label, reason = data
                         self.status.set(label + ": nie zapisano nowego wyniku.")
                         messagebox.showwarning("Analiza lokalna", reason)
+                elif kind in {"record_to_asr_complete", "record_to_asr_failure"}:
+                    self.active = False
+                    self.start_button.configure(state="normal")
+                    self.resume_button.configure(state="normal")
+                    self.cancel_button.configure(state="disabled")
+                    if kind == "record_to_asr_complete":
+                        self.project.set(data["project"])
+                        self.source.set(data["source_wav"])
+                        self.stream.set("")
+                        self.streams.clear()
+                        self.stream_box.configure(values=[])
+                        self.status.set("Zakończono transkrypcję całej sesji. Projekt i eksport zapisano lokalnie.")
+                        self._load(silent=True)
+                    else:
+                        project_path, reason = data
+                        self.status.set(
+                            "Transkrypcja nie została ukończona. Jeśli projekt już powstał, "
+                            "użyj Wznów projekt i zachowaj źródłowe WAV."
+                        )
+                        messagebox.showwarning("Transkrypcja nagrania", reason +
+                            " W przypadku utworzenia projektu wznowienie następuje przez Wznów projekt: " + project_path)
                 elif kind == "progress":
                     done, total = data
                     self.progress["maximum"] = max(total, 1)
