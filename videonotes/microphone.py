@@ -22,6 +22,7 @@ from typing import Callable
 
 from .errors import VideoNotesError
 from .media import executable
+from .contracts import sha256_file
 from .storage import load_json, save_json
 
 SCHEMA = "videonotes-mic-recording-v1"
@@ -119,6 +120,9 @@ def recording_status(folder: Path) -> dict:
         raise VideoNotesError("Nieobsługiwany format dziennika nagrania.")
     if info.get("status") not in {"recording", "finished", "needs_review"}:
         raise VideoNotesError("Nieprawidłowy stan nagrania.")
+    policy = info.get("hash_policy")
+    if policy not in (None, "sha256-v1"):
+        raise VideoNotesError("Nieobsługiwana polityka kontroli integralności nagrania.")
     if info["status"] == "finished":
         segments = inspect_wav_segments(folder)
         # Previously, deleting a finished part could silently shorten the
@@ -133,6 +137,21 @@ def recording_status(folder: Path) -> dict:
                 "Dziennik ukończonego nagrania nie zgadza się z częściami WAV; "
                 "sesja wymaga ręcznej kontroli."
             )
+        if policy == "sha256-v1":
+            expected = info.get("segment_sha256")
+            names = {part["name"] for part in segments}
+            if (not isinstance(expected, dict) or set(expected) != names or
+                    any(not isinstance(value, str) or
+                        not re.fullmatch(r"[0-9a-f]{64}", value)
+                        for value in expected.values())):
+                raise VideoNotesError("Brak lub uszkodzone sumy SHA-256 części WAV.")
+            for part in segments:
+                candidate = folder / part["name"]
+                if candidate.is_symlink() or sha256_file(candidate) != expected[part["name"]]:
+                    raise VideoNotesError(
+                        "Integralność SHA-256 nagrania nie zgadza się z dziennikiem; "
+                        "zachowano pliki do ręcznej kontroli."
+                    )
         damaged: list[str] = []
     else:
         segments = []
@@ -145,7 +164,8 @@ def recording_status(folder: Path) -> dict:
                 damaged.append(part.name)
     return {"schema": SCHEMA, "session_id": info.get("session_id"),
             "status": info["status"], "segments": segments,
-            "unreadable_parts": damaged, "requires_manual_review": info["status"] != "finished"}
+            "unreadable_parts": damaged, "requires_manual_review": info["status"] != "finished",
+            "sha256_verified": info["status"] == "finished" and policy == "sha256-v1"}
 
 
 
@@ -288,6 +308,7 @@ def record_microphone(device: str, folder: Path, *, consent: bool,
               "created_at": datetime.now(timezone.utc).isoformat(),
               "status": "recording", "format": "wav-pcm16-mono-16000",
               "segment_seconds": SEGMENT_SECONDS, "user_consented": True,
+              "hash_policy": "sha256-v1",
               "device_stored": False, "max_seconds": max_seconds,
               "system_audio_requested": system_device is not None,
               "system_audio_consented": system_consent is True}
@@ -319,7 +340,11 @@ def record_microphone(device: str, folder: Path, *, consent: bool,
         if returncode != 0 or not parts:
             raise VideoNotesError("FFmpeg nie ukończył nagrywania lub brak poprawnego WAV. Pliki zachowano.")
         report.update({"status": "finished", "stopped_by_user": stopped,
-                       "segments": len(parts), "duration_ms": sum(x["duration_ms"] for x in parts)})
+                       "segments": len(parts), "duration_ms": sum(x["duration_ms"] for x in parts),
+                       "segment_sha256": {
+                           part["name"]: sha256_file(folder / part["name"])
+                           for part in parts
+                       }})
         save_json(folder / "recording.json", report)
         return recording_status(folder)
     except OSError as error:
