@@ -87,3 +87,11 @@ Interfejs sesji mikrofonowej otrzymał osobne przyciski **Pauza**, **Wznów nagr
 Awaria podczas pauzy lub po restarcie pozostawia dziennik `paused` lub `needs_review`; polecenie `record-status` pokazuje czytelne części, ale **nie** oznacza sesji automatycznie jako ukończonej. Uruchomienie po awarii do tego samego katalogu jest celowo zabronione, aby nie nadpisać danych. Ponowne wznowienie istniejącej zakończonej sesji po zamknięciu aplikacji nie jest jeszcze dostępne.
 
 Testy automatyczne symulują proces FFmpeg, jego prawidłowe zamykanie, dwie oddzielne części o różnych próbkach PCM, pauzę, wznowienie, stop w pauzie, wyścigi i błąd drugiego ujęcia. Sprawdzają SHA, dziennik, numery części, treść po bezstratnym sklejeniu oraz rzeczywiste przyciski Tk na Linux/Windows CI. **Nie potwierdzają testu fizycznego mikrofonu ani zachowania urządzenia DirectShow po 2 godzinach**. Wymagany pozostaje test na prawdziwym komputerze, urządzeniu USB, przy odłączeniu i uśpieniu systemu.
+
+### Izolacja nowych ujęć przed opublikowaniem (zabezpieczenie FFmpeg)
+
+Weryfikacja z **rzeczywistym FFmpeg na Linux CI** wykazała, że segmentowy muxer potrafi **ignorować globalną opcję `-n`** i zapisać plik pod istniejącą nazwą bez zgłoszenia błędu. Dlatego samo podawanie numeru kolejnego fragmentu nie zapewniało wystarczającej ochrony.
+
+Każde nowe ujęcie (przed pauzą i po wznowieniu) zapisuje się teraz w odrębnym losowym katalogu `.vn-take-*`. Program sprawdza format i numery jego WAV, a następnie publikuje wszystkie fragmenty do katalogu sesji przez **atomowe dowiązania twarde bez możliwości zastąpienia istniejącego pliku**. Dopiero po pełnej publikacji usuwa zapasowe nazwy z katalogu roboczego. Istniejące części są chronione również w scenariuszu, gdy inny proces utworzy oczekiwany plik w ostatniej chwili.
+
+Po niepowodzeniu nagrania, uszkodzeniu fragmentu lub konflikcie zapisu ukryty katalog `.vn-take-*` **pozostaje na dysku** wraz z niezapisanymi jeszcze do sesji próbkami, zamiast być automatycznie kasowany. `record-status` zwraca nazwy tych katalogów w `pending_takes`; stan `needs_review` wymaga ręcznej kontroli. Nie przenoś, nie usuwaj ani nie uruchamiaj ponownie nagrywania w tym samym folderze, dopóki nie wykonasz bezpiecznej kopii. Nie jest to jeszcze automatyczne przywracanie przerwanego nagrania z bufora FFmpeg.
