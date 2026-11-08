@@ -24,6 +24,7 @@ from .asr_lab import run_real_benchmark
 from .backup import create_backup, restore_backup, relink_backup
 from .bundle import create_internal_bundle, verify_internal_bundle
 from .sbom import create_internal_sbom
+from .diagnostics import diagnose_local_install
 from .installer import build_internal_installer
 from .pipeline import create_project, transcribe_project, transcription_lock_status, recover_stale_transcription_lock
 from .storage import read_project
@@ -187,6 +188,13 @@ def parser() -> argparse.ArgumentParser:
     sbom = sub.add_parser("bundle-sbom", help="Zapisz offline SPDX 2.3: SHA-256 bez deklaracji praw licencyjnych")
     sbom.add_argument("folder", type=Path)
     sbom.add_argument("--output", type=Path, required=True)
+    doctor = sub.add_parser("doctor", help="Diagnoza lokalnych narzędzi i miejsca na dysku bez pracy ASR lub sieci")
+    doctor.add_argument("--ffmpeg", default="ffmpeg")
+    doctor.add_argument("--ffprobe", default="ffprobe")
+    doctor.add_argument("--whisper-cli")
+    doctor.add_argument("--model", type=Path)
+    doctor.add_argument("--source", type=Path, help="Opcjonalny lokalny plik OBS/audio do odczytu ścieżek")
+    doctor.add_argument("--workspace", type=Path, help="Opcjonalny katalog na projekty do pomiaru wolnego miejsca")
     sub.add_parser("gui", help="Uruchom prosty interfejs Windows/Tkinter")
     return cmd
 
@@ -353,6 +361,11 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(verify_internal_bundle(args.folder), ensure_ascii=False, indent=2))
         elif args.action == "bundle-sbom":
             print(json.dumps(create_internal_sbom(args.folder, args.output), ensure_ascii=False, indent=2))
+        elif args.action == "doctor":
+            report = diagnose_local_install(ffmpeg=args.ffmpeg, ffprobe=args.ffprobe,
+                                            whisper_cli=args.whisper_cli, model=args.model,
+                                            source=args.source, workspace=args.workspace)
+            print(json.dumps(report, ensure_ascii=False, indent=2))
         elif args.action == "gui":
             from .gui import launch
             launch()
