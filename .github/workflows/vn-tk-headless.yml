@@ -1,9 +1,10 @@
-name: Video Notes — real Tk widgets under isolated Xvfb
+name: Video Notes — real Tk GUI widgets on Linux Xvfb and Windows runner
 on:
   pull_request:
     branches: [develop]
     paths:
       - 'videonotes/gui.py'
+      - 'videonotes/notes.py'
       - 'videonotes/note_revisions.py'
       - 'scripts/gui_headless_test.py'
       - '.github/workflows/vn-tk-headless.yml'
@@ -30,3 +31,23 @@ jobs:
         run: |
           set -euo pipefail
           timeout 120s xvfb-run -a /usr/bin/python3 -m scripts.gui_headless_test
+
+  gui-tk-windows:
+    name: Real Tk GUI on hosted Windows VM (not physical offline acceptance)
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Require genuine Windows Tk widgets and execute all GUI interaction tests
+        shell: pwsh
+        env:
+          PYTHONIOENCODING: utf-8
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -c "import sys, tkinter; assert sys.platform == 'win32'; root = tkinter.Tk(); root.withdraw(); print('Windows Tk loaded'); root.destroy()"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m scripts.gui_headless_test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

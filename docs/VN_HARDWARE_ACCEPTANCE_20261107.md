@@ -151,3 +151,9 @@ Te testy redukują ryzyko utraty danych. **MIC-01, MIC-02, MIX-01/02, HW-01 i PK
 ## 14. Kontrola SHA-256 nagrań — PR #66 (08.11.2026)
 
 [PR #66](https://github.com/testowyemailaplikacja-spec/Video-notes/pull/66) scala nową weryfikację sum SHA-256 wszystkich części nowo ukończonych sesji, raport `sha256_verified`, odmowę dla niezgodnej treści PCM i bezpieczną obsługę dawnych dzienników bez hashy. [Linux/Windows/browser CI #42468276521](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42468276521) **5/5 PASS**, [Windows DEV EXE #42468276515](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42468276515) **PASS**. Nie opiera się na uploadzie nagrań użytkowników; testowa modyfikacja próbki jest syntetyczna. Kontrola nie stanowi podpisu cyfrowego ani testu fizycznego awaryjnego dysku. `MIC-01/MIC-02`, pełne testy Windows i odbiór wydania nadal **NOT_RUN**.
+
+## Windows VM: prawdziwe komponenty Tkinter — nowa kontrola (08.11.2026)
+
+Workflow `.github/workflows/vn-tk-headless.yml` uruchamia dotychczasowe testy widżetów Tkinter pod Ubuntu/Xvfb, a dodatkowo próbuje wykonać **te same rzeczywiste interakcje Tk na runnerze Windows** z Pythonem 3.13. Klasa `GuiNotesHeadlessTest` nie może być pomijana na Windows: wymagana jest działająca instancja `tk.Tk()`. Testy sprawdzają historię notatek, odzyskanie po przerwanym zapisie, ochronę niezapisanego tekstu, lokalne PDF i stan wyboru kompletnego nagrania po połączeniu WAV. Okna potwierdzeń są automatycznie zastąpione odpowiedziami testowymi, nie wymaga to klikania przez użytkownika.
+
+To **test widżetów GUI we współdzielonej maszynie GitHub Actions**, nie fizyczny test systemu Windows, urządzeń audio, instalatora ani pracy offline na komputerze użytkownika. Jego wynik zostanie uznany za PASS dopiero po pomyślnym wykonaniu obu jobów i pełnej regresji.
