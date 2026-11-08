@@ -118,3 +118,15 @@ Transkrypcję można uruchamiać również z plików WAV, MP3, M4A, FLAC, OGG i 
 GitHub Actions buduje `VideoNotes-DEV.exe` i uruchamia testy podstawowego CLI na Windows. Artefakt jest oznaczony **DEV-NOT-OFFLINE**, nie zawiera FFmpeg ani modeli Whisper i nie jest jeszcze pełnym instalatorem. [Szczegóły i bramki wydania](docs/VN06_WINDOWS_DEV_BUILD.md).
 
 **Przetestowany artefakt Windows DEV:** [GitHub Actions #42296659497](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42296659497), wynik SUCCESS. Do pobrania jest tymczasowy ZIP z `VideoNotes-DEV.exe` i SHA-256, ale **bez modelu ASR i FFmpeg**; nie jest to wydanie stabilne.
+
+## Wielogodzinne nagrania mikrofonowe (VN-04, wersja rozwojowa)
+
+Po ukończeniu sesji podzielonej na części `part-00000.wav`, `part-00001.wav` itd. nie należy transkrybować wyłącznie pierwszej części jako całego wykładu. W GUI wybierz **„Połącz części ukończonego nagrania WAV do transkrypcji”**, wskaż folder sesji i potwierdź lokalne połączenie. Alternatywa CLI:
+
+```bash
+python -m videonotes record-status KATALOG_SESJI
+python -m videonotes record-join KATALOG_SESJI --output KATALOG_SESJI/recording-full.wav
+python -m videonotes inspect KATALOG_SESJI/recording-full.wav
+```
+
+Program sprawdza ciągłość WAV i dziennik `finished`, nie nadpisuje gotowych plików, zachowuje oryginalne części, zapisuje nowy wynik atomowo i wymaga dodatkowego wolnego miejsca. Standardowy WAV ma limit około 4 GB. Testy automatyczne PR #63 i #64 są zielone, lecz **nie wykonano fizycznego testu mikrofonu Windows ani 2-godzinnej sesji**. Szczegóły: [VN04_MICROPHONE_CAPTURE.md](docs/VN04_MICROPHONE_CAPTURE.md).
