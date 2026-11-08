@@ -64,6 +64,8 @@ def capture_command(ffmpeg: str, device: str, output: Path, *, max_seconds: int 
                  "-f", "segment", "-segment_time", str(SEGMENT_SECONDS),
                  "-reset_timestamps", "1"])
     if start_number:
+        # The output name is already in a unique staging folder. Do not rely
+        # on FFmpeg's -n to protect segments: some muxers ignore it.
         args.extend(["-segment_start_number", str(start_number)])
     args.extend(["-segment_format", "wav", str(output)])
     return args
@@ -168,9 +170,16 @@ def recording_status(folder: Path) -> dict:
             except VideoNotesError:
                 # Do not follow symlinks or mutate user data to 'fix' it.
                 damaged.append(part.name)
+    pending_takes = sorted(
+        part.name for part in folder.glob(".vn-take-*")
+        if part.is_dir() and not part.is_symlink()
+    )
+    if info["status"] == "finished" and pending_takes:
+        raise VideoNotesError("Sesja ma niezatwierdzone WAV w .vn-take; wymaga ręcznej kontroli.")
     return {"schema": SCHEMA, "session_id": info.get("session_id"),
             "status": info["status"], "segments": segments,
-            "unreadable_parts": damaged, "requires_manual_review": info["status"] != "finished",
+            "unreadable_parts": damaged, "pending_takes": pending_takes,
+            "requires_manual_review": info["status"] != "finished",
             "sha256_verified": info["status"] == "finished" and policy == "sha256-v1"}
 
 
@@ -307,7 +316,13 @@ def _capture_with_pauses(tool: str, device: str, folder: Path, report: dict,
             remaining = max_seconds - (used_ms + 999) // 1000
             if remaining <= 0:
                 return stopped, 0, count_pauses
-        output = folder / "part-%05d.wav"
+        # FFmpeg's segment muxer may IGNORE global -n even when input files
+        # exist. Capture into a unique private directory and publish each
+        # verified WAV using os.link() O_EXCL-like semantics. A crash keeps the
+        # private take for manual recovery rather than destroying audio.
+        take_folder = folder / (".vn-take-" + uuid.uuid4().hex)
+        take_folder.mkdir(mode=0o700)
+        output = take_folder / "part-%05d.wav"
         command = capture_command(
             tool, device, output, max_seconds=remaining,
             system_device=system_device, start_number=next_index,
@@ -339,7 +354,34 @@ def _capture_with_pauses(tool: str, device: str, folder: Path, report: dict,
                 except (OSError, ValueError):
                     pass
         if returncode != 0:
-            raise VideoNotesError("FFmpeg przerwał sesję; zachowano pliki do ręcznej kontroli.")
+            raise VideoNotesError(
+                "FFmpeg przerwał sesję; pliki WAV i ukryty katalog .vn-take zachowano do kontroli."
+            )
+        staged = sorted(take_folder.glob("part-*.wav"))
+        if not staged or next_index + len(staged) > 100_000:
+            raise VideoNotesError(
+                "FFmpeg nie zapisał nowej części lub przekroczono limit; katalog .vn-take zachowano."
+            )
+        for offset, part in enumerate(staged):
+            if part.name != f"part-{next_index + offset:05d}.wav":
+                raise VideoNotesError("Prawidłowa kolejność WAV nie została zachowana; katalog .vn-take zachowano.")
+            _inspect_single_wav(part)
+        try:
+            for part in staged:
+                # Atomic no-replace regardless of FFmpeg's own overwrite flags.
+                os.link(part, folder / part.name)
+        except FileExistsError as error:
+            raise VideoNotesError(
+                "Część WAV została utworzona równolegle; nie nadpisano pliku. Sprawdź .vn-take."
+            ) from error
+        except OSError as error:
+            raise VideoNotesError(
+                "Nie udało się bezpiecznie opublikować WAV. Zapis w .vn-take zachowano."
+            ) from error
+        # Only drop staging hard links AFTER every destination was published.
+        for part in staged:
+            part.unlink()
+        take_folder.rmdir()
         new_parts = inspect_wav_segments(folder)
         if len(new_parts) <= next_index:
             raise VideoNotesError("Nie powstał nowy pełny WAV; zachowano dziennik do kontroli.")
