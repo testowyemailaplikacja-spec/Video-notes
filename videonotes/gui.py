@@ -15,7 +15,7 @@ from .media import probe
 from .microphone import record_microphone, list_microphone_devices, join_finished_recording
 from .notes import generate_basic_notes, read_basic_notes, edit_note_point, export_basic_notes, export_basic_notes_docx
 from .advanced_notes import export_advanced_outline
-from .study_guide import export_study_guide
+from .study_guide import export_study_guide, verify_study_guide
 from .pdf_export import export_basic_notes_pdf
 from .note_revisions import regenerate_basic_notes, list_note_versions, restore_note_version, recover_interrupted_note_update
 from .pipeline import create_project, transcribe_project
@@ -481,8 +481,27 @@ class VideoNotesWindow:
             preview.configure(state="disabled")
             self.status.set("Zapisano lokalny przewodnik: " + ", ".join(str(p) for p in targets))
 
+        def check_source() -> None:
+            if self.active:
+                messagebox.showwarning("Video Notes", "Poczekaj na zakończenie innej operacji.")
+                return
+            try:
+                report = verify_study_guide(folder)
+            except VideoNotesError as error:
+                messagebox.showerror("Weryfikacja przewodnika", str(error))
+                return
+            self.status.set(
+                f"Potwierdzono {report['source_citations']} cytatów w "
+                f"{report['sections']} częściach względem lokalnej transkrypcji."
+            )
+            messagebox.showinfo(
+                "Weryfikacja przewodnika",
+                "Cytaty, znaczniki czasu i treść JSON zgadzają się z aktualną transkrypcją. "
+                "Nie jest to podpis cyfrowy ani ocena poprawności ASR."
+            )
         ttk.Button(tools, text="Opracuj / odśwież", command=generate).pack(side="left", padx=4)
         ttk.Button(tools, text="Eksport DOCX", command=lambda: generate(docx=True)).pack(side="left", padx=4)
+        ttk.Button(tools, text="Sprawdź źródła", command=check_source).pack(side="left", padx=4)
         ttk.Button(tools, text="Eksport PDF", command=lambda: generate(pdf=True)).pack(side="left", padx=4)
         generate()
 
