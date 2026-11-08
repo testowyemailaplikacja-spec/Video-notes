@@ -22,6 +22,7 @@ from videonotes.notes import export_basic_notes_docx, generate_basic_notes, read
 from videonotes.note_revisions import regenerate_basic_notes
 from videonotes.pipeline import create_project, transcribe_project
 from videonotes.storage import read_project
+from videonotes.study_guide import export_study_guide
 
 
 def main() -> int:
@@ -129,6 +130,30 @@ def main() -> int:
                     raise VideoNotesError("Konspekt DOCX nie zawiera treści.")
                 if corrected_text not in word.read("word/document.xml").decode("utf-8"):
                     raise VideoNotesError("DOCX konspektu nie zawiera ręcznej poprawki.")
+            # Full source-indexed study guide on *actual* Whisper output.
+            # No model-generated claims or fake transcript rows are introduced.
+            guide_paths = export_study_guide(
+                project_dir, section_minutes=1, detail="full", include_docx=True
+            )
+            if len(guide_paths) != 3 or any(not path.is_file() for path in guide_paths):
+                raise VideoNotesError("Przewodnik nie wygenerował MD/JSON/DOCX.")
+            study = json.loads(guide_paths[1].read_text(encoding="utf-8"))
+            if study["source_sha256"] != doc["source_sha256"]:
+                raise VideoNotesError("Skrót do nauki nie odpowiada poprawionemu źródłu.")
+            for chapter in study["sections"]:
+                for field in ("key_quotes", "definition_hints",
+                              "examples", "questions_or_uncertainties"):
+                    for cite in chapter[field]:
+                        original = corrected_source.get(cite["segment_id"])
+                        if original is None or cite["start_ms"] != original["start_ms"] or cite["end_ms"] != original["end_ms"]:
+                            raise VideoNotesError("Przewodnik utracił czas/ID rozpoznanego fragmentu.")
+                        expected_text = corrected_text if cite["segment_id"] == first["id"] else original["text"]
+                        if cite["text"] != expected_text:
+                            raise VideoNotesError("Przewodnik dodał treść spoza rozpoznanego źródła.")
+            with zipfile.ZipFile(guide_paths[2]) as word:
+                if corrected_text not in word.read("word/document.xml").decode("utf-8"):
+                    raise VideoNotesError("Word przewodnika nie zawiera ręcznej korekty źródłowej.")
+
             results.append({
                 "language_selected": language,
                 "input_duration_ms": media["duration_ms"],
@@ -140,6 +165,7 @@ def main() -> int:
                 "raw_asr_preserved": True,
                 "advanced_outline_citations_checked": len(citations),
                 "source_grounded_advanced_md_json_docx": True,
+                "source_only_study_guide_md_json_docx": True,
                 "accuracy_evaluated": False,
             })
     summary = {
