@@ -118,3 +118,20 @@ Testy automatyczne obejmują rzeczywiste oryginalne PCM: sinusoidalną mowopodob
 Po testach jednostkowych z atrapą uruchamiana jest również osobna bramka CI `.github/workflows/vn-real-mic-pause.yml`. Korzysta z faktycznego procesu **FFmpeg** na Linux i lokalnego generatora `lavfi sine` zamiast mikrofonu. Program przeprowadza **dwa faktyczne ujęcia**, celowo pauzuje przez polecenie `q` (FFmpeg finalizuje WAV), wznowienie wykonuje do kolejnego prywatnego katalogu, a po stopie kontroluje status `finished`, SHA-256, dwie różne próbki, niezmienność wcześniejszej części, brak pozostałych tymczasowych katalogów, bezstratne sklejenie i analizę poziomu dźwięku.
 
 Nie jest to atrapa procesu nagrywającego — przetwarzanie WAV, sterowanie stdin, segmentowy muxer i dekodowanie PCM są wykonywane rzeczywiście. **Źródłem jest sztuczna fala sinusoidalna; test nie otwiera mikrofonu Windows, nie sprawdza DirectShow, uprawnień, loopback ani zachowania po wielu godzinach.** Dopiero po zielonej akcji CI można oznaczyć podtest jako PASS. Nie oznacza to ukończenia VN-04.
+
+## Bezpieczne odzyskanie czytelnej części po awarii (08.11.2026)
+
+Dotychczas aplikacja zachowywała `part-XXXXX.wav` i `.vn-take-*` po awarii FFmpeg, lecz wymagała ręcznej obsługi plików. Dodano **podgląd odzysku i eksport częściowo uratowanego nagrania**. System nie uznaje automatycznie uszkodzonej sesji za ukończoną.
+
+Najpierw upewnij się, że **proces nagrywania już nie działa**. W terminalu uruchom:
+
+```powershell
+python -m videonotes record-recovery-status C:\\Nagrania\\wyklad-001
+python -m videonotes record-salvage C:\\Nagrania\\wyklad-001 --output C:\\Nagrania\\wyklad-001\\recording-salvaged-INCOMPLETE.wav --confirm-stopped
+```
+
+Podgląd czyta i sprawdza wszystkie rozpoznane WAV w katalogu sesji i jej podkatalogach roboczych `.vn-take-<UUID>`; weryfikuje format PCM mono 16 kHz/16 bit, liczbę próbek, obecne sumy SHA-256, nazwę i ciągłość numeracji. Zwraca listę poprawnych części tworzących **nieprzerwany prefiks** od `part-00000.wav` i nazwy problemów. Jeśli wykryje brak `part-00001.wav`, uszkodzenie, konflikt dwóch różnych poprawnych plików o tej samej nazwie albo symlink, **nie przeskakuje** do dalszych fragmentów. Niczego nie naprawia ani nie usuwa.
+
+Dopiero osobne `--confirm-stopped` pozwala utworzyć nowy plik WAV. W programie Windows jest przycisk **„Odzyskaj czytelne WAV po awarii (może być niekompletne)”**. Użytkownik potwierdza zatrzymanie FFmpeg i otrzymuje silne ostrzeżenie o niekompletnym wykładzie. Po odzyskaniu program wskazuje nowy WAV jako źródło do transkrypcji, lecz nie zmienia oryginalnego dziennika ani plików. Dla wynikowego WAV używane są ograniczone bufory, sprawdzenie wolnego miejsca, walidacja danych i atomowe opublikowanie bez nadpisania istniejącego celu. Źródła można nadal analizować ręcznie albo z kopii.
+
+**Ważna granica:** funkcja nie odzyskuje niezapisanych próbek z pamięci urządzenia, utraconej końcówki WAV ani dźwięku po pierwszej luce. Nie rekonstruuje brakujących fragmentów i nie poprawia automatycznie uszkodzonego nagłówka. Zwraca `not_a_complete_lecture=true` i `requires_user_review=true`. Eksport działa wyłącznie dla sesji oznaczonej `needs_review` po zatrzymaniu procesu. Dla `recording`, `paused` i `finished` odmówi utworzenia kopii, aby nie podszyć się pod kompletny wykład. Nadal wymagany pozostaje fizyczny test awarii mikrofonu i kontroli materiału Windows.
