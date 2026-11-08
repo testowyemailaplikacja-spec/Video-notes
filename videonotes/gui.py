@@ -21,7 +21,7 @@ from .study_guide import export_study_guide, verify_study_guide
 from .pdf_export import export_basic_notes_pdf
 from .note_revisions import regenerate_basic_notes, list_note_versions, restore_note_version, recover_interrupted_note_update
 from .pipeline import create_project, transcribe_project
-from .storage import read_project
+from .storage import read_project, load_json
 
 
 class VideoNotesWindow:
@@ -44,6 +44,8 @@ class VideoNotesWindow:
         self.mic_resume = threading.Event()
         self.mic_controls: dict = {}
         self._rows: dict[str, dict] = {}
+        self._current_segment_id: str | None = None
+        self._loaded_project_path: Path | None = None
         self._build()
         self.root.protocol("WM_DELETE_WINDOW", self._on_app_close)
         self.root.after(100, self._drain)
@@ -573,27 +575,155 @@ class VideoNotesWindow:
             pass
         self.root.after(100, self._drain)
 
-    def _load(self, silent: bool = False) -> None:
+    def _has_transcript_draft(self) -> bool:
+        """Do not discard manual ASR edits when notes navigate to a source."""
+        key = self._current_segment_id
+        if not key or key not in self._rows or self._loaded_project_path is None:
+            return False
         try:
-            _project, transcript, edits = read_project(Path(self.project.get()))
+            _project, _transcript, edits = read_project(self._loaded_project_path)
+        except VideoNotesError:
+            # If the project changed on disk, refuse to silently destroy draft.
+            return True
+        original = edits["edits"].get(key, self._rows[key]["text"])
+        return self.edit_text.get("1.0", "end-1c") != original
+
+    def _load(self, silent: bool = False, *, force: bool = False) -> bool:
+        if not force and self._has_transcript_draft():
+            if silent:
+                self.status.set("Zachowano niezapisany szkic; zapisz poprawkę przed ponownym wczytaniem projektu.")
+                return False
+            if not messagebox.askyesno(
+                "Niezapisana poprawka transkrypcji",
+                "Otworzyć projekt i odrzucić niezapisany tekst bieżącego segmentu?"
+            ):
+                return False
+        try:
+            folder = Path(self.project.get()).resolve()
+            _project, transcript, edits = read_project(folder)
+            self._current_segment_id = None
+            self._loaded_project_path = folder
             self.segments.delete(*self.segments.get_children())
             self._rows.clear()
+            self.edit_text.delete("1.0", "end")
             for item in transcript["segments"]:
                 value = edits["edits"].get(item["id"], item["text"])
                 self._rows[item["id"]] = item
-                self.segments.insert("", "end", iid=item["id"], values=(f"{item['start_ms']/1000:.2f}", value.replace("\n", " ")))
-            self.status.set(f"Załadowano {len(transcript['segments'])} segmentów. Poprawki są zapisywane oddzielnie.")
-        except VideoNotesError as error:
+                self.segments.insert(
+                    "", "end", iid=item["id"],
+                    values=(f"{item['start_ms']/1000:.2f}", value.replace("\n", " "))
+                )
+            self.status.set(
+                f"Załadowano {len(transcript['segments'])} segmentów. Poprawki są zapisywane oddzielnie."
+            )
+            return True
+        except (VideoNotesError, OSError) as error:
             if not silent:
                 messagebox.showerror("Video Notes", str(error))
+            return False
 
     def _selected(self, _event=None) -> None:
         selection = self.segments.selection()
-        if selection:
-            _project, _transcript, edits = read_project(Path(self.project.get()))
-            item = self._rows[selection[0]]
-            self.edit_text.delete("1.0", "end")
-            self.edit_text.insert("1.0", edits["edits"].get(item["id"], item["text"]))
+        if not selection:
+            return
+        key = selection[0]
+        if key == self._current_segment_id:
+            return
+        if self._has_transcript_draft():
+            if not messagebox.askyesno(
+                "Niezapisana poprawka transkrypcji",
+                "Zmienić fragment i odrzucić niezapisany tekst? Wybierz Nie, by zachować szkic."
+            ):
+                if self._current_segment_id in self._rows:
+                    self.segments.selection_set(self._current_segment_id)
+                return
+        try:
+            _, _, edits = read_project(self._loaded_project_path or Path(self.project.get()))
+            item = self._rows[key]
+            value = edits["edits"].get(key, item["text"])
+        except (VideoNotesError, KeyError) as error:
+            messagebox.showwarning("Transkrypcja", "Nie można otworzyć wybranego źródła; sprawdź projekt.")
+            return
+        self._current_segment_id = key
+        self.edit_text.delete("1.0", "end")
+        self.edit_text.insert("1.0", value)
+
+    def _jump_to_source(self, segment_id: str) -> bool:
+        """Select source segment in the desktop editor, preserving unsaved work."""
+        if self.active:
+            messagebox.showwarning("Video Notes", "Najpierw zakończ inne przetwarzanie.")
+            return False
+        if not isinstance(segment_id, str) or not segment_id:
+            messagebox.showwarning("Źródło", "Nieprawidłowy identyfikator segmentu.")
+            return False
+        folder = Path(self.project.get()).resolve()
+        if self._loaded_project_path != folder or segment_id not in self._rows:
+            if self._has_transcript_draft() and not messagebox.askyesno(
+                "Niezapisana poprawka transkrypcji",
+                "Zmiana projektu może odrzucić niezapisany tekst. Kontynuować?"
+            ):
+                return False
+            if not self._load(silent=True, force=True):
+                messagebox.showwarning("Źródło", "Nie udało się wczytać transkrypcji projektu.")
+                return False
+        if segment_id not in self._rows:
+            messagebox.showwarning("Źródło", "Nie znaleziono tego fragmentu w aktualnej transkrypcji.")
+            return False
+        self.segments.selection_set(segment_id)
+        self._selected()
+        if self._current_segment_id != segment_id:
+            return False
+        self.segments.focus(segment_id)
+        self.segments.see(segment_id)
+        self.status.set(f"Źródło {segment_id} — możesz odsłuchać oryginał i poprawić tekst.")
+        return True
+
+    def _source_navigation_tree(self, parent: ttk.Frame) -> ttk.Treeview:
+        """Reusable clickable, keyboard-accessible source list for notes."""
+        container = ttk.LabelFrame(parent, text="Źródła — wybierz cytat i przejdź do edytora")
+        container.pack(fill="x", pady=5)
+        table = ttk.Treeview(
+            container, columns=("time", "text"), show="headings",
+            selectmode="browse", height=5,
+        )
+        table.heading("time", text="Czas")
+        table.heading("text", text="Dosłowny cytat z transkrypcji")
+        table.column("time", width=90, stretch=False)
+        table.column("text", width=600)
+        table.pack(side="left", fill="x", expand=True)
+        bar = ttk.Scrollbar(container, orient="vertical", command=table.yview)
+        table.configure(yscrollcommand=bar.set)
+        bar.pack(side="right", fill="y")
+
+        def navigate(_event=None) -> None:
+            selected = table.selection()
+            if not selected:
+                messagebox.showinfo("Źródło", "Zaznacz cytat, aby przejść do transkrypcji.")
+                return
+            self._jump_to_source(selected[0])
+
+        table.bind("<Double-1>", navigate)
+        ttk.Button(parent, text="Przejdź do zaznaczonego źródła", command=navigate).pack(anchor="e")
+        return table
+
+    def _fill_source_navigation(self, table: ttk.Treeview, quotes) -> None:
+        """Bind only literal verified segment IDs, capped for huge lectures."""
+        table.delete(*table.get_children())
+        seen: set[str] = set()
+        for quote in quotes:
+            identifier = quote["segment_id"]
+            if identifier in seen:
+                continue
+            seen.add(identifier)
+            table.insert(
+                "", "end", iid=identifier,
+                values=(
+                    f"{quote['start_ms']/1000:.2f}s",
+                    quote["text"].replace("\n", " ")[:180],
+                ),
+            )
+            if len(seen) >= 2000:
+                break
 
     def _save_edit(self) -> None:
         if self.active:
@@ -641,6 +771,21 @@ class VideoNotesWindow:
         preview = tk.Text(body, wrap="word")
         preview.pack(fill="both", expand=True)
         preview.configure(state="disabled")
+        source_table = self._source_navigation_tree(body)
+
+        def refresh_source_list() -> None:
+            try:
+                verify_study_guide(folder)
+                doc = load_json(folder / "exports" / "notes-study.json")
+            except VideoNotesError:
+                source_table.delete(*source_table.get_children())
+                return
+            quotes = []
+            for chapter in doc["sections"]:
+                quotes.extend(chapter["key_quotes"])
+                for field in ("definition_hints", "examples", "questions_or_uncertainties"):
+                    quotes.extend(chapter[field])
+            self._fill_source_navigation(source_table, quotes)
 
         def generate(*, docx: bool = False, pdf: bool = False) -> None:
             if self.active:
@@ -660,6 +805,7 @@ class VideoNotesWindow:
             preview.delete("1.0", "end")
             preview.insert("1.0", content)
             preview.configure(state="disabled")
+            refresh_source_list()
             self.status.set("Zapisano lokalny przewodnik: " + ", ".join(str(p) for p in targets))
 
         def check_source() -> None:
@@ -735,6 +881,22 @@ class VideoNotesWindow:
         content = tk.Text(body, wrap="word", undo=False)
         content.pack(fill="both", expand=True)
         content.configure(state="disabled")
+        source_table = self._source_navigation_tree(body)
+
+        def refresh_source_list() -> None:
+            try:
+                verify_advanced_outline(folder)
+                data = load_json(folder / "exports" / "notes-advanced.json")
+            except VideoNotesError:
+                source_table.delete(*source_table.get_children())
+                return
+            quotes = []
+            for chapter in data["sections"]:
+                for category in chapter.get("template_focus", []):
+                    quotes.extend(category["citations"])
+                for topic in chapter["topics"]:
+                    quotes.extend(topic["citations"])
+            self._fill_source_navigation(source_table, quotes)
 
         def generate(*, docx: bool = False, pdf: bool = False) -> None:
             if self.active:
@@ -764,6 +926,7 @@ class VideoNotesWindow:
             content.delete("1.0", "end")
             content.insert("1.0", markdown)
             content.configure(state="disabled")
+            refresh_source_list()
             self.status.set("Konspekt źródłowy zapisano lokalnie: " + ", ".join(str(p) for p in targets))
 
         def verify() -> None:
@@ -796,6 +959,7 @@ class VideoNotesWindow:
             content.configure(state="normal")
             content.insert("1.0", saved.read_text(encoding="utf-8"))
             content.configure(state="disabled")
+            refresh_source_list()
             self.status.set("Otworzono zapisany konspekt. Sprawdź źródła lub opracuj ponownie.")
         else:
             generate()
@@ -934,6 +1098,23 @@ class VideoNotesWindow:
             except VideoNotesError as error:
                 messagebox.showerror("Notatka", str(error))
         ttk.Button(right, text="Zapisz poprawkę i Markdown", command=save_edit).pack(anchor="e", pady=7)
+        def navigate_original() -> None:
+            if has_unsaved_draft():
+                messagebox.showwarning(
+                    "Niezapisany szkic notatki",
+                    "Najpierw zapisz poprawkę punktu notatki przed przejściem do transkrypcji."
+                )
+                return
+            ids = view.selection()
+            if not ids:
+                messagebox.showinfo("Źródło", "Najpierw zaznacz punkt notatki.")
+                return
+            self._jump_to_source(content_by_id[ids[0]]["segment_id"])
+
+        ttk.Button(
+            right, text="Przejdź do źródła transkrypcji",
+            command=navigate_original,
+        ).pack(anchor="e", pady=4)
         def export_docx() -> None:
             if has_unsaved_draft():
                 messagebox.showwarning("Eksport DOCX", "Najpierw zapisz poprawkę w edytorze.")
