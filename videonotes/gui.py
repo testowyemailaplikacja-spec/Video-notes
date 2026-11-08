@@ -771,6 +771,21 @@ class VideoNotesWindow:
         preview = tk.Text(body, wrap="word")
         preview.pack(fill="both", expand=True)
         preview.configure(state="disabled")
+        source_table = self._source_navigation_tree(body)
+
+        def refresh_source_list() -> None:
+            try:
+                verify_study_guide(folder)
+                doc = load_json(folder / "exports" / "notes-study.json")
+            except VideoNotesError:
+                source_table.delete(*source_table.get_children())
+                return
+            quotes = []
+            for chapter in doc["sections"]:
+                quotes.extend(chapter["key_quotes"])
+                for field in ("definition_hints", "examples", "questions_or_uncertainties"):
+                    quotes.extend(chapter[field])
+            self._fill_source_navigation(source_table, quotes)
 
         def generate(*, docx: bool = False, pdf: bool = False) -> None:
             if self.active:
@@ -790,6 +805,7 @@ class VideoNotesWindow:
             preview.delete("1.0", "end")
             preview.insert("1.0", content)
             preview.configure(state="disabled")
+            refresh_source_list()
             self.status.set("Zapisano lokalny przewodnik: " + ", ".join(str(p) for p in targets))
 
         def check_source() -> None:
