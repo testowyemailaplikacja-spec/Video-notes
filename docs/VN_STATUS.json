@@ -41,7 +41,8 @@
         "PR #43: real FFmpeg/FFprobe OBS-like MP4 and MKV 2-track path via actual local subprocess emitting whisper.cpp-shaped synthetic JSON; global stream selection, checkpoint cancel/resume, human edit and 4 exports; Ubuntu CI 120 tests PASS, Win+browser CI 5/5 PASS. NOT true speech recognition.",
         "PR #52 real whisper.cpp PL/EN synthetic short WAV through FFmpeg to checkpoint JSON/4 exports/basic notes/DOCX, workflow 42426108460 PASS.",
         "PR #56: real FFmpeg 121-minute OGG/Opus sine input, 61 actual two-minute PCM extractions, checkpoint cancel at 12/resume to 61, idempotent and source unchanged, workflow 42427011686 PASS (7260006 ms; 59.583s generation + 15.107s checkpoint/resume/export); ASR stub, not real 2h model.",
-        "PR #59: real whisper.cpp multilingual tiny end-to-end on self-generated two-track OBS-like MP4 (PL) and MKV (EN), actual FFprobe/FFmpeg, explicit non-default audio track, checkpoints, human edits that preserve raw ASR and 4 exports; GitHub Actions 42465075107 real-ASR job PASS, all source/browser Linux+Windows jobs 42465074909 PASS. No human speech, real OBS camera or physical Windows."
+        "PR #59: real whisper.cpp multilingual tiny end-to-end on self-generated two-track OBS-like MP4 (PL) and MKV (EN), actual FFprobe/FFmpeg, explicit non-default audio track, checkpoints, human edits that preserve raw ASR and 4 exports; GitHub Actions 42465075107 real-ASR job PASS, all source/browser Linux+Windows jobs 42465074909 PASS. No human speech, real OBS camera or physical Windows.",
+        "PR #61: actual local whisper.cpp CPU on 34-second synthetic two-track MKV, safe cancel after first 30-second chunk, genuine ASR checkpoint resume for second chunk, no duplicates, idempotent re-run, four exports; real-ASR workflow 42465450853 PASS and five source/browser Linux+Windows checks 42465450897 PASS. Does not test 2-hour natural speech or physical Windows."
       ],
       "blockers": [
         "Real Whisper model end-to-end transcript of MP4/MKV",
@@ -666,6 +667,19 @@
     {
       "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42465074909",
       "scope": "PR #59 5/5 cross-platform source/browser checks success (Linux and Windows); no physical Windows acceptance",
+      "source_linux_windows_browser": "PASS",
+      "physical_windows": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42465450853",
+      "scope": "PR #61 genuine whisper.cpp CPU checkpoint cancel/resume on 34s synthetic dual-track OBS-like MKV, 4 exports and idempotence",
+      "real_whisper_synthetic_resume": "PASS",
+      "two_hour_model_test": false,
+      "physical_windows": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42465450897",
+      "scope": "PR #61 5/5 CI: Python/source Linux Windows, Chromium Ubuntu, Chrome Edge Windows and Firefox Ubuntu success",
       "source_linux_windows_browser": "PASS",
       "physical_windows": false
     }
