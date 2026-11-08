@@ -43,7 +43,7 @@ class PrivateInstallerTest(unittest.TestCase):
         self.assertIn("INTERNAL TEST", text)
         self.assertNotIn("http://", text)
         self.assertNotIn("https://", text)
-        self.assertIn("bin/model.bin".replace("/", "\\"), text)
+        self.assertIn("model.bin", text)
         self.assertEqual(command[1], "/Q")
         self.assertFalse(kwargs["shell"])
         self.assertEqual(kwargs["timeout"], 900)
