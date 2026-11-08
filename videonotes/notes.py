@@ -69,6 +69,32 @@ def _select(group: list[dict], limit: int) -> list[dict]:
     return [group[i] for i in sorted(chosen)]
 
 
+def _section_heading(index: int, window_minutes: int, selected: list[dict]) -> str:
+    """Add optional topical hints backed by repeated literal words in quotes.
+
+    Keep the existing time range and use source vocabulary only. Single-quote
+    or rarely mentioned words are not promoted to a speculative "topic".
+    This is deterministic extractive metadata, never a semantic summary.
+    """
+    prefix = f"Fragment {index * window_minutes}–{(index + 1) * window_minutes} min"
+    counts = Counter(term for row in selected for term in _tokens(row["text"]))
+    repeated = {term for term, count in counts.items() if count >= 2}
+    if not repeated:
+        return prefix
+    spellings: dict[str, str] = {}
+    for row in selected:
+        for word in re.findall(r"[^\\W_]+", row["text"], re.UNICODE):
+            key = word.casefold()
+            if (key in repeated and len(word) <= 32
+                    and any(character.isalpha() for character in word)):
+                spellings.setdefault(key, word)
+    if not spellings:
+        return prefix
+    # Python's stable sorting preserves first appearance for equal frequency.
+    words = [spellings[term] for term in sorted(spellings, key=lambda t: -counts[t])[:3]]
+    return prefix + " · " + " ".join(words)
+
+
 def generate_basic_notes(folder: Path, *, window_minutes: int = 5, points_per_section: int = 6) -> dict:
     if not (1 <= window_minutes <= 60 and 2 <= points_per_section <= 20):
         raise VideoNotesError("Nieprawidłowy zakres sekcji lub liczba punktów.")
@@ -96,14 +122,18 @@ def generate_basic_notes(folder: Path, *, window_minutes: int = 5, points_per_se
     groups: dict[int, list[dict]] = {}
     for row in source:
         groups.setdefault(row["start_ms"] // duration, []).append(row)
-    sections = [
-        {"id": f"time-{index:06d}",
-         "heading": f"Fragment {index * window_minutes}–{(index + 1) * window_minutes} min",
-         "points": [{"id": f"quote-{row['id']}", "segment_id": row["id"],
-                     "start_ms": row["start_ms"], "text": row["text"]}
-                    for row in _select(rows, points_per_section)]}
-        for index, rows in sorted(groups.items())
-    ]
+    sections = []
+    for index, rows in sorted(groups.items()):
+        selected = _select(rows, points_per_section)
+        sections.append({
+            "id": f"time-{index:06d}",
+            "heading": _section_heading(index, window_minutes, selected),
+            "points": [
+                {"id": f"quote-{row['id']}", "segment_id": row["id"],
+                 "start_ms": row["start_ms"], "text": row["text"]}
+                for row in selected
+            ],
+        })
     notes = {"schema": SCHEMA, "project_id": project["id"],
              "source_sha256": _hash(source), "method": "extractive-verbatim-v1",
              "complete": True, "title": "Notatka podstawowa — fragmenty wypowiedzi",
