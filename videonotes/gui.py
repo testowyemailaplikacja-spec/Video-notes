@@ -15,6 +15,7 @@ from .media import probe
 from .microphone import record_microphone, list_microphone_devices, join_finished_recording
 from .notes import generate_basic_notes, read_basic_notes, edit_note_point, export_basic_notes, export_basic_notes_docx
 from .advanced_notes import export_advanced_outline
+from .study_guide import export_study_guide
 from .pdf_export import export_basic_notes_pdf
 from .note_revisions import regenerate_basic_notes, list_note_versions, restore_note_version, recover_interrupted_note_update
 from .pipeline import create_project, transcribe_project
@@ -73,6 +74,7 @@ class VideoNotesWindow:
         ttk.Button(commands, text="Otwórz projekt", command=self._load).pack(side="left")
         ttk.Button(outer, text="Notatka podstawowa — wybrane cytaty z transkrypcji", command=self._show_notes).pack(anchor="w", pady=(0, 7))
         ttk.Button(outer, text="Konspekt źródłowy — rozdziały i cytaty (VN-03)", command=self._show_advanced).pack(anchor="w", pady=(0, 7))
+        ttk.Button(outer, text="Przewodnik do nauki — cytaty, pojęcia i pytania (VN-02/03)", command=self._show_study_guide).pack(anchor="w", pady=(0, 7))
         ttk.Button(outer, text="Nagraj mikrofon — nowa sesja WAV (Windows)", command=self._show_mic_recorder).pack(anchor="w", pady=(0, 7))
         ttk.Button(outer, text="Połącz części ukończonego nagrania WAV do transkrypcji", command=self._join_finished_recording_dialog).pack(anchor="w", pady=(0, 7))
         self.status = tk.StringVar(value="Gotowe. Wybierz plik i lokalny model.")
@@ -428,6 +430,61 @@ class VideoNotesWindow:
         except VideoNotesError as error:
             messagebox.showerror("Video Notes", str(error))
 
+
+    def _show_study_guide(self) -> None:
+        """Explicit local study-guide preview and optional offline exports."""
+        if self.active:
+            messagebox.showwarning("Video Notes", "Zakończ nagrywanie lub transkrypcję przed opracowaniem notatek.")
+            return
+        if not self.project.get().strip():
+            messagebox.showwarning("Video Notes", "Najpierw wskaż lokalny katalog ukończonego projektu.")
+            return
+        folder = Path(self.project.get())
+        window = tk.Toplevel(self.root)
+        window.title("Przewodnik do nauki — tylko informacje z transkrypcji")
+        window.geometry("940x650")
+        body = ttk.Frame(window, padding=12)
+        body.pack(fill="both", expand=True)
+        ttk.Label(body, text="Wyłącznie dosłowne cytaty ze źródła. Etykiety nie stanowią weryfikacji faktów ani podsumowania AI.",
+                  wraplength=880).pack(anchor="w")
+        tools = ttk.Frame(body)
+        tools.pack(fill="x", pady=8)
+        detail = tk.StringVar(value="standard")
+        minutes = tk.StringVar(value="5")
+        ttk.Label(tools, text="Szczegółowość").pack(side="left")
+        ttk.Combobox(tools, textvariable=detail, values=["brief", "standard", "full"],
+                     state="readonly", width=10).pack(side="left", padx=6)
+        ttk.Label(tools, text="Minut na część").pack(side="left")
+        ttk.Combobox(tools, textvariable=minutes, values=["5", "10", "15", "30"],
+                     state="readonly", width=5).pack(side="left", padx=6)
+        preview = tk.Text(body, wrap="word")
+        preview.pack(fill="both", expand=True)
+        preview.configure(state="disabled")
+
+        def generate(*, docx: bool = False, pdf: bool = False) -> None:
+            if self.active:
+                messagebox.showwarning("Video Notes", "Inna operacja trwa. Zachowaj aktualny dokument.")
+                return
+            try:
+                targets = export_study_guide(
+                    folder, section_minutes=int(minutes.get()),
+                    detail=detail.get(), include_docx=docx,
+                    include_pdf=pdf,
+                )
+                content = targets[0].read_text(encoding="utf-8")
+            except (ValueError, VideoNotesError, OSError) as error:
+                messagebox.showerror("Przewodnik do nauki", str(error))
+                return
+            preview.configure(state="normal")
+            preview.delete("1.0", "end")
+            preview.insert("1.0", content)
+            preview.configure(state="disabled")
+            self.status.set("Zapisano lokalny przewodnik: " + ", ".join(str(p) for p in targets))
+
+        ttk.Button(tools, text="Opracuj / odśwież", command=generate).pack(side="left", padx=4)
+        ttk.Button(tools, text="Eksport DOCX", command=lambda: generate(docx=True)).pack(side="left", padx=4)
+        ttk.Button(tools, text="Eksport PDF", command=lambda: generate(pdf=True)).pack(side="left", padx=4)
+        generate()
 
     def _show_advanced(self) -> None:
         """Read-only local Markdown preview, without cloud processing."""
