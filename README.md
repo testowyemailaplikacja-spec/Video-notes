@@ -211,3 +211,7 @@ Polecenie `python -m videonotes semantic-draft KATALOG_PROJEKTU --model C:\\Mode
 ## Transkrypcja całego zakończonego nagrania z mikrofonu (VN-04)
 
 Nowe polecenie `record-transcribe` obsługuje sesje WAV po pauzach, wymaga zgód i spójnego SHA-256, łączy wszystkie części bez nadpisania i kieruje je do identycznego lokalnego przepływu ASR/eksportu co pliki OBS. Po przerwaniu użyj istniejącego `resume`. Instrukcja: [VN04_RECORD_TO_ASR.md](docs/VN04_RECORD_TO_ASR.md). Nie zastępuje fizycznego testu mikrofonu Windows.
+
+## Okno lokalnej analizy w interfejsie Windows
+
+W aplikacji desktopowej dodano przycisk **„OCR slajdów i lokalne szkice AI (wymagają kontroli)”**. Otwiera osobne narzędzia do tworzenia szkicu semantycznego, OCR slajdów, eksportu Markdown i weryfikacji źródeł. Dłuższe operacje uruchamiane są w osobnym wątku bez blokowania okna; nie ma automatycznej synchronizacji ani wysyłki danych. Wyniki pozostają oznaczone jako niezweryfikowane. Testy prawdziwych widżetów Tk w CI nie zastępują odbioru na fizycznym Windows.
