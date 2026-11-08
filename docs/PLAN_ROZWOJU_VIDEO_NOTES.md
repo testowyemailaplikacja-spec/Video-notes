@@ -101,7 +101,7 @@ Użytkownik nagrał wykład lub tutorial w OBS, np. do MP4 albo MKV. Wybiera pli
 
 ### VN-03 — Zaawansowane notatki i materiały naukowe (v0.3)
 
-**Cel:** wielopoziomowe opracowanie materiałów edukacyjnych z zachowaniem powiązań do źródła. **Status: W TRAKCIE — istnieją konspekt ekstrakcyjny i źródłowy przewodnik do nauki, ale nie pełna synteza semantyczna ani odbiór.**
+**Cel:** wielopoziomowe opracowanie materiałów edukacyjnych z zachowaniem powiązań do źródła. **Status: W TRAKCIE — konspekt i przewodnik mają realnie różne szablony źródłowe, klikane cytaty, konfigurację GUI i kontrolę zgodności z transkrypcją; semantyczna synteza, OCR i odbiór na prawdziwych wykładach nadal otwarte.**
 
 - [ ] Szablony: wykład akademicki, tutorial techniczny, spotkanie, materiał do nauki; ustawienia długości i szczegółowości.
 - [ ] Spis treści, podrozdziały, definicje, przykłady, kroki procedur, pojęcia do sprawdzenia, lista niejasności i cytowane fragmenty z czasem źródła.
@@ -115,7 +115,7 @@ Użytkownik nagrał wykład lub tutorial w OBS, np. do MP4 albo MKV. Wybiera pli
 
 ### VN-04 — Mikrofon na żywo podczas wykładu (v0.4)
 
-**Cel:** możliwość rejestrowania i rozpoznawania wypowiedzi bez przygotowanego pliku OBS. **Status: W TRAKCIE — Windows DirectShow, GUI Start/Pauza/Wznów/Stop, zamykanie WAV, izolacja nowych ujęć, SHA-256, łączenie i lokalna kontrola RMS/ciszy/clippingu; realny FFmpeg na syntetycznej fali i Tk Windows/Linux CI PASS, fizyczny mikrofon i 2h wciąż nieodebrane.**
+**Cel:** możliwość rejestrowania i rozpoznawania wypowiedzi bez przygotowanego pliku OBS. **Status: W TRAKCIE — Windows DirectShow, GUI Start/Pauza/Wznów/Stop, odzyskanie poprawnego początku WAV z awarii, SHA, izolacja ujęć i diagnostyka poziomów istnieją; realny FFmpeg/Tk Windows/Linux CI PASS, fizyczny mikrofon i 2h wciąż nieodebrane.**
 
 - [ ] Wybór mikrofonu, wskaźnik poziomu, zgoda użytkownika, start/pauza/wznów/stop oraz czytelny status nagrywania.
 - [x] Zapisywanie nagrania w częściach WAV co 2h i odrębnych katalogach ujęć po pauzie, z SHA-256; testy real FFmpeg i Windows/Linux PASS, fizyczna awaria nadal do odbioru.
@@ -320,3 +320,13 @@ Te zmiany **nie upoważniają do oznaczenia całego etapu jako DONE**, bo wymaga
 **PR #79 (VN-04)** — pełny przebieg **realnego procesu FFmpeg** z syntetyczną falą sinusoidalną (nie atrapą procesu): 2 rzeczywiste ujęcia, zamknięcie `q`, pauza/wznowienie, różne PCM, SHA, bezstratne łączenie i numeryczna analiza. **6/6 CI PASS** — [dedykowany real FFmpeg smoke](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42480072624), [standard Linux/Windows](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42480072912).
 
 **Pozostaje warunkiem pełnego odbioru VN-04/VN-05:** fizyczny Windows 10/11 z prawdziwym mikrofonem, niezależnie podanym wejściem systemowym, aktywną zgodą użytkownika, przerwą i wznowieniem po dłuższej sesji, testem USB unplug/uśpienia/dysku pełnego i dwugodzinnym testem w praktyce. Nie było rzeczywistego odsłuchu ani pomiaru jakości mowy. Formalne liczniki: **0/9 DONE, 8/9 W_TRAKCIE, 1/9 PLANOWANE**.
+
+## H. Duże wdrożenia źródłowych notatek i odzysku nagrań (08.11.2026)
+
+**[PR #81](https://github.com/testowyemailaplikacja-spec/Video-notes/pull/81), VN-04:** użytkownik może skontrolować osierocone po awarii WAV (również w `.vn-take-*`) i wyeksportować *tylko poprawny, ciągły początek* do nowego pliku `INCOMPLETE.wav`, bez nadpisywania oryginałów i bez fałszywego statusu `finished`. Walidacja każdego PCM, SHA-256, symlinków, konfliktów i miejsca na dysku. CLI + prawdziwe przyciski Tk, jawne potwierdzenie zakończenia procesu, ostrzeżenia. **9/9 automatycznych kontroli PASS** (runs 42488798070/42488798071/42488798109/42488798065). Wciąż brak fizycznego testu awarii urządzenia Windows.
+
+**[PR #82](https://github.com/testowyemailaplikacja-spec/Video-notes/pull/82), VN-03:** cztery szablony zaawansowane (wykład, instruktaż, spotkanie, nauka) mają osobne, sprawdzalne grupy cytatów zamiast zmieniać jedynie tytuł. GUI pozwala określić szczegółowość i czas sekcji, nie nadpisuje poprzednich dokumentów bez zgody, a `advanced-verify` sprawdza cały JSON z aktualną poprawioną transkrypcją. Word/PDF zawiera etykiety kategorii i źródłowe ID. **12/12 CI PASS**, w tym realny Whisper CPU na syntetycznej mowie PL/EN (run 42489421967), 121min FFmpeg ze stub ASR (42489421987), rzeczywisty LibreOffice (42489422032) i Tk Windows/Linux (42489421956). Nie jest to generowanie semantycznych podsumowań AI.
+
+**[PR #83](https://github.com/testowyemailaplikacja-spec/Video-notes/pull/83), VN-02/VN-03:** w Windows można kliknąć cytat w notatce podstawowej, zaawansowanej lub przewodniku i przejść do dokładnego segmentu w głównym edytorze transkrypcji. Poza stabilnymi ID i kontrolą aktualności źródła naprawiono możliwość przypadkowej utraty niezapisanego szkicu ASR podczas zmiany wiersza lub ponownego wczytania projektu. **8/8 CI PASS** (runs 42490034930/42490034938/42490035033), w tym testy rzeczywistego Tk Windows i Linux. Nie implementuje jeszcze zsynchronizowanego odtwarzacza audio.
+
+**Ewidencja formalna:** nadal `0/9 DONE`; potrzebna jest ocena rzeczywistych wykładów przez człowieka, semantyczne opracowanie i OCR (osobny zakres), fizyczne Windows 10/11 z prawdziwym mikrofonem i realne próby instalacji offline z licencjonowanymi modelami. Wszystkie te nowe pakiety dotyczą tylko repozytorium `Video-notes/develop`, nie hosta Wiedora ani Netlify.

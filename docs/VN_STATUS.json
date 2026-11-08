@@ -70,7 +70,8 @@
         "PR #57: .notes.lock carries PID with fsync; notes-lock-status and notes-lock-recover --confirm allow only verified dead PID, not active/malformed/unknown/symlink; multi-OS CI, real Tk/LibreOffice and Windows DEV EXE PASS 42427381623/42427381540/42427381588/42427381622; no physical power loss.",
         "PR #68: genuine whisper.cpp CPU inference on original PL/EN synthetic TTS, manual transcript correction preserves raw ASR, stale basic notes rejected, versioned regeneration and DOCX checked, GitHub Actions real ASR 42468924700 + source/browser 42468924655 (6/6 PASS); not natural lecture quality.",
         "PR #69: basic notes use up to 3 repeated literal source words as optional topical hints while preserving timestamps and citation IDs; same heading algorithm on versioned regeneration, malicious markup not promoted; 8/8 CI PASS source/browser 42469190022, Windows DEV 42469190156, LibreOffice 42469190102, Linux Tk 42469190015; no semantic AI summary.",
-        "PR #72: implemented separate offline source-only study guide with source-attributed overview quote, TOC, repeated term index, heuristic definition/example/uncertainty quotes, CLI and real Tk GUI, MD/JSON/DOCX/PDF; genuine whisper.cpp PL/EN synthetic TTS + Tk Linux/Windows + LibreOffice CI 10/10 PASS (42475117373, 42475117324, 42475117362, 42475117406, 42475117343). Not a semantic summary or human natural lecture review."
+        "PR #72: implemented separate offline source-only study guide with source-attributed overview quote, TOC, repeated term index, heuristic definition/example/uncertainty quotes, CLI and real Tk GUI, MD/JSON/DOCX/PDF; genuine whisper.cpp PL/EN synthetic TTS + Tk Linux/Windows + LibreOffice CI 10/10 PASS (42475117373, 42475117324, 42475117362, 42475117406, 42475117343). Not a semantic summary or human natural lecture review.",
+        "PR #83: desktop basic-note point now has explicit jump to original ASR segment editor by stable source ID, with protection for unsaved note and transcription drafts and project reload; real Tk hosted Windows and Linux Xvfb PASS, full regressions 8/8 checks: 42490034930, 42490034938, 42490035033. Not automatic audio playback or human semantic review."
       ],
       "blockers": [
         "Human assessment on real lectures",
@@ -92,7 +93,9 @@
         "PR #68: verified real whisper.cpp CPU PL/EN synthetic TTS -> corrected transcript -> source-linked advanced outline Markdown/JSON/DOCX with literal quotes, exact segment IDs and timestamps, 6/6 CI PASS (42468924700, 42468924655); no human evaluation of natural lectures or semantic synthesis.",
         "PR #72: offline versioned study-guide JSON and Word/PDF source-linked citations with actual real Whisper CPU synthetic PL/EN speech, edited ASR and source SHA, test 10/10 jobs PASS. Heuristic extraction only; no semantic fact synthesis.",
         "PR #74: actual 121min 440Hz synthetic OGG/Opus compressed FFmpeg input -> 61 checkpointed stub-ASR chunks, cancel at 12 and resume, then 61/61 source-linked study-guide citations and DOCX; 6/6 CI PASS, real-media 42476108843 and source/browser 42476109194. Not human speech or 121min true Whisper inference.",
-        "PR #75: independent read-only study-verify CLI and real Tk GUI fail closed for invented/stale/modified source guide JSON, checking all citations/time labels against current corrected transcript, while preserving user files. Genuine whisper.cpp CPU PL/EN TTS, Windows/Linux real GUI, synthetic 121min FFmpeg and real Inno installer regression all 11/11 PASS (42476485059, 42476485075, 42476485031, 42476485064, 42476485035, 42476485044). No semantic fact correctness or cryptographic signature claim."
+        "PR #75: independent read-only study-verify CLI and real Tk GUI fail closed for invented/stale/modified source guide JSON, checking all citations/time labels against current corrected transcript, while preserving user files. Genuine whisper.cpp CPU PL/EN TTS, Windows/Linux real GUI, synthetic 121min FFmpeg and real Inno installer regression all 11/11 PASS (42476485059, 42476485075, 42476485031, 42476485064, 42476485035, 42476485044). No semantic fact correctness or cryptographic signature claim.",
+        "PR #82: four formerly title-only advanced templates now classify exact source citations separately for lecture/tutorial/meeting/study, configurable time/detail in real Tk, DOCX/PDF focus groups, independent advanced-verify JSON provenance; genuine local whisper.cpp CPU PL/EN on synthetic TTS, 121min FFmpeg/stub ASR regression, LibreOffice Word/PDF, hosted Windows Tk and Linux, 12/12 checks PASS: 42489421967, 42489421987, 42489422032, 42489421956, 42489422062, 42489421888, 42489421878. Still heuristic, not semantic AI or fact validation.",
+        "PR #83: source index of verified advanced/study-guide citations with stable segment IDs, timestamps and clickable/double-click navigation to main desktop transcription/editor; prevents discarding unsaved ASR draft. Real Windows Tk/Linux Xvfb and source/browser 8/8 checks PASS: 42490034930, 42490034938, 42490035033. No synchronized audio playback or physical user acceptance."
       ],
       "blockers": [
         "Real lectures/tutorials/CCNA human acceptance",
@@ -113,11 +116,12 @@
         "PR #66: new completed WAV sessions persist per-part SHA-256 and fail closed on silent PCM changes or missing fingerprint journal; legacy recordings report sha256_verified=false, existing parts are not modified; synthetic source/browser CI 42468276521 5/5 PASS and Windows DEV EXE 42468276515 PASS. No physical disk-failure or microphone test.",
         "PR #77: real GUI Pause/Resume/Stop buttons; FFmpeg closes WAV on pause, validates PCM/SHA and resumes at next numbered part without overwriting. Critical discovery: FFmpeg segment muxer ignores global -n, so each take uses isolated .vn-take staging and atomic no-clobber os.link before deleting temp names. Failed takes remain visible for manual review. Synthetic subprocess + real FFmpeg numbering, Linux/Windows source/browser, Tk Windows VM and Linux Xvfb, Windows DEV EXE 8/8 checks PASS (42479432972/42479432973/42479432971). No physical microphone.",
         "PR #78: independent fully local record-analyze CLI and real Tk GUI WAV signal-level diagnostics: streaming RMS/peak dBFS, silence, clipping, per-part stats and warnings, no transcript/audio upload, refusal for paused/damaged sessions. Original synthetic PCM, Windows/Linux unit, genuine Tk, real Inno synthetic installer regression 9/9 checks PASS (42479769485/42479769582/42479769460/42479769480). Cannot infer natural speech quality or physical mic acceptance.",
-        "PR #79: actual subprocess FFmpeg sine lavfi capture (not mocked process), interactive q pause, two separate 440/880 Hz takes, WAV SHA/continuity/no-clobber, joins sample-exact, numerical quality analysis. Linux dedicated real-FFmpeg 42480072624 PASS and 5 standard source/browser Linux/Windows checks 42480072912 PASS (6/6). Synthetic source; no DirectShow USB mic or >2h hardware."
+        "PR #79: actual subprocess FFmpeg sine lavfi capture (not mocked process), interactive q pause, two separate 440/880 Hz takes, WAV SHA/continuity/no-clobber, joins sample-exact, numerical quality analysis. Linux dedicated real-FFmpeg 42480072624 PASS and 5 standard source/browser Linux/Windows checks 42480072912 PASS (6/6). Synthetic source; no DirectShow USB mic or >2h hardware.",
+        "PR #81: real non-destructive recovery from interrupted FFmpeg WAV segments, including .vn-take-UUID after crash. Read-only record-recovery-status, explicit record-salvage --confirm-stopped; strict SHA, PCM, continuity, conflict/symlink/disk/race validation; original journal stays needs_review; new WAV is labeled INCOMPLETE. Actual Tk Linux/hosted Windows, source/browser, synthetic installer Windows 9/9 checks PASS: 42488798070, 42488798071, 42488798109, 42488798065. Physical USB/2h crash still NOT_RUN."
       ],
       "blockers": [
         "Physical Windows microphone permission and recording",
-        "Actual physical Windows 2h session including pause/resume, device unplug, disk full and crash/restart recovery; 2-take real FFmpeg lavfi and virtual Tk PASS do not replace hardware acceptance",
+        "Actual physical Windows 2h session including pause/resume, device unplug, disk-full and crash/restart recovery; opt-in intact-prefix salvage now implemented (PR #81) and 2-take FFmpeg lavfi CI PASS, but no physical recovery acceptance",
         "Physical Windows user acceptance of device picker, Start/Pause/Resume/Stop GUI and post-capture signal diagnostics; genuine Tk Windows VM + Linux Xvfb CI PASS",
         "Real physical offline Windows acceptance with owner-supplied licensed FFmpeg/Whisper/model within private Inno installer; CI synthetic setup PASS only"
       ]
@@ -951,6 +955,104 @@
       "source_linux_windows_browser": "PASS",
       "physical_microphone": false,
       "real_human_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42488798070",
+      "scope": "PR81 5/5 Linux/Windows source/browser tests including crash WAV salvage, integrity and CLI safety",
+      "source_linux_windows_browser": "PASS",
+      "physical_windows_microphone": false,
+      "human_natural_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42488798071",
+      "scope": "PR81 genuine Inno Setup synthetic package install/uninstall regression, not full offline genuine model",
+      "inno_synthetic_installer": "PASS",
+      "physical_windows_microphone": false,
+      "human_natural_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42488798109",
+      "scope": "PR81 genuine Tk Linux Xvfb and hosted Windows UI recovered audio warning and selection",
+      "real_tk_linux_hosted_windows": "PASS",
+      "physical_windows_microphone": false,
+      "human_natural_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42488798065",
+      "scope": "PR81 Windows DEV EXE build/smoke",
+      "windows_dev_executable": "PASS",
+      "physical_windows_microphone": false,
+      "human_natural_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42489422062",
+      "scope": "PR82 5/5 source/browser tests Linux/Windows, four functional advanced note templates, independent provenance",
+      "source_linux_windows_browser": "PASS",
+      "physical_windows_microphone": false,
+      "human_natural_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42489422032",
+      "scope": "PR82 actual LibreOffice Writer DOCX/PDF generated from verified template citations on Linux",
+      "real_libreoffice_linux": "PASS",
+      "physical_windows_microphone": false,
+      "human_natural_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42489421967",
+      "scope": "PR82 genuine whisper.cpp CPU synthetic PL/EN TTS -> template-specific citation verification",
+      "real_whisper_cpp_cpu_pl_en_tts": "PASS",
+      "physical_windows_microphone": false,
+      "human_natural_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42489421956",
+      "scope": "PR82 genuine Tk GUI template selector and Word/verification on hosted Windows and Linux Xvfb",
+      "real_tk_linux_hosted_windows": "PASS",
+      "physical_windows_microphone": false,
+      "human_natural_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42489421987",
+      "scope": "PR82 121min genuine compressed FFmpeg media, resume and study-guide DOCX (ASR stub, not 121min Whisper)",
+      "real_ffmpeg_121min_stub_asr": "PASS",
+      "physical_windows_microphone": false,
+      "human_natural_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42489421888",
+      "scope": "PR82 genuine Windows Inno synthetic offline-installer regression",
+      "inno_synthetic_installer": "PASS",
+      "physical_windows_microphone": false,
+      "human_natural_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42489421878",
+      "scope": "PR82 Windows DEV EXE smoke",
+      "windows_dev_executable": "PASS",
+      "physical_windows_microphone": false,
+      "human_natural_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42490034930",
+      "scope": "PR83 5/5 full source/browser Linux/Windows tests, guarded stable transcript source selection",
+      "source_linux_windows_browser": "PASS",
+      "physical_windows_microphone": false,
+      "human_natural_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42490034938",
+      "scope": "PR83 actual Tk source navigation and unsaved draft guards Linux Xvfb and hosted Windows VM",
+      "real_tk_linux_hosted_windows": "PASS",
+      "physical_windows_microphone": false,
+      "human_natural_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42490035033",
+      "scope": "PR83 Windows development binary compile/smoke",
+      "windows_dev_executable": "PASS",
+      "physical_windows_microphone": false,
+      "human_natural_lecture": false
     }
   ],
   "notes": [
