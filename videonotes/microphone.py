@@ -37,7 +37,7 @@ def _valid_device(device: str) -> str:
 
 
 def capture_command(ffmpeg: str, device: str, output: Path, *, max_seconds: int | None = None,
-                    system_device: str | None = None) -> list[str]:
+                    system_device: str | None = None, start_number: int = 0) -> list[str]:
     """Build a shell-free dshow command; no automatic device selection."""
     _valid_device(device)
     if system_device is not None:
@@ -46,7 +46,10 @@ def capture_command(ffmpeg: str, device: str, output: Path, *, max_seconds: int 
             raise VideoNotesError("Wybierz dwa różne urządzenia wejściowe do miksu.")
     if max_seconds is not None and (type(max_seconds) is not int or not 1 <= max_seconds <= 24 * 3600):
         raise VideoNotesError("Limit nagrywania musi być liczbą sekund od 1 do 86400.")
-    args = [ffmpeg, "-hide_banner", "-loglevel", "error", "-nostats", "-y",
+    if type(start_number) is not int or not 0 <= start_number < 100_000:
+        raise VideoNotesError("Numer części nagrania przekracza limit WAV.")
+    args = [ffmpeg, "-hide_banner", "-loglevel", "error", "-nostats",
+            "-n" if start_number else "-y",
             "-thread_queue_size", "512", "-f", "dshow", "-i", "audio=" + device]
     if system_device is not None:
         args.extend(["-thread_queue_size", "512", "-f", "dshow", "-i", "audio=" + system_device,
@@ -59,7 +62,12 @@ def capture_command(ffmpeg: str, device: str, output: Path, *, max_seconds: int 
         args.extend(["-t", str(max_seconds)])
     args.extend(["-vn", "-sn", "-dn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le",
                  "-f", "segment", "-segment_time", str(SEGMENT_SECONDS),
-                 "-reset_timestamps", "1", "-segment_format", "wav", str(output)])
+                 "-reset_timestamps", "1"])
+    if start_number:
+        # The output name is already in a unique staging folder. Do not rely
+        # on FFmpeg's -n to protect segments: some muxers ignore it.
+        args.extend(["-segment_start_number", str(start_number)])
+    args.extend(["-segment_format", "wav", str(output)])
     return args
 
 
@@ -118,7 +126,7 @@ def recording_status(folder: Path) -> dict:
     info = load_json(folder / "recording.json")
     if not isinstance(info, dict) or info.get("schema") != SCHEMA:
         raise VideoNotesError("Nieobsługiwany format dziennika nagrania.")
-    if info.get("status") not in {"recording", "finished", "needs_review"}:
+    if info.get("status") not in {"recording", "paused", "finished", "needs_review"}:
         raise VideoNotesError("Nieprawidłowy stan nagrania.")
     policy = info.get("hash_policy")
     if policy not in (None, "sha256-v1"):
@@ -162,9 +170,16 @@ def recording_status(folder: Path) -> dict:
             except VideoNotesError:
                 # Do not follow symlinks or mutate user data to 'fix' it.
                 damaged.append(part.name)
+    pending_takes = sorted(
+        part.name for part in folder.glob(".vn-take-*")
+        if part.is_dir() and not part.is_symlink()
+    )
+    if info["status"] == "finished" and pending_takes:
+        raise VideoNotesError("Sesja ma niezatwierdzone WAV w .vn-take; wymaga ręcznej kontroli.")
     return {"schema": SCHEMA, "session_id": info.get("session_id"),
             "status": info["status"], "segments": segments,
-            "unreadable_parts": damaged, "requires_manual_review": info["status"] != "finished",
+            "unreadable_parts": damaged, "pending_takes": pending_takes,
+            "requires_manual_review": info["status"] != "finished",
             "sha256_verified": info["status"] == "finished" and policy == "sha256-v1"}
 
 
@@ -274,10 +289,139 @@ def _stop_ffmpeg(proc: object) -> int:
         raise VideoNotesError("FFmpeg nie zakończył nagrywania po poleceniu stop. Pliki zachowano.") from error
 
 
+
+def _capture_with_pauses(tool: str, device: str, folder: Path, report: dict,
+                         *, system_device: str | None, max_seconds: int | None,
+                         stop: threading.Event, pause: threading.Event,
+                         resume: threading.Event, process_factory: Callable[..., object],
+                         on_state: Callable[[str], None] | None) -> tuple[bool, int, int]:
+    """Pause by closing FFmpeg gracefully; resume in the NEXT untouched WAV.
+
+    Avoid Windows-specific process suspension: that can lose audio data and
+    freeze the DirectShow device. While paused, all files are closed/verified;
+    the raw PCM timeline *excludes* the deliberate pause gap. The caller
+    finalizes a single session only after every take has cleanly exited.
+    """
+    count_pauses = 0
+    stopped = False
+    journal = folder / "recording.json"
+    while True:
+        saved = inspect_wav_segments(folder)
+        next_index = len(saved)
+        if next_index >= 100_000:
+            raise VideoNotesError("Nagranie przekroczyło maksymalną liczbę części WAV.")
+        used_ms = sum(part["duration_ms"] for part in saved)
+        remaining = None
+        if max_seconds is not None:
+            remaining = max_seconds - (used_ms + 999) // 1000
+            if remaining <= 0:
+                return stopped, 0, count_pauses
+        # FFmpeg's segment muxer may IGNORE global -n even when input files
+        # exist. Capture into a unique private directory and publish each
+        # verified WAV using os.link() O_EXCL-like semantics. A crash keeps the
+        # private take for manual recovery rather than destroying audio.
+        take_folder = folder / (".vn-take-" + uuid.uuid4().hex)
+        take_folder.mkdir(mode=0o700)
+        output = take_folder / "part-%05d.wav"
+        command = capture_command(
+            tool, device, output, max_seconds=remaining,
+            system_device=system_device, start_number=next_index,
+        )
+        process = process_factory(
+            command, stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        reason = "natural"
+        try:
+            if on_state is not None:
+                on_state("recording")
+            while process.poll() is None:
+                if stop.wait(0.10):
+                    reason = "stop"
+                    break
+                if pause.is_set():
+                    reason = "pause"
+                    break
+            returncode = _stop_ffmpeg(process) if reason != "natural" else process.wait()
+        except KeyboardInterrupt:
+            stopped = True
+            returncode = _stop_ffmpeg(process)
+            reason = "stop"
+        finally:
+            if process.stdin:
+                try:
+                    process.stdin.close()
+                except (OSError, ValueError):
+                    pass
+        if returncode != 0:
+            raise VideoNotesError(
+                "FFmpeg przerwał sesję; pliki WAV i ukryty katalog .vn-take zachowano do kontroli."
+            )
+        staged = sorted(take_folder.glob("part-*.wav"))
+        if not staged or next_index + len(staged) > 100_000:
+            raise VideoNotesError(
+                "FFmpeg nie zapisał nowej części lub przekroczono limit; katalog .vn-take zachowano."
+            )
+        for offset, part in enumerate(staged):
+            if part.name != f"part-{next_index + offset:05d}.wav":
+                raise VideoNotesError("Prawidłowa kolejność WAV nie została zachowana; katalog .vn-take zachowano.")
+            _inspect_single_wav(part)
+        try:
+            for part in staged:
+                # Atomic no-replace regardless of FFmpeg's own overwrite flags.
+                os.link(part, folder / part.name)
+        except FileExistsError as error:
+            raise VideoNotesError(
+                "Część WAV została utworzona równolegle; nie nadpisano pliku. Sprawdź .vn-take."
+            ) from error
+        except OSError as error:
+            raise VideoNotesError(
+                "Nie udało się bezpiecznie opublikować WAV. Zapis w .vn-take zachowano."
+            ) from error
+        # Only drop staging hard links AFTER every destination was published.
+        for part in staged:
+            part.unlink()
+        take_folder.rmdir()
+        new_parts = inspect_wav_segments(folder)
+        if len(new_parts) <= next_index:
+            raise VideoNotesError("Nie powstał nowy pełny WAV; zachowano dziennik do kontroli.")
+        if reason == "stop":
+            return True, 0, count_pauses
+        if reason == "natural":
+            return False, 0, count_pauses
+
+        count_pauses += 1
+        # Session is not finished; an app crash while paused stays reviewable.
+        report.update({
+            "status": "paused", "pause_count": count_pauses,
+            "segments": len(new_parts),
+            "duration_ms": sum(part["duration_ms"] for part in new_parts),
+            "segment_sha256": {
+                part["name"]: sha256_file(folder / part["name"])
+                for part in new_parts
+            },
+        })
+        save_json(journal, report)
+        if on_state is not None:
+            on_state("paused")
+        while True:
+            if stop.wait(0.10):
+                return True, 0, count_pauses
+            if resume.is_set():
+                resume.clear()
+                pause.clear()
+                report["status"] = "recording"
+                save_json(journal, report)
+                break
+
+
 def record_microphone(device: str, folder: Path, *, consent: bool,
                       ffmpeg: str = "ffmpeg", max_seconds: int | None = None,
                       system_device: str | None = None, system_consent: bool = False,
                       stop: threading.Event | None = None,
+                      pause: threading.Event | None = None,
+                      resume: threading.Event | None = None,
+                      on_state: Callable[[str], None] | None = None,
                       process_factory: Callable[..., object] = subprocess.Popen) -> dict:
     """Capture Windows mic; close files on stop, preserving partials on failure.
 
@@ -288,6 +432,13 @@ def record_microphone(device: str, folder: Path, *, consent: bool,
         raise VideoNotesError("Ten adapter mikrofonu wymaga Windows/DirectShow.")
     if consent is not True:
         raise VideoNotesError("Nagrywanie wymaga świadomej zgody użytkownika.")
+    if (pause is None) != (resume is None):
+        raise VideoNotesError("Pauza i wznowienie wymagają dwóch osobnych sygnałów.")
+    if pause is not None and (stop is None or
+                              pause is resume or pause is stop or resume is stop):
+        raise VideoNotesError("Pauza/wznowienie wymagają osobnych sygnałów i obsługi Stop.")
+    if on_state is not None and not callable(on_state):
+        raise VideoNotesError("Nieprawidłowa funkcja aktualizacji stanu nagrania.")
     _valid_device(device)
     if system_device is not None:
         if system_consent is not True:
@@ -315,27 +466,35 @@ def record_microphone(device: str, folder: Path, *, consent: bool,
     save_json(folder / "recording.json", report)
     stopped = False
     try:
-        proc = process_factory(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
-                               stderr=subprocess.DEVNULL)
-        try:
-            if stop is None:
-                try:
-                    returncode = proc.wait()
-                except KeyboardInterrupt:
-                    stopped = True
-                    returncode = _stop_ffmpeg(proc)
-            else:
-                while proc.poll() is None:
-                    if stop.wait(0.2):
+        if pause is not None and resume is not None and stop is not None:
+            stopped, returncode, count_pauses = _capture_with_pauses(
+                tool, device, folder, report, system_device=system_device,
+                max_seconds=max_seconds, stop=stop, pause=pause, resume=resume,
+                process_factory=process_factory, on_state=on_state,
+            )
+            report["pause_count"] = count_pauses
+        else:
+            proc = process_factory(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+                                   stderr=subprocess.DEVNULL)
+            try:
+                if stop is None:
+                    try:
+                        returncode = proc.wait()
+                    except KeyboardInterrupt:
                         stopped = True
-                        break
-                returncode = _stop_ffmpeg(proc) if stopped else proc.wait()
-        finally:
-            if proc.stdin:
-                try:
-                    proc.stdin.close()
-                except (OSError, ValueError):
-                    pass
+                        returncode = _stop_ffmpeg(proc)
+                else:
+                    while proc.poll() is None:
+                        if stop.wait(0.2):
+                            stopped = True
+                            break
+                    returncode = _stop_ffmpeg(proc) if stopped else proc.wait()
+            finally:
+                if proc.stdin:
+                    try:
+                        proc.stdin.close()
+                    except (OSError, ValueError):
+                        pass
         parts = inspect_wav_segments(folder)
         if returncode != 0 or not parts:
             raise VideoNotesError("FFmpeg nie ukończył nagrywania lub brak poprawnego WAV. Pliki zachowano.")

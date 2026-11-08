@@ -38,6 +38,8 @@ class VideoNotesWindow:
         self.cancel = threading.Event()
         self.active = False
         self.mic_stop = threading.Event()
+        self.mic_pause = threading.Event()
+        self.mic_resume = threading.Event()
         self.mic_controls: dict = {}
         self._rows: dict[str, dict] = {}
         self._build()
@@ -219,7 +221,7 @@ class VideoNotesWindow:
             return
         window = tk.Toplevel(self.root)
         window.title("Video Notes — mikrofon Windows")
-        window.geometry("700x380")
+        window.geometry("760x430")
         panel = ttk.Frame(window, padding=14)
         panel.pack(fill="both", expand=True)
         ttk.Label(panel, text="Dźwięk pozostaje lokalny. Wybierz urządzenie i katalog nowych nagrań.",
@@ -260,7 +262,7 @@ class VideoNotesWindow:
             if chosen:
                 parent.set(chosen)
         ttk.Button(pathrow, text="Wybierz", command=browse_parent).pack(side="left", padx=5)
-        ttk.Label(panel, text="Nagrania będą dzielone co 2 godziny. Stop domyka plik WAV.",
+        ttk.Label(panel, text="Nagrania dzielone są co 2 godziny. Pauza zamyka WAV; Wznów tworzy nową część. Cisza podczas pauzy nie trafia do pliku.",
                   wraplength=600).pack(anchor="w")
         actions = ttk.Frame(panel)
         actions.pack(fill="x", pady=12)
@@ -286,15 +288,21 @@ class VideoNotesWindow:
             system_consent = bool(selected_system and system_agreed.get())
             target = folder / ("mic-" + uuid.uuid4().hex[:12])
             self.mic_stop.clear()
+            self.mic_pause.clear()
+            self.mic_resume.clear()
             self.active = True
             start.configure(state="disabled")
             stop.configure(state="normal")
+            pause_button.configure(state="normal")
+            resume_button.configure(state="disabled")
             self.start_button.configure(state="disabled")
             self.resume_button.configure(state="disabled")
             status.set("Trwa nagrywanie. Aby zakończyć, kliknij Zatrzymaj.")
             def work() -> None:
                 try:
                     result = record_microphone(selected, target, consent=True, stop=self.mic_stop,
+                                               pause=self.mic_pause, resume=self.mic_resume,
+                                               on_state=lambda state: self.events.put(("mic_capture_state", state)),
                                                system_device=selected_system or None,
                                                system_consent=system_consent)
                     self.events.put(("mic_complete", (target, result)))
@@ -308,12 +316,29 @@ class VideoNotesWindow:
         def request_stop() -> None:
             self.mic_stop.set()
             status.set("Kończenie nagrywania i zapisywanie segmentu WAV...")
+        def request_pause() -> None:
+            if self.active:
+                self.mic_pause.set()
+                pause_button.configure(state="disabled")
+                status.set("Zamykanie części WAV przed pauzą...")
+
+        def request_resume() -> None:
+            if self.active and self.mic_pause.is_set():
+                self.mic_resume.set()
+                resume_button.configure(state="disabled")
+                status.set("Wznawianie — nowa część WAV, bez nadpisania starszych...")
+
+        pause_button = ttk.Button(actions, text="Pauza", command=request_pause, state="disabled")
+        pause_button.pack(side="left", padx=5)
+        resume_button = ttk.Button(actions, text="Wznów nagrywanie", command=request_resume, state="disabled")
+        resume_button.pack(side="left", padx=5)
         stop = ttk.Button(actions, text="Zatrzymaj", command=request_stop, state="disabled")
-        stop.pack(side="left")
+        stop.pack(side="left", padx=5)
         ttk.Label(panel, textvariable=status, wraplength=600).pack(anchor="w", pady=4)
         self.mic_controls = {"window": window, "devices": device_box,
                              "system_devices": system_box,
-                             "status": status, "start": start, "stop": stop}
+                             "status": status, "start": start, "stop": stop,
+                             "pause": pause_button, "resume": resume_button}
         def on_close() -> None:
             if self.active and str(stop["state"]) == "normal":
                 messagebox.showwarning("Video Notes", "Najpierw zatrzymaj nagrywanie i poczekaj na zamknięcie pliku.")
@@ -335,6 +360,17 @@ class VideoNotesWindow:
                     if self.mic_controls and self.mic_controls["window"].winfo_exists():
                         self.mic_controls["status"].set(str(data))
                     messagebox.showwarning("Mikrofony Windows", str(data))
+                elif kind == "mic_capture_state":
+                    if self.mic_controls and self.mic_controls["window"].winfo_exists() and self.active:
+                        controls = self.mic_controls
+                        if data == "paused":
+                            controls["pause"].configure(state="disabled")
+                            controls["resume"].configure(state="normal")
+                            controls["status"].set("Nagrywanie wstrzymane; wszystkie poprzednie WAV są zamknięte. Wznów lub Zatrzymaj.")
+                        elif data == "recording":
+                            controls["pause"].configure(state="normal")
+                            controls["resume"].configure(state="disabled")
+                            controls["status"].set("Trwa nagrywanie lokalne. Pauza zamyka aktualny WAV.")
                 elif kind in {"mic_complete", "mic_failure"}:
                     self.active = False
                     self.start_button.configure(state="normal")
@@ -342,6 +378,8 @@ class VideoNotesWindow:
                     if self.mic_controls and self.mic_controls["window"].winfo_exists():
                         self.mic_controls["start"].configure(state="normal")
                         self.mic_controls["stop"].configure(state="disabled")
+                        self.mic_controls["pause"].configure(state="disabled")
+                        self.mic_controls["resume"].configure(state="disabled")
                     if kind == "mic_complete":
                         folder, report = data
                         count = len(report["segments"])
