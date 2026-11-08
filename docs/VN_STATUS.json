@@ -91,7 +91,8 @@
         "PR #54: optional source-grounded advanced notes PDF conversion with installed local LibreOffice, preflight before replacing Markdown/JSON/DOCX/PDF; real LibreOffice+Poppler test 42426680781 PASS, Windows mock/DEV EXE PASS, physical Windows Office untested.",
         "PR #68: verified real whisper.cpp CPU PL/EN synthetic TTS -> corrected transcript -> source-linked advanced outline Markdown/JSON/DOCX with literal quotes, exact segment IDs and timestamps, 6/6 CI PASS (42468924700, 42468924655); no human evaluation of natural lectures or semantic synthesis.",
         "PR #72: offline versioned study-guide JSON and Word/PDF source-linked citations with actual real Whisper CPU synthetic PL/EN speech, edited ASR and source SHA, test 10/10 jobs PASS. Heuristic extraction only; no semantic fact synthesis.",
-        "PR #74: actual 121min 440Hz synthetic OGG/Opus compressed FFmpeg input -> 61 checkpointed stub-ASR chunks, cancel at 12 and resume, then 61/61 source-linked study-guide citations and DOCX; 6/6 CI PASS, real-media 42476108843 and source/browser 42476109194. Not human speech or 121min true Whisper inference."
+        "PR #74: actual 121min 440Hz synthetic OGG/Opus compressed FFmpeg input -> 61 checkpointed stub-ASR chunks, cancel at 12 and resume, then 61/61 source-linked study-guide citations and DOCX; 6/6 CI PASS, real-media 42476108843 and source/browser 42476109194. Not human speech or 121min true Whisper inference.",
+        "PR #75: independent read-only study-verify CLI and real Tk GUI fail closed for invented/stale/modified source guide JSON, checking all citations/time labels against current corrected transcript, while preserving user files. Genuine whisper.cpp CPU PL/EN TTS, Windows/Linux real GUI, synthetic 121min FFmpeg and real Inno installer regression all 11/11 PASS (42476485059, 42476485075, 42476485031, 42476485064, 42476485035, 42476485044). No semantic fact correctness or cryptographic signature claim."
       ],
       "blockers": [
         "Real lectures/tutorials/CCNA human acceptance",
@@ -845,6 +846,43 @@
       "scope": "PR #74 standard 5/5 Linux/Windows source/browser CI success",
       "source_linux_windows_browser": "PASS",
       "physical_windows": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42476485059",
+      "scope": "PR #75 genuine Whisper CPU PL/EN synthetic TTS -> study-guide saved JSON independently verified against current corrected transcript; CI PASS",
+      "real_whisper_provenance": "PASS",
+      "human_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42476485075",
+      "scope": "PR #75 real Tk GUI on both Ubuntu Xvfb and hosted Windows VM, provenance verification button PASS",
+      "real_tk_gui_linux": "PASS",
+      "real_tk_gui_hosted_windows": "PASS",
+      "physical_windows": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42476485031",
+      "scope": "PR #75 121min real synthetic compressed OGG/Opus source plus stub ASR/61 checkpoints and study guide regression PASS",
+      "real_121min_ffmpeg_and_study_guide": "PASS",
+      "real_whisper_121min": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42476485064",
+      "scope": "PR #75 genuine Inno compiler and private synthetic Windows installer install/verify/uninstall regression PASS",
+      "real_inno_synthetic_install_uninstall": "PASS",
+      "physical_offline_windows": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42476485035",
+      "scope": "PR #75 standard Linux/Windows source and browser 5/5 CI PASS, including fail-closed study verifier",
+      "source_linux_windows_browser": "PASS",
+      "physical_windows": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42476485044",
+      "scope": "PR #75 Windows DEV EXE smoke PASS, no signed public release",
+      "windows_dev_executable": "PASS",
+      "signed_release": false
     }
   ],
   "notes": [
