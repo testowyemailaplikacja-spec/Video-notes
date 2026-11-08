@@ -83,7 +83,7 @@ def _section_heading(index: int, window_minutes: int, selected: list[dict]) -> s
         return prefix
     spellings: dict[str, str] = {}
     for row in selected:
-        for word in re.findall(r"[^\\W_]+", row["text"], re.UNICODE):
+        for word in re.findall(r"[^\W_]+", row["text"], re.UNICODE):
             key = word.casefold()
             if (key in repeated and len(word) <= 32
                     and any(character.isalpha() for character in word)):
