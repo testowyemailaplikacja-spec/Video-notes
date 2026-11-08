@@ -31,6 +31,12 @@ Wykonanie bez płatnego API, konta, serwera i bez automatycznej wysyłki danych.
 
 Nowy przewodnik to istotny krok ku VN-02/VN-03, ale **nie jest semantycznym streszczeniem AI, rozpoznaniem znaczenia definicji, weryfikacją źródeł ani transkrypcją 1:1 bez błędów**. Udany test z syntetyczną mową TTS nie oznacza oceny przez człowieka prawdziwego wykładu. Testy fizycznego Windows, długich sesji i instalatora pozostają niezależnymi bramkami odbioru.
 
+## Automatyczna próba 121-minutowego nagrania (08.11.2026)
+
+`scripts/real_2h_media_smoke.py` generuje prawdziwe 121-minutowe OGG/Opus bez prywatnych danych, faktycznie dekoduje dźwięk FFmpeg w 61 fragmentach, przerywa przetwarzanie po 12 zapisanych checkpointach i następnie bez powtórzeń wznawia pozostałe. Dodatkowo przechodzi całą ścieżkę `ukończona transkrypcja → przewodnik do nauki → MD/JSON/DOCX`, sprawdzając zgodność każdej wypowiedzi i znacznika czasu, kompletność 61 ID, brak duplikatów i nienaruszony plik źródłowy.
+
+**Ważne:** wejście audio jest syntetycznym tonem 440 Hz, a zwracane „rozpoznania” pochodzą z jawnej atrapy, więc test ten **nie mierzy jakości ani szybkości prawdziwego modelu ASR**. Status będzie odnotowany jako PASS wyłącznie po rzeczywistym zielonym przebiegu GitHub Actions. Nie zastępuje oceny wykładu przez człowieka ani testu sprzętowego Windows.
+
 ## Niezależna kontrola cytatów (08.11.2026)
 
 Po zapisaniu `exports/notes-study.json` można sprawdzić zgodność **całego JSON, wszystkich cytatów, czasów, pojęć, etykiet i numerów sekcji z aktualną lokalną transkrypcją**:
