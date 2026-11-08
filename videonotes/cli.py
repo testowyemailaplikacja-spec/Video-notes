@@ -13,7 +13,7 @@ from .media import probe
 from .microphone import record_microphone, recording_status, list_microphone_devices, join_finished_recording
 from .notes import generate_basic_notes, edit_note_point, export_basic_notes, export_basic_notes_text, export_basic_notes_docx
 from .advanced_notes import export_advanced_outline
-from .study_guide import export_study_guide
+from .study_guide import export_study_guide, verify_study_guide
 from .pdf_export import export_basic_notes_pdf
 from .note_revisions import regenerate_basic_notes, list_note_versions, restore_note_version, recover_interrupted_note_update, notes_lock_status, recover_stale_notes_lock
 from .quality import compare_text_files
@@ -105,6 +105,9 @@ def parser() -> argparse.ArgumentParser:
     study.add_argument("--docx", action="store_true", help="Dodatkowo lokalny DOCX ze źródłami")
     study.add_argument("--pdf", action="store_true", help="Opcjonalny PDF przy lokalnym LibreOffice")
     study.add_argument("--office", default="libreoffice", help="Lokalne LibreOffice (tylko PDF)")
+    study_check = sub.add_parser("study-verify", help="Sprawdź cytaty zapisanej notatki przeciw aktualnej transkrypcji, bez modyfikowania danych")
+    study_check.add_argument("project", type=Path)
+    study_check.add_argument("--file", type=Path, help="Opcjonalny lokalny plik przewodnika JSON")
     real = sub.add_parser("benchmark-real", help="Uruchom lokalne whisper.cpp i faster-whisper na tym samym audio OBS (bez chmury)")
     real.add_argument("source", type=Path)
     real.add_argument("--reference", type=Path, required=True, help="Ręcznie sprawdzona transkrypcja wybranego fragmentu")
@@ -258,6 +261,9 @@ def main(argv: list[str] | None = None) -> int:
                 include_pdf=args.pdf, office=args.office,
             ):
                 print(path)
+        elif args.action == "study-verify":
+            print(json.dumps(verify_study_guide(args.project, document=args.file),
+                             ensure_ascii=False, indent=2))
         elif args.action == "benchmark-real":
             report = run_real_benchmark(args.source, args.reference, cpp_executable=args.cpp_executable,
                                         cpp_model=args.cpp_model, faster_model_dir=args.faster_model_dir,
