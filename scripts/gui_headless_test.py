@@ -252,6 +252,89 @@ class GuiNotesHeadlessTest(unittest.TestCase):
         self.assertFalse(self.gui.active)
         self.assertIn("Połączono całe nagranie", self.gui.status.get())
 
+    def test_basic_note_click_source_opens_corresponding_transcript_segment(self):
+        self.gui._show_notes()
+        self.root.update()
+        window = self._note_windows()[-1]
+        table = next(w for w in children(window) if isinstance(w, ttk.Treeview)
+                     and "quote" in w.cget("columns"))
+        first = table.get_children()[0]
+        table.selection_set(first)
+        self.root.update()
+        expected_id = first.removeprefix("quote-")
+        self._button(window, "Przejdź do źródła transkrypcji").invoke()
+        self.root.update()
+        self.assertEqual(self.gui._current_segment_id, expected_id)
+        self.assertEqual(self.gui.segments.selection()[0], expected_id)
+        self.assertIn("Wykład dotyczy", self.gui.edit_text.get("1.0", "end-1c"))
+        self.assertIn(expected_id, self.gui.status.get())
+
+    def test_jump_to_source_respects_unsaved_asr_draft_on_selection_and_reload(self):
+        self.assertTrue(self.gui._load())
+        ids = list(self.gui.segments.get_children())
+        self.assertGreaterEqual(len(ids), 2)
+        self.gui.segments.selection_set(ids[0])
+        self.gui._selected()
+        self.gui.edit_text.insert("end", " DRAFT NIEZAPISANY")
+        with patch("videonotes.gui.messagebox.askyesno", return_value=False) as prompt:
+            self.assertFalse(self.gui._jump_to_source(ids[1]))
+            self.assertTrue(prompt.called)
+        self.assertEqual(self.gui._current_segment_id, ids[0])
+        self.assertIn("DRAFT NIEZAPISANY", self.gui.edit_text.get("1.0", "end-1c"))
+        self.assertFalse(self.gui._load(silent=True))
+        with patch("videonotes.gui.messagebox.askyesno", return_value=True):
+            self.assertTrue(self.gui._jump_to_source(ids[1]))
+        self.assertEqual(self.gui._current_segment_id, ids[1])
+        self.assertNotIn("DRAFT NIEZAPISANY", self.gui.edit_text.get("1.0", "end-1c"))
+
+    def test_advanced_and_study_guide_citations_open_actual_source_in_tk(self):
+        for kind in ("advanced", "study"):
+            with self.subTest(kind=kind):
+                if kind == "advanced":
+                    self.gui._show_advanced()
+                    title_part = "Konspekt źródłowy"
+                else:
+                    self.gui._show_study_guide()
+                    title_part = "Przewodnik do nauki"
+                self.root.update()
+                windows = [
+                    w for w in children(self.root) if isinstance(w, tk.Toplevel)
+                    and w.winfo_exists() and title_part in w.title()
+                ]
+                self.assertTrue(windows)
+                window = windows[-1]
+                trees = [
+                    w for w in children(window) if isinstance(w, ttk.Treeview)
+                    and tuple(w.cget("columns")) == ("time", "text")
+                ]
+                self.assertEqual(len(trees), 1)
+                table = trees[0]
+                self.assertGreaterEqual(len(table.get_children()), 2)
+                target = table.get_children()[-1]
+                table.selection_set(target)
+                self._button(window, "Przejdź do zaznaczonego źródła").invoke()
+                self.root.update()
+                self.assertEqual(self.gui._current_segment_id, target)
+                self.assertEqual(self.gui.segments.selection()[0], target)
+                self.assertTrue(self.gui.edit_text.get("1.0", "end-1c"))
+                window.destroy()
+
+    def test_basic_note_unsaved_draft_blocks_source_navigation(self):
+        self.gui._show_notes()
+        self.root.update()
+        window = self._note_windows()[-1]
+        table = next(w for w in children(window) if isinstance(w, ttk.Treeview)
+                     and "quote" in w.cget("columns"))
+        table.selection_set(table.get_children()[0])
+        self.root.update()
+        editor = next(w for w in children(window) if isinstance(w, tk.Text))
+        editor.insert("end", " NIEZAPISANA UWAGA")
+        with patch("videonotes.gui.messagebox.showwarning") as dialog:
+            self._button(window, "Przejdź do źródła transkrypcji").invoke()
+            dialog.assert_called_once()
+        self.assertIsNone(self.gui._current_segment_id)
+        self.assertIn("NIEZAPISANA UWAGA", editor.get("1.0", "end-1c"))
+
     def test_real_advanced_template_gui_changes_content_exports_docx_and_verifies_json(self):
         self.gui._show_advanced()
         self.root.update()
