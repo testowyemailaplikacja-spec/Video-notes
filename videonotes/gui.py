@@ -14,6 +14,7 @@ from .exports import edit_segment, export_project
 from .media import probe
 from .microphone import record_microphone, list_microphone_devices, join_finished_recording
 from .audio_diagnostics import analyze_finished_recording
+from .recovery_audio import salvage_recording
 from .notes import generate_basic_notes, read_basic_notes, edit_note_point, export_basic_notes, export_basic_notes_docx
 from .advanced_notes import export_advanced_outline
 from .study_guide import export_study_guide, verify_study_guide
@@ -80,6 +81,7 @@ class VideoNotesWindow:
         ttk.Button(outer, text="Przewodnik do nauki — cytaty, pojęcia i pytania (VN-02/03)", command=self._show_study_guide).pack(anchor="w", pady=(0, 7))
         ttk.Button(outer, text="Nagraj mikrofon — nowa sesja WAV (Windows)", command=self._show_mic_recorder).pack(anchor="w", pady=(0, 7))
         ttk.Button(outer, text="Połącz części ukończonego nagrania WAV do transkrypcji", command=self._join_finished_recording_dialog).pack(anchor="w", pady=(0, 7))
+        ttk.Button(outer, text="Odzyskaj czytelne WAV po awarii (może być niekompletne)", command=self._salvage_mic_recording).pack(anchor="w", pady=(0, 7))
         ttk.Button(outer, text="Sprawdź jakość nagrania WAV — cisza i przesterowanie", command=self._inspect_recording_quality).pack(anchor="w", pady=(0, 7))
         self.status = tk.StringVar(value="Gotowe. Wybierz plik i lokalny model.")
         ttk.Label(outer, textvariable=self.status, wraplength=700).pack(anchor="w", pady=4)
@@ -181,6 +183,46 @@ class VideoNotesWindow:
             except Exception:
                 self.events.put(("error", "Wewnętrzny błąd. Projekt zachowany; sprawdź log testowy przed wznowieniem."))
         threading.Thread(target=worker, name="vn-transcribe", daemon=True).start()
+
+    def _salvage_mic_recording(self) -> None:
+        """Opt-in, read-only-source recovery from a stopped crashed mic session."""
+        if self.active:
+            messagebox.showwarning("Video Notes", "Najpierw zakończ inne nagrywanie lub transkrypcję.")
+            return
+        selected = filedialog.askdirectory(
+            title="Wybierz lokalny katalog PRZERWANEGO nagrania (needs_review)"
+        )
+        if not selected:
+            return
+        folder = Path(selected)
+        output = folder / "recording-salvaged-INCOMPLETE.wav"
+        if output.is_symlink() or output.exists():
+            messagebox.showwarning("Odzyskanie WAV", "Wynik już istnieje; nie nadpisuję nagrania.")
+            return
+        if not messagebox.askyesno(
+            "Odzysk po awarii — niekompletny materiał",
+            "Czy potwierdzasz, że FFmpeg już NIE NAGRYWA i chcesz skopiować "
+            "tylko czytelny, ciągły początek nagrania do NOWEGO pliku WAV? "
+            "To NIE oznacza odzyskania całego wykładu. Źródłowe WAV, "
+            "pliki robocze i dziennik pozostaną bez zmian."
+        ):
+            return
+        self.active = True
+        self.start_button.configure(state="disabled")
+        self.resume_button.configure(state="disabled")
+        self.status.set("Weryfikacja i kopiowanie czytelnej części WAV bez naruszania oryginałów...")
+        def work() -> None:
+            try:
+                result = salvage_recording(folder, output, confirm_stopped=True)
+                self.events.put(("mic_salvage_complete", result))
+            except VideoNotesError as error:
+                self.events.put(("mic_salvage_failure", str(error)))
+            except Exception:
+                self.events.put((
+                    "mic_salvage_failure",
+                    "Nie udało się odzyskać WAV; oryginalne części nagrania pozostawiono bez zmian."
+                ))
+        threading.Thread(target=work, daemon=True, name="vn-mic-salvage").start()
 
     def _inspect_recording_quality(self) -> None:
         """Read only numerical audio quality, without showing or uploading speech."""
@@ -463,6 +505,30 @@ class VideoNotesWindow:
                         messagebox.showwarning("Nagrywanie mikrofonu", message)
                     if self.mic_controls and self.mic_controls["window"].winfo_exists():
                         self.mic_controls["status"].set(message)
+                elif kind in {"mic_salvage_complete", "mic_salvage_failure"}:
+                    self.active = False
+                    self.start_button.configure(state="normal")
+                    self.resume_button.configure(state="normal")
+                    if kind == "mic_salvage_complete":
+                        output = str(data["output"])
+                        self.source.set(output)
+                        self.stream.set("")
+                        self.streams.clear()
+                        self.stream_box.configure(values=[])
+                        self.status.set(
+                            f"Odzyskano {data['copied_parts']} części do NOWEGO WAV. "
+                            "UWAGA: zapis może być NIEKOMPLETNY. "
+                            "Sprawdź odsłuchem przed transkrypcją: " + output
+                        )
+                        messagebox.showwarning(
+                            "WAV po awarii — wymaga kontroli",
+                            "Utworzono osobny plik z czytelnego początku nagrania. "
+                            "Może nie zawierać końca wykładu. Źródła pozostają bez zmian. "
+                            "Odsłuchaj plik i sprawdź raport 'record-recovery-status'."
+                        )
+                    else:
+                        self.status.set(str(data))
+                        messagebox.showwarning("Odzysk po awarii", str(data))
                 elif kind in {"mic_quality_complete", "mic_quality_failure"}:
                     self.active = False
                     self.start_button.configure(state="normal")
