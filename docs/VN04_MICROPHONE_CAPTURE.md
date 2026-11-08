@@ -45,3 +45,11 @@ Jeżeli po awarii nagrywania dziennik ma stan `needs_review` lub `recording`, po
 Dokument i nagrania pozostają bez zmian: kontrola nie naprawia, nie usuwa, nie odtwarza brakujących danych, nie zmienia `recording.json` ani nie otwiera dowiązań symbolicznych do plików spoza katalogu. Tylko sesja z dziennikiem `finished` przechodzi nadal **ścisłą walidację wszystkich plików**; uszkodzenie dowolnej części powoduje błąd.
 
 Przykład: przy kompletnym `part-00000.wav` i urwanym `part-00001.wav` stan po awarii pokazuje pierwszy jako możliwy do późniejszego odzysku, a drugi jako wymagający kontroli. Nie dowodzi to możliwości przywrócenia urwanej części ani ukończenia testu awarii fizycznego urządzenia Windows.
+
+## Kontrola integralności WAV po awarii i brakujących fragmentach (08.11.2026)
+
+Sam nagłówek RIFF/WAV nie dowodzi, że zapisano wszystkie próbki. Po awarii może pozostać plik, w którym zadeklarowana długość PCM jest większa od faktycznej. Kontrola `record-status` sprawdza teraz **całe zadeklarowane audio**, czytając dane sekwencyjnie w blokach do 65 536 próbek (bez ładowania długiego wykładu do pamięci). Nie odtwarza i nie poprawia uszkodzonych danych.
+
+Dla sesji `finished` wymagane są także ciągłe nazwy `part-00000.wav`, `part-00001.wav` itd., zgodność liczby części i sumy czasu z zapisanym dziennikiem `recording.json`. Brak części, ucięta końcówka PCM albo niespójny dziennik oznaczają błąd zamiast fałszywego potwierdzenia kompletności. Dla sesji `recording` lub `needs_review` nieczytelne pliki trafiają do `unreadable_parts`, a nie do listy zdrowych części. Materiały i dziennik pozostają nienaruszone.
+
+Automatyczne regresje obejmują celowe ucięcie danych przy zachowaniu poprawnego nagłówka, usunięcie/przesunięcie części oraz nieprawidłowe metadane zakończenia. **Nie jest to test fizycznej awarii dysku, 2-godzinnego nagrywania ani rzeczywistego mikrofonu Windows.** Odbiór VN-04 wymaga nadal testów urządzeń i pełnego instalatora.

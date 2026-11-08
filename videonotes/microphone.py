@@ -67,11 +67,25 @@ def _inspect_single_wav(part: Path) -> dict:
         with wave.open(str(part), "rb") as audio:
             sample_rate, channels = audio.getframerate(), audio.getnchannels()
             sample_width, samples = audio.getsampwidth(), audio.getnframes()
+            if sample_rate != 16000 or channels != 1 or sample_width != 2 or samples <= 0:
+                raise VideoNotesError("Nagranie nie ma formatu mono PCM 16 kHz/16 bit lub jest puste.")
+            # wave.open() only trusts the *declared* data chunk length. A power
+            # loss can truncate actual PCM while leaving an intact WAV header.
+            # Read in bounded blocks to verify every declared frame, even for
+            # multi-hour files, without loading the lecture into RAM.
+            remaining = samples
+            frame_bytes = channels * sample_width
+            while remaining:
+                amount = min(remaining, 65_536)
+                actual = audio.readframes(amount)
+                if len(actual) != amount * frame_bytes:
+                    raise VideoNotesError(
+                        "Plik WAV ma ucięte dane audio; jest uszkodzony i wymaga ręcznej kontroli."
+                    )
+                remaining -= amount
         size = part.stat().st_size
     except (OSError, EOFError, wave.Error) as error:
         raise VideoNotesError("Plik WAV jest niekompletny lub uszkodzony; zachowano nagranie do kontroli.") from error
-    if sample_rate != 16000 or channels != 1 or sample_width != 2 or samples <= 0:
-        raise VideoNotesError("Nagranie nie ma formatu mono PCM 16 kHz/16 bit lub jest puste.")
     return {"name": part.name, "duration_ms": samples * 1000 // sample_rate,
             "size_bytes": size}
 
@@ -81,8 +95,11 @@ def _wav_paths(folder: Path) -> list[Path]:
 
 
 def inspect_wav_segments(folder: Path) -> list[dict]:
-    """Strict inspection: any invalid WAV makes a completed recording untrusted."""
-    return [_inspect_single_wav(part) for part in _wav_paths(folder)]
+    """Strict inspection: every part must be present, contiguous and readable."""
+    paths = _wav_paths(folder)
+    if any(part.name != f"part-{index:05d}.wav" for index, part in enumerate(paths)):
+        raise VideoNotesError("Brakuje części WAV nagrania albo numeracja części jest przerwana.")
+    return [_inspect_single_wav(part) for part in paths]
 
 
 def recording_status(folder: Path) -> dict:
@@ -101,6 +118,18 @@ def recording_status(folder: Path) -> dict:
         raise VideoNotesError("Nieprawidłowy stan nagrania.")
     if info["status"] == "finished":
         segments = inspect_wav_segments(folder)
+        # Previously, deleting a finished part could silently shorten the
+        # reported recording. Cross-check the completion journal too.
+        count = info.get("segments")
+        duration = info.get("duration_ms")
+        if (type(count) is not int or count < 1 or
+                type(duration) is not int or duration < 1 or
+                count != len(segments) or
+                duration != sum(part["duration_ms"] for part in segments)):
+            raise VideoNotesError(
+                "Dziennik ukończonego nagrania nie zgadza się z częściami WAV; "
+                "sesja wymaga ręcznej kontroli."
+            )
         damaged: list[str] = []
     else:
         segments = []
