@@ -215,3 +215,5 @@ Nowe polecenie `record-transcribe` obsługuje sesje WAV po pauzach, wymaga zgód
 ## Okno lokalnej analizy w interfejsie Windows
 
 W aplikacji desktopowej dodano przycisk **„OCR slajdów i lokalne szkice AI (wymagają kontroli)”**. Otwiera osobne narzędzia do tworzenia szkicu semantycznego, OCR slajdów, eksportu Markdown i weryfikacji źródeł. Dłuższe operacje uruchamiane są w osobnym wątku bez blokowania okna; nie ma automatycznej synchronizacji ani wysyłki danych. Wyniki pozostają oznaczone jako niezweryfikowane. Testy prawdziwych widżetów Tk w CI nie zastępują odbioru na fizycznym Windows.
+
+Aplikacja Tk oferuje również przycisk „Zakończone nagranie mikrofonowe → transkrypcja całej sesji”: jawny wybór zakończonej sesji, pustego folderu, ewentualnego WAV i modelu, potem wspólny proces ASR z postępem i bezpiecznym przerwaniem. Źródłowe nagrania są zachowywane.

@@ -103,6 +103,65 @@ class GuiNotesHeadlessTest(unittest.TestCase):
             notice.assert_called_once()
             warning.assert_not_called()
 
+
+    def test_finished_microphone_asr_dialog_requires_explicit_new_folder_and_preserves_existing_project(self):
+        import time
+        prior_project = self.gui.project.get()
+        new_project = str(self.folder / "new-recording-asr-project")
+        recording = str(self.folder / "finished-mic")
+        result = {
+            "schema": "videonotes-record-to-asr-v1", "project_id": "new-test",
+            "project": new_project, "source_wav": str(self.folder / "joined.wav"),
+            "recording_parts": 2, "completed_chunks": 2, "segments": 2,
+            "exports": [], "original_recording_preserved": True,
+        }
+        btn = self._button(self.root, "Zakończone nagranie mikrofonowe → transkrypcja całej sesji")
+        self.gui.model.set(str(self.folder / "model.bin"))
+        with patch("videonotes.gui.filedialog.askdirectory", side_effect=[recording, new_project]), \
+             patch("videonotes.gui.filedialog.asksaveasfilename",
+                   return_value=str(self.folder / "joined.wav")), \
+             patch("videonotes.gui.recording_status", return_value={
+                 "status": "finished", "sha256_verified": True,
+                 "segments": [{"name": "part-00000.wav"}, {"name": "part-00001.wav"}],
+             }), \
+             patch("videonotes.gui.transcribe_finished_session", return_value=result) as backend, \
+             patch("videonotes.gui.messagebox.askyesno", return_value=True), \
+             patch("videonotes.gui.messagebox.showwarning") as warning, \
+             patch.object(self.gui, "_load", return_value=True) as load:
+            btn.invoke()
+            self.assertEqual(self.gui.project.get(), prior_project)
+            self.assertTrue(self.gui.active)
+            for _ in range(100):
+                self.root.update()
+                if not self.gui.active:
+                    break
+                time.sleep(0.02)
+            self.assertFalse(self.gui.active)
+            backend.assert_called_once()
+            call = backend.call_args
+            self.assertEqual(str(call.args[0]), recording)
+            self.assertEqual(str(call.args[1]), new_project)
+            self.assertTrue(call.kwargs["original_recording_preserved"] if
+                            "original_recording_preserved" in call.kwargs else result["original_recording_preserved"])
+            self.assertEqual(self.gui.project.get(), new_project)
+            load.assert_called_once()
+            warning.assert_not_called()
+
+    def test_finished_mic_asr_refuses_existing_nonempty_project(self):
+        recorded = str(self.folder / "finished-mic")
+        with patch("videonotes.gui.filedialog.askdirectory", side_effect=[recorded, str(self.folder)]), \
+             patch("videonotes.gui.recording_status", return_value={
+                 "status": "finished", "sha256_verified": True,
+                 "segments": [{"name": "part-00000.wav"}],
+             }), \
+             patch("videonotes.gui.transcribe_finished_session") as backend, \
+             patch("videonotes.gui.messagebox.showwarning") as warning:
+            self.gui.model.set(str(self.folder / "model.bin"))
+            self._button(self.root, "Zakończone nagranie mikrofonowe → transkrypcja całej sesji").invoke()
+            self.assertTrue(warning.called)
+            backend.assert_not_called()
+            self.assertFalse(self.gui.active)
+
     def test_version_history_button_opens_and_restores_selected_source_safe_snapshot(self):
         note = generate_basic_notes(self.folder, window_minutes=1)
         point = note["sections"][0]["points"][0]["id"]

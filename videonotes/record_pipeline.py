@@ -20,7 +20,8 @@ def transcribe_finished_session(recording: Path, project: Path, *, model: Path,
                                 language: str = "pl", chunk_seconds: int = 30,
                                 ffmpeg: str = "ffmpeg", ffprobe: str = "ffprobe",
                                 asr_factory: Callable[..., object] = WhisperCpp,
-                                progress: Callable[[int, int], None] | None = None) -> dict:
+                                progress: Callable[[int, int], None] | None = None,
+                                cancel: Callable[[], bool] | None = None) -> dict:
     recording = Path(recording).expanduser().resolve()
     project = Path(project).expanduser().absolute()
     summary = recording_status(recording)
@@ -65,7 +66,8 @@ def transcribe_finished_session(recording: Path, project: Path, *, model: Path,
     create_project(source, project, model=model, whisper_cli=whisper_cli,
                    language=language, chunk_ms=chunk_seconds * 1000, ffprobe=ffprobe)
     transcript = transcribe_project(project, ffmpeg=ffmpeg, ffprobe=ffprobe,
-                                    asr_factory=asr_factory, progress=progress)
+                                    asr_factory=asr_factory, progress=progress,
+                                    cancel=cancel)
     exports = export_project(project)
     p, stored, _ = read_project(project)
     return {
