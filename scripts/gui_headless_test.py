@@ -252,6 +252,45 @@ class GuiNotesHeadlessTest(unittest.TestCase):
         self.assertFalse(self.gui.active)
         self.assertIn("Połączono całe nagranie", self.gui.status.get())
 
+    def test_real_advanced_template_gui_changes_content_exports_docx_and_verifies_json(self):
+        self.gui._show_advanced()
+        self.root.update()
+        windows = [
+            w for w in children(self.root) if isinstance(w, tk.Toplevel)
+            and w.winfo_exists() and "Konspekt źródłowy" in w.title()
+        ]
+        self.assertEqual(len(windows), 1)
+        panel = windows[0]
+        choices = [w for w in children(panel) if isinstance(w, ttk.Combobox)]
+        self.assertEqual(len(choices), 3)
+        choices[0].set("Spotkanie")
+        choices[1].set("Pełny")
+        choices[2].set("5")
+        original = (self.folder / "exports" / "notes-advanced.json").read_bytes()
+        with patch("videonotes.gui.messagebox.askyesno", return_value=False) as refuse:
+            self._button(panel, "Opracuj / odśwież").invoke()
+            refuse.assert_called_once()
+        self.assertEqual(
+            (self.folder / "exports" / "notes-advanced.json").read_bytes(), original
+        )
+        with patch("videonotes.gui.messagebox.askyesno", return_value=True):
+            self._button(panel, "Opracuj / odśwież").invoke()
+        doc = __import__("json").loads(
+            (self.folder / "exports" / "notes-advanced.json").read_text("utf-8")
+        )
+        self.assertEqual(doc["template"], "meeting")
+        self.assertEqual(doc["detail"], "full")
+        self.assertEqual(doc["section_minutes"], 5)
+        self.assertEqual(str(next(w for w in children(panel) if isinstance(w, tk.Text))["state"]),
+                         "disabled")
+        with patch("videonotes.gui.messagebox.askyesno", return_value=True):
+            self._button(panel, "Eksport DOCX").invoke()
+        self.assertTrue((self.folder / "exports" / "notes-advanced.docx").is_file())
+        with patch("videonotes.gui.messagebox.showinfo") as info:
+            self._button(panel, "Sprawdź źródła").invoke()
+            info.assert_called_once()
+        self.assertIn("Zweryfikowano", self.gui.status.get())
+
     def test_real_study_guide_gui_preview_reconfigure_and_word_export(self):
         self._button(
             self.root,
