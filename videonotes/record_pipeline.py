@@ -40,9 +40,6 @@ def transcribe_finished_session(recording: Path, project: Path, *, model: Path,
     model = Path(model).expanduser()
     if model.is_symlink() or not model.is_file() or not model.stat().st_size:
         raise VideoNotesError("Wymagany jest niepusty lokalny model ASR.")
-    executable(ffmpeg)
-    executable(ffprobe)
-    executable(whisper_cli)
     parts = len(summary["segments"])
     if parts == 1:
         if joined_wav is not None:
@@ -56,6 +53,11 @@ def transcribe_finished_session(recording: Path, project: Path, *, model: Path,
             raise VideoNotesError("Połączony WAV musi być poza katalogiem projektu.")
         if source in {recording / entry["name"] for entry in summary["segments"]}:
             raise VideoNotesError("Nie wolno zastąpić oryginalnej części WAV.")
+    # Validate every prerequisite before publishing the optional joined WAV.
+    executable(ffmpeg)
+    executable(ffprobe)
+    executable(whisper_cli)
+    if parts > 1:
         join_finished_recording(recording, source)
     after = recording_status(recording)
     if after["status"] != "finished" or after["segments"] != summary["segments"] or not after["sha256_verified"]:
