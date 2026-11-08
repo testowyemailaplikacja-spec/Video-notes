@@ -1,9 +1,11 @@
-name: Video Notes — real FFmpeg 121 minute compressed audio, stub ASR
+name: Video Notes — 121-minute FFmpeg checkpoints and study guide (stub ASR)
 on:
   pull_request:
     branches: [develop]
     paths:
       - 'scripts/real_2h_media_smoke.py'
+      - 'videonotes/study_guide.py'
+      - 'videonotes/docx_export.py'
       - 'videonotes/media.py'
       - 'videonotes/pipeline.py'
       - '.github/workflows/vn-real-long-media.yml'
@@ -12,7 +14,7 @@ permissions:
   contents: read
 jobs:
   real-opus-two-hour:
-    name: Actual 121-min OGG/Opus FFmpeg checkpoints with synthetic ASR
+    name: Actual 121-min OGG/Opus FFmpeg -> resume -> study guide DOCX (stub ASR)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -30,7 +32,7 @@ jobs:
           fi
           ffmpeg -hide_banner -encoders | grep libopus
           ffmpeg -version | head -n 1
-      - name: Generate and decode 121 minutes of actual compressed audio in bounded chunks
+      - name: Generate/decode 121min actual compressed audio, resume checkpoints and source-only study guide
         shell: bash
         run: |
           set -euo pipefail
