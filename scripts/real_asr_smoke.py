@@ -22,7 +22,7 @@ from videonotes.notes import export_basic_notes_docx, generate_basic_notes, read
 from videonotes.note_revisions import regenerate_basic_notes
 from videonotes.pipeline import create_project, transcribe_project
 from videonotes.storage import read_project
-from videonotes.study_guide import export_study_guide
+from videonotes.study_guide import export_study_guide, verify_study_guide
 
 
 def main() -> int:
@@ -153,6 +153,11 @@ def main() -> int:
             with zipfile.ZipFile(guide_paths[2]) as word:
                 if corrected_text not in word.read("word/document.xml").decode("utf-8"):
                     raise VideoNotesError("Word przewodnika nie zawiera ręcznej korekty źródłowej.")
+            checked_guide = verify_study_guide(project_dir)
+            if (not checked_guide["verified"] or
+                    checked_guide["source_sha256"] != study["source_sha256"] or
+                    checked_guide["source_citations"] < 1):
+                raise VideoNotesError("Nie można potwierdzić pochodzenia przewodnika z prawdziwego ASR.")
 
             results.append({
                 "language_selected": language,
@@ -166,6 +171,7 @@ def main() -> int:
                 "advanced_outline_citations_checked": len(citations),
                 "source_grounded_advanced_md_json_docx": True,
                 "source_only_study_guide_md_json_docx": True,
+                "source_only_study_guide_verified_against_whisper": True,
                 "accuracy_evaluated": False,
             })
     summary = {
