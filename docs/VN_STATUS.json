@@ -66,7 +66,9 @@
         "PR #51: snapshot + fingerprints in .notes-transaction.json for crash between notes.json and notes-edits.json, explicit notes-recover --confirm, refusal to overwrite unknown edits, shared manual edit lock; 141 Linux tests and 5/5 source-browser CI, LibreOffice and Windows DEV EXE PASS 42425818272,42425818404,42425818367; synthetic disk interruption, not physical loss.",
         "PR #53: genuine Linux Tk/Xvfb 3 GUI interaction tests PASS 42426298481 for history restore, explicit journal recovery consent and unsaved draft; source browser 5/5 and Win DEV EXE PASS 42426298387/42426298366. Physical Windows GUI untested.",
         "PR #54: optional local installed LibreOffice PDF export in CLI/GUI for source notes, fail-closed preflight and unsaved draft guard; 147 Linux tests, 5/5 source-browser CI 42426680763, real LibreOffice/Poppler PDF verification 42426680781 (2 tests), Tk GUI 42426680779 and Win DEV EXE 42426680776 PASS. LibreOffice not bundled; no standalone Windows PDF.",
-        "PR #57: .notes.lock carries PID with fsync; notes-lock-status and notes-lock-recover --confirm allow only verified dead PID, not active/malformed/unknown/symlink; multi-OS CI, real Tk/LibreOffice and Windows DEV EXE PASS 42427381623/42427381540/42427381588/42427381622; no physical power loss."
+        "PR #57: .notes.lock carries PID with fsync; notes-lock-status and notes-lock-recover --confirm allow only verified dead PID, not active/malformed/unknown/symlink; multi-OS CI, real Tk/LibreOffice and Windows DEV EXE PASS 42427381623/42427381540/42427381588/42427381622; no physical power loss.",
+        "PR #68: genuine whisper.cpp CPU inference on original PL/EN synthetic TTS, manual transcript correction preserves raw ASR, stale basic notes rejected, versioned regeneration and DOCX checked, GitHub Actions real ASR 42468924700 + source/browser 42468924655 (6/6 PASS); not natural lecture quality.",
+        "PR #69: basic notes use up to 3 repeated literal source words as optional topical hints while preserving timestamps and citation IDs; same heading algorithm on versioned regeneration, malicious markup not promoted; 8/8 CI PASS source/browser 42469190022, Windows DEV 42469190156, LibreOffice 42469190102, Linux Tk 42469190015; no semantic AI summary."
       ],
       "blockers": [
         "Human assessment on real lectures",
@@ -84,7 +86,8 @@
         "PR #39: pre-render Markdown/JSON/DOCX before replacing prior exports; simulated DOCX failure preserves all existing files and creates no new partial exports; Linux/Windows source+browser CI PASS and Windows DEV EXE PASS, no physical Word/LibreOffice test.",
         "PR #41: source-word-only topic hints replace generic heading labels, prioritize repeated terms across distinct quotes; untrusted HTML/Markdown stripped from headings but original citations preserved; Linux/Windows source+browser CI and Windows DEV EXE PASS. Not semantic AI.",
         "PR #49: real LibreOffice Writer Ubuntu headless imports advanced DOCX, renders PDF and verifies Polish text via Poppler; canonical default namespace in [Content_Types].xml and _rels/.rels fixed true previous failure; 48 concurrent DOCX export namespace regression; dedicated workflow, 5/5 source/browser and DEV EXE PASS. Not physical Microsoft Word/LibreOffice manual GUI acceptance.",
-        "PR #54: optional source-grounded advanced notes PDF conversion with installed local LibreOffice, preflight before replacing Markdown/JSON/DOCX/PDF; real LibreOffice+Poppler test 42426680781 PASS, Windows mock/DEV EXE PASS, physical Windows Office untested."
+        "PR #54: optional source-grounded advanced notes PDF conversion with installed local LibreOffice, preflight before replacing Markdown/JSON/DOCX/PDF; real LibreOffice+Poppler test 42426680781 PASS, Windows mock/DEV EXE PASS, physical Windows Office untested.",
+        "PR #68: verified real whisper.cpp CPU PL/EN synthetic TTS -> corrected transcript -> source-linked advanced outline Markdown/JSON/DOCX with literal quotes, exact segment IDs and timestamps, 6/6 CI PASS (42468924700, 42468924655); no human evaluation of natural lectures or semantic synthesis."
       ],
       "blockers": [
         "Real lectures/tutorials/CCNA human acceptance",
@@ -158,7 +161,8 @@
         "PR #30: headless real Chromium file:// import/edit/TXT export and deny-replace smoke on GitHub Ubuntu runner PASS, without npm/network; Windows/Edge/Firefox/a11y still open",
         "PR #32: actual headless Chrome and Edge file:// smoke on Windows GitHub Actions runner, alongside Linux Chromium/source CI PASS; no physical Windows accessibility/Firefox acceptance.",
         "PR #33: 50,000 synthetic segments imported/searched/paginated in real Chromium Linux, Chrome and Edge Windows CI, keyboard focus/ARIA and no HTTP(S) resource requests PASS; 207ms Linux, 160ms Chrome Windows, 109ms Edge Windows CI; not physical screen-reader or full WEB-02 acceptance.",
-        "PR #35: real headless Firefox file:// WebDriver on Ubuntu runner, local import/edit/export and synthetic 50k/focus scenario PASS alongside 4 existing CI jobs, workflow 42416372511; not physical Windows Firefox or screen-reader acceptance."
+        "PR #35: real headless Firefox file:// WebDriver on Ubuntu runner, local import/edit/export and synthetic 50k/focus scenario PASS alongside 4 existing CI jobs, workflow 42416372511; not physical Windows Firefox or screen-reader acceptance.",
+        "PR #70: genuine Tkinter widget interactions run on GitHub-hosted Windows 3.13 VM as well as Ubuntu Xvfb, without skipping, with note history/crash/draft guards and full-WAV selection, source/browser and GUI CI 7/7 PASS (42469389311 and 42469389310). Does not constitute physical Windows, screen reader or full offline installation acceptance."
       ],
       "blockers": [
         "Physical Windows Firefox/Chrome/Edge browser tests, keyboard and screen-reader accessibility acceptance; headless Firefox Linux and Chrome/Edge Windows CI are not human acceptance",
@@ -727,6 +731,55 @@
       "scope": "PR #66 Windows DEV EXE smoke success; no physical Windows recording or full offline model",
       "windows_executable": "PASS",
       "physical_microphone": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42468924700",
+      "scope": "PR #68 genuine whisper.cpp CPU inference -> corrected transcript -> regenerated basic note and source-cited advanced MD/JSON/DOCX on synthetic PL/EN speech",
+      "real_asr_to_advanced_notes": "PASS",
+      "natural_lecture_quality": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42468924655",
+      "scope": "PR #68 five Linux/Windows source/browser regression jobs success",
+      "source_linux_windows_browser": "PASS",
+      "physical_windows": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42469190022",
+      "scope": "PR #69 source-only topical note headings, safe regeneration, markup protection; Linux/Windows browser/source 5/5 PASS",
+      "source_linux_windows_browser": "PASS",
+      "semantic_summary": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42469190102",
+      "scope": "PR #69 real headless LibreOffice renders notes, CI PASS",
+      "real_libreoffice_linux": "PASS",
+      "physical_windows": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42469190156",
+      "scope": "PR #69 Windows development executable build/smoke PASS, not offline installer",
+      "windows_dev_executable": "PASS",
+      "offline_installer": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42469190015",
+      "scope": "PR #69 real Tk GUI interaction smoke under Ubuntu Xvfb PASS",
+      "real_tk_gui_linux": "PASS",
+      "physical_windows": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42469389311",
+      "scope": "PR #70 real Tk widgets and interaction tests under Linux Xvfb and GitHub-hosted Windows 3.13, both PASS",
+      "real_tk_gui_linux": "PASS",
+      "real_tk_gui_hosted_windows": "PASS",
+      "physical_windows": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42469389310",
+      "scope": "PR #70 five standard Linux/Windows source/browser regression jobs PASS",
+      "source_linux_windows_browser": "PASS",
+      "physical_windows": false
     }
   ],
   "notes": [
