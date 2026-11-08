@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import hashlib
 import subprocess
 import tempfile
 import threading
@@ -69,6 +70,7 @@ class MicrophoneTest(unittest.TestCase):
     def test_record_success_and_journal_status_with_no_device_name(self):
         report = self._record(max_seconds=120)
         self.assertEqual(report["status"], "finished")
+        self.assertTrue(report["sha256_verified"])
         self.assertEqual(len(report["segments"]), 1)
         self.assertEqual(report["segments"][0]["duration_ms"], 100)
         self.assertEqual(len(inspect_wav_segments(self.folder)), 1)
@@ -177,6 +179,42 @@ class MicrophoneTest(unittest.TestCase):
         self.assertEqual(journal_path.read_text("utf-8"), json.dumps(journal))
         self.assertGreater(len(original), 100)
 
+    def test_finished_sha256_detects_silent_pcm_changes_and_legacy_journal_is_explicit(self):
+        self._record()
+        journal_path = self.folder / "recording.json"
+        journal = json.loads(journal_path.read_text("utf-8"))
+        self.assertEqual(journal["hash_policy"], "sha256-v1")
+        part = self.folder / "part-00000.wav"
+        self.assertEqual(set(journal["segment_sha256"]), {part.name})
+        expected_hash = hashlib.sha256(part.read_bytes()).hexdigest()
+        self.assertEqual(journal["segment_sha256"][part.name], expected_hash)
+        self.assertTrue(recording_status(self.folder)["sha256_verified"])
+
+        original = part.read_bytes()
+        tampered = bytearray(original)
+        tampered[-1] ^= 0x01  # Valid 16 kHz mono WAV but changed speech data.
+        part.write_bytes(tampered)
+        with self.assertRaisesRegex(VideoNotesError, "SHA-256"):
+            recording_status(self.folder)
+        self.assertEqual(part.read_bytes(), bytes(tampered))
+
+        part.write_bytes(original)
+        self.assertTrue(recording_status(self.folder)["sha256_verified"])
+        broken = dict(journal)
+        broken.pop("segment_sha256")
+        journal_path.write_text(json.dumps(broken), encoding="utf-8")
+        with self.assertRaisesRegex(VideoNotesError, "sumy SHA-256"):
+            recording_status(self.folder)
+
+        # Pre-upgrade recordings without a hash policy remain readable, but
+        # their old integrity evidence must not be claimed as hash-verified.
+        legacy = dict(journal)
+        legacy.pop("hash_policy")
+        legacy.pop("segment_sha256")
+        journal_path.write_text(json.dumps(legacy), encoding="utf-8")
+        self.assertFalse(recording_status(self.folder)["sha256_verified"])
+        self.assertEqual(part.read_bytes(), original)
+
     def test_crash_status_does_not_follow_symlink_part(self):
         self._record()
         outside = self.folder.parent / "private.txt"
@@ -208,6 +246,7 @@ class MicrophoneTest(unittest.TestCase):
             wav.writeframes(b"\x01\x00" * 1600)
         journal["segments"] = 2
         journal["duration_ms"] = 200
+        journal["segment_sha256"][second.name] = hashlib.sha256(second.read_bytes()).hexdigest()
         journal_path.write_text(json.dumps(journal), encoding="utf-8")
         return journal_path
 
