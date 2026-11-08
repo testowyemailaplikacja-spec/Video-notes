@@ -42,7 +42,7 @@ def _common_terms(rows: list[dict], *, limit: int = 4) -> list[dict]:
     for row in rows:
         terms = _tokens(row["text"])
         counts.update(terms)
-        for word in re.findall(r"[^\\W_]+", row["text"], re.UNICODE):
+        for word in re.findall(r"[^\W_]+", row["text"], re.UNICODE):
             key = word.casefold()
             if (key in terms and len(word) <= 32 and
                     any(char.isalpha() for char in word)):
