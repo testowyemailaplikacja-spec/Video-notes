@@ -73,3 +73,14 @@ Test jest wykonywany w tym samym `vn-real-asr-smoke.yml` z tym samym wcześniej 
 ## Prawdziwy checkpoint i wznowienie po zatrzymaniu ASR — PR #61 (08.11.2026)
 
 [PR #61](https://github.com/testowyemailaplikacja-spec/Video-notes/pull/61) został scalony do `develop` po **6/6 kontrolach PASS**, w tym [rzeczywisty whisper.cpp CPU, Actions 42465450853](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42465450853) i [5 testów Linux/Windows/browser, Actions 42465450897](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42465450897). `scripts/real_resume_asr_smoke.py` tworzy wyłącznie oryginalny syntetyczny 34-sekundowy głos TTS i MKV z dwiema ścieżkami, używa rzeczywistego FFmpeg i modelu Whisper. Przerywa po zapisaniu pierwszego fragmentu 30 s, wznawia transkrypcję drugiego, sprawdza identyczny zapis pierwszej części, brak duplikatów, niezmienność ukończonego projektu po kolejnym resume oraz cztery eksporty. Nie przetwarza prywatnych nagrań. **Nie jest to 2-godzinny test realnego modelu na wykładzie, fizyczna instalacja Windows, pomiar stabilności sprzętu ani odbiór VN-01.**
+
+## Rozszerzony odbiór źródłowych notatek po prawdziwym ASR (08.11.2026)
+
+Test `scripts/real_asr_smoke.py` po rozpoznaniu polskiego i angielskiego syntetycznego TTS rzeczywistym `whisper.cpp` dodatkowo sprawdza:
+
+1. Ręczna korekta rozpoznanej wypowiedzi nie zmienia surowego `transcript.json`.
+2. Dotychczasowa notatka podstawowa staje się jawnie nieaktualna i nie może być po cichu eksportowana jako aktualna.
+3. Regeneracja cytatów zachowuje poprzednią wersję w historii, a nowa notatka wiąże poprawiony tekst z tym samym ID źródłowym.
+4. Konspekt zaawansowany `MD/JSON/DOCX` powstaje z **rzeczywistego lokalnego wyniku ASR**, zawiera cytaty o prawidłowych ID i czasach, poprawioną treść w Word DOCX oraz nie dodaje obcych wypowiedzi.
+
+To test **ekstrakcyjnego konspektu źródłowego**, nie semantycznego rozumienia wykładu. Zestaw testowy generowany jest wyłącznie w jednorazowym CI, bez prywatnych nagrań i bez wysyłania transkrypcji. Status wykonania należy potwierdzić na GitHub Actions powiązanym z PR przed oznaczeniem `PASS`. Formalny odbiór VN-02/VN-03 nadal wymaga jakościowej oceny prawdziwych materiałów i urządzeń.
