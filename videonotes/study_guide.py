@@ -12,9 +12,10 @@ from collections import Counter
 from pathlib import Path
 
 from .advanced_notes import _category, _clock
+from .contracts import sha256_file
 from .errors import VideoNotesError
 from .notes import _hash, _select, _source, _tokens
-from .storage import atomic_write, read_project
+from .storage import atomic_write, read_project, load_json
 
 SCHEMA = "videonotes-study-guide-v1"
 DETAIL_LIMITS = {"brief": 3, "standard": 6, "full": 12}
@@ -211,3 +212,50 @@ def export_study_guide(folder: Path, *, section_minutes: int = 5,
         atomic_write(pdf, pdf_bytes)
         result.append(pdf)
     return tuple(result)
+
+
+def verify_study_guide(folder: Path, *, document: Path | None = None) -> dict:
+    """Verify a saved JSON document against the *current* local transcript.
+
+    No edits, downloads, exports, network, or automatic repair. Exact
+    deterministic comparison rejects invented quotes, altered labels,
+    timestamps, word counts, and obsolete/source-mismatched documents.
+    Markdown and DOCX are not independently signature-verified by this check.
+    """
+    root = Path(folder)
+    candidate = Path(document) if document is not None else root / "exports" / "notes-study.json"
+    if candidate.is_symlink() or not candidate.is_file():
+        raise VideoNotesError("Nie znaleziono zwykłego pliku JSON przewodnika do sprawdzenia.")
+    content = load_json(candidate)
+    if not isinstance(content, dict) or content.get("schema") != SCHEMA:
+        raise VideoNotesError("Nieobsługiwany format zapisanego przewodnika do nauki.")
+    detail = content.get("detail")
+    minutes = content.get("section_minutes")
+    if type(minutes) is not int or not 1 <= minutes <= 60 or not isinstance(detail, str) or detail not in DETAIL_LIMITS:
+        raise VideoNotesError("Niepoprawne parametry źródłowego przewodnika.")
+    expected = build_study_guide(root, section_minutes=minutes, detail=detail)
+    if content.get("project_id") != expected["project_id"]:
+        raise VideoNotesError("Przewodnik pochodzi z innego projektu.")
+    if content.get("source_sha256") != expected["source_sha256"]:
+        raise VideoNotesError(
+            "Przewodnik jest nieaktualny względem transkrypcji; wygeneruj nowy."
+        )
+    if content != expected:
+        raise VideoNotesError(
+            "Cytaty, czasy, klasyfikacje lub struktura przewodnika zostały zmienione; "
+            "nie można potwierdzić pochodzenia."
+        )
+    return {
+        "schema": SCHEMA,
+        "verified": True,
+        "project_id": expected["project_id"],
+        "source_sha256": expected["source_sha256"],
+        "document_sha256": sha256_file(candidate),
+        "sections": len(expected["sections"]),
+        "source_citations": sum(
+            len(section["key_quotes"]) for section in expected["sections"]
+        ),
+        "private_text_in_report": False,
+        "report_only_checks_json": True,
+        "cryptographic_signature_verified": False,
+    }

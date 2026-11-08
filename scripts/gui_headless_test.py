@@ -188,6 +188,11 @@ class GuiNotesHeadlessTest(unittest.TestCase):
         self.root.update()
         self.assertTrue((self.folder / "exports" / "notes-study.docx").is_file())
         self.assertIn("notes-study.docx", self.gui.status.get())
+        with patch("videonotes.gui.messagebox.showinfo") as info:
+            self._button(dialog, "Sprawdź źródła").invoke()
+            self.root.update()
+            info.assert_called_once()
+        self.assertIn("Potwierdzono", self.gui.status.get())
         self.assertFalse(self.gui.active)
 
     def test_basic_pdf_button_refuses_unsaved_draft(self):
