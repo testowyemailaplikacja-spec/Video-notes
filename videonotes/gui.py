@@ -1098,6 +1098,23 @@ class VideoNotesWindow:
             except VideoNotesError as error:
                 messagebox.showerror("Notatka", str(error))
         ttk.Button(right, text="Zapisz poprawkę i Markdown", command=save_edit).pack(anchor="e", pady=7)
+        def navigate_original() -> None:
+            if has_unsaved_draft():
+                messagebox.showwarning(
+                    "Niezapisany szkic notatki",
+                    "Najpierw zapisz poprawkę punktu notatki przed przejściem do transkrypcji."
+                )
+                return
+            ids = view.selection()
+            if not ids:
+                messagebox.showinfo("Źródło", "Najpierw zaznacz punkt notatki.")
+                return
+            self._jump_to_source(content_by_id[ids[0]]["segment_id"])
+
+        ttk.Button(
+            right, text="Przejdź do źródła transkrypcji",
+            command=navigate_original,
+        ).pack(anchor="e", pady=4)
         def export_docx() -> None:
             if has_unsaved_draft():
                 messagebox.showwarning("Eksport DOCX", "Najpierw zapisz poprawkę w edytorze.")
