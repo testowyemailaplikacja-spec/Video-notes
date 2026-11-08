@@ -101,7 +101,8 @@
         "PR #16: bounded FFmpeg stop/terminate/kill and preserved recording journal when recorder stalls, Linux/Windows CI and DEV EXE PASS",
         "PR #45: after interrupted recording or needs_review journal, read-only record-status reports healthy earlier WAV parts separately from damaged or symlinked parts, never auto-marks finished or modifies audio; finished sessions still strictly validate. Linux 125 tests and 5/5 source/browser CI plus Windows DEV EXE PASS. Not physical microphone crash test.",
         "PR #63: fail-closed WAV payload validation catches real truncated PCM despite intact RIFF header; verified whole-part numbering and finished recording.json count/duration; synthetic Linux/Windows CI and Windows DEV EXE 6/6 PASS (42467300146, 42467300161). Does not prove physical crash recovery.",
-        "PR #64: explicit offline CLI/GUI join of completed multi-part mic sessions into one lossless PCM WAV, no auto-selection of first part when multiple, original parts preserved, preflight disk/RIFF4GB and atomic no-clobber publication; actual Tk Xvfb + source/browser Linux/Windows + DEV EXE 7/7 PASS (42467815506, 42467815511, 42467815520). Not a physical 2h microphone test."
+        "PR #64: explicit offline CLI/GUI join of completed multi-part mic sessions into one lossless PCM WAV, no auto-selection of first part when multiple, original parts preserved, preflight disk/RIFF4GB and atomic no-clobber publication; actual Tk Xvfb + source/browser Linux/Windows + DEV EXE 7/7 PASS (42467815506, 42467815511, 42467815520). Not a physical 2h microphone test.",
+        "PR #66: new completed WAV sessions persist per-part SHA-256 and fail closed on silent PCM changes or missing fingerprint journal; legacy recordings report sha256_verified=false, existing parts are not modified; synthetic source/browser CI 42468276521 5/5 PASS and Windows DEV EXE 42468276515 PASS. No physical disk-failure or microphone test."
       ],
       "blockers": [
         "Physical Windows microphone permission and recording",
@@ -713,6 +714,18 @@
       "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42467815520",
       "scope": "PR #64 real Tk Xvfb GUI event transitions and multi-part source selection PASS; no physical Windows GUI",
       "real_tk_headless_linux": "PASS",
+      "physical_microphone": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42468276521",
+      "scope": "PR #66 5/5 Linux/Windows source/browser CI validates WAV SHA-256 tamper detection, legacy migration and lossless joins",
+      "source_linux_windows_browser": "PASS",
+      "physical_microphone": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42468276515",
+      "scope": "PR #66 Windows DEV EXE smoke success; no physical Windows recording or full offline model",
+      "windows_executable": "PASS",
       "physical_microphone": false
     }
   ],
