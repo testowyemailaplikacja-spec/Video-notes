@@ -5,6 +5,7 @@ on:
     paths:
       - 'videonotes/gui.py'
       - 'videonotes/notes.py'
+      - 'videonotes/study_guide.py'
       - 'videonotes/note_revisions.py'
       - 'scripts/gui_headless_test.py'
       - '.github/workflows/vn-tk-headless.yml'

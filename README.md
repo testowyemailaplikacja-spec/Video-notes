@@ -131,6 +131,18 @@ python -m videonotes inspect KATALOG_SESJI/recording-full.wav
 
 Program sprawdza ciągłość WAV i dziennik `finished`, nie nadpisuje gotowych plików, zachowuje oryginalne części, zapisuje nowy wynik atomowo i wymaga dodatkowego wolnego miejsca. Standardowy WAV ma limit około 4 GB. Testy automatyczne PR #63 i #64 są zielone, lecz **nie wykonano fizycznego testu mikrofonu Windows ani 2-godzinnej sesji**. Szczegóły: [VN04_MICROPHONE_CAPTURE.md](docs/VN04_MICROPHONE_CAPTURE.md).
 
+## Przewodnik do nauki z cytatami (VN-02/03)
+
+Video Notes pozwala przygotować **źródłowy przewodnik do nauki** z ukończonej transkrypcji. Program tworzy spis treści, chronologiczne cytaty ze znacznikami czasu, powtarzające się pojęcia, możliwe definicje, przykłady i fragmenty wymagające sprawdzenia. Całość jest lokalna i nie wykorzystuje płatnego API.
+
+```powershell
+python -m videonotes study-guide C:\\Notatki\\wyklad-001 --section-minutes 10 --detail full --docx
+```
+
+W interfejsie Windows jest przycisk **„Przewodnik do nauki — cytaty, pojęcia i pytania (VN-02/03)”**, z wyborem szczegółowości i opcjonalnym eksportem PDF przez lokalne LibreOffice. Zapisuje oddzielne `notes-study.md`, `notes-study.json` i opcjonalne DOCX/PDF; nie zastępuje oryginalnego rozpoznania ASR, notatki podstawowej ani historii poprawek. **Nie jest to semantyczne streszczenie AI; każda informacja pozostaje dosłownym cytatem źródłowym i wymaga weryfikacji.**
+
+Instrukcja: [VN_STUDY_GUIDE.md](docs/VN_STUDY_GUIDE.md).
+
 ## Prywatny instalator Windows offline (VN-06 — testy wewnętrzne)
 
 Po przygotowaniu legalnych lokalnych plików `VideoNotes-DEV.exe`, `ffmpeg.exe`, `ffprobe.exe`, `whisper-cli.exe` i modelu GGML możesz stworzyć zweryfikowaną prywatną paczkę `bundle-dev`, a następnie **rzeczywisty instalator Inno Setup EXE**, który zawiera te pliki bez automatycznego pobierania podczas instalacji:
