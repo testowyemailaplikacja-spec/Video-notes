@@ -191,3 +191,7 @@ Z notatki podstawowej, zaawansowanej oraz przewodnika do nauki można teraz **pr
 Przejście jest zabezpieczone przed przypadkową utratą niezapisanych poprawek. W przypadku istniejącego szkicu aplikacja najpierw pyta o jego zachowanie lub świadome odrzucenie; nie kasuje tekstu bez ostrzeżenia. Program nie odtwarza jeszcze automatycznie dźwięku od danego timecode — łącznik wskazuje tekstowe źródło z oznaczeniem czasu.
 
 Szczegóły: [VN03_FUNCTIONAL_TEMPLATES.md](docs/VN03_FUNCTIONAL_TEMPLATES.md).
+
+## Inwentarz zależności offline do prywatnego pakietu Windows (VN-06)
+
+Polecenie `python -m videonotes bundle-sbom KATALOG_PAKIETU --output raport.spdx.json` sprawdza istniejącą prywatną paczkę i zapisuje oddzielnie SPDX 2.3 z SHA-256 poszczególnych binariów/modelu. Wszystkie licencje są jawnie niezweryfikowane (`NOASSERTION`); brak podstaw do publikacji stabilnej wersji. Opis: [VN06_SBOM.md](docs/VN06_SBOM.md).
