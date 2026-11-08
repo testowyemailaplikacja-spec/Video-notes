@@ -53,3 +53,19 @@ Sam nagłówek RIFF/WAV nie dowodzi, że zapisano wszystkie próbki. Po awarii m
 Dla sesji `finished` wymagane są także ciągłe nazwy `part-00000.wav`, `part-00001.wav` itd., zgodność liczby części i sumy czasu z zapisanym dziennikiem `recording.json`. Brak części, ucięta końcówka PCM albo niespójny dziennik oznaczają błąd zamiast fałszywego potwierdzenia kompletności. Dla sesji `recording` lub `needs_review` nieczytelne pliki trafiają do `unreadable_parts`, a nie do listy zdrowych części. Materiały i dziennik pozostają nienaruszone.
 
 Automatyczne regresje obejmują celowe ucięcie danych przy zachowaniu poprawnego nagłówka, usunięcie/przesunięcie części oraz nieprawidłowe metadane zakończenia. **Nie jest to test fizycznej awarii dysku, 2-godzinnego nagrywania ani rzeczywistego mikrofonu Windows.** Odbiór VN-04 wymaga nadal testów urządzeń i pełnego instalatora.
+
+## Transkrypcja sesji podzielonej na kilka części (VN-04, 08.11.2026)
+
+Dłuższe nagranie jest zapisywane jako `part-00000.wav`, `part-00001.wav` itd. **Pierwszy plik nie jest całym wykładem.** Aby po ukończeniu sesji uzyskać jeden plik nadający się do istniejącej kolejki transkrypcji, użyj:
+
+```powershell
+python -m videonotes record-status C:\\Nagrania\\wyklad-001
+python -m videonotes record-join C:\\Nagrania\\wyklad-001 --output C:\\Nagrania\\wyklad-001\\recording-full.wav
+python -m videonotes inspect C:\\Nagrania\\wyklad-001\\recording-full.wav
+```
+
+W GUI dodano osobny przycisk **„Połącz części ukończonego nagrania WAV do transkrypcji”**. Po wskazaniu katalogu i potwierdzeniu program tworzy w tle plik `recording-full.wav`, który można wybrać do transkrypcji. Gdy nagranie ma więcej niż jedną część, GUI nie wybiera już automatycznie samej pierwszej jako pełnego źródła.
+
+Łączenie nie wymaga FFmpeg ani sieci. Kopiuje mono PCM 16 kHz/16 bit bez zmiany próbek, w blokach do 65 536 ramek. Przed zapisem sprawdza integralność źródłowych części, ciągłość numeracji i zgodność dziennika, weryfikuje dostępne miejsce, limit standardowego WAV 4 GB oraz nie nadpisuje istniejącego celu nawet w razie jednoczesnego utworzenia go przez inny proces. Wynik powstaje w pliku tymczasowym i jest udostępniany atomowo dopiero po walidacji. Części źródłowe i `recording.json` pozostają bez zmian. Sesja w stanie `needs_review` nie może być automatycznie łączona, dopóki nie zostanie odrębnie sprawdzona.
+
+**Ograniczenia:** złączenie wymaga dodatkowego miejsca w przybliżeniu równego wielkości audio, trwa proporcjonalnie do jego długości i nie usuwa oryginalnych części. Powyżej 4 GB standardowego WAV potrzebna będzie osobna ścieżka przetwarzania. Testy automatyczne korzystają z prawdziwych syntetycznych plików PCM zapisanych przez bibliotekę `wave`, nie z fizycznego mikrofonu Windows. Nie oznaczają zakończenia VN-04.

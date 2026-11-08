@@ -7,6 +7,9 @@ No subprocess shell, cloud account, remote API or third-party Python package.
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import tempfile
 import re
 import subprocess
 import sys
@@ -144,6 +147,84 @@ def recording_status(folder: Path) -> dict:
             "status": info["status"], "segments": segments,
             "unreadable_parts": damaged, "requires_manual_review": info["status"] != "finished"}
 
+
+
+
+def join_finished_recording(folder: Path, output: Path) -> Path:
+    """Join all verified local WAV parts without altering the source recording.
+
+    This is an explicit, extra-disk-space operation for recordings longer than
+    one segment. Write to a temporary WAV, verify, then publish with a hard
+    link (atomic no-clobber) so existing outputs are never overwritten.
+    """
+    folder = Path(folder).expanduser().resolve()
+    output = Path(output).expanduser().absolute()
+    if output.suffix.lower() != ".wav" or output.is_symlink() or output.exists():
+        raise VideoNotesError("Wskaż nowy plik wynikowy WAV, którego jeszcze nie ma.")
+    if output.parent.resolve() == folder and PATTERN.fullmatch(output.name):
+        raise VideoNotesError("Nie zapisuj wyniku jako numerowana część oryginalnej sesji.")
+    # Refuse ongoing/incomplete sessions and prove exact part continuity,
+    # journal count and WAV PCM readability before allocating output.
+    report = recording_status(folder)
+    if report["status"] != "finished":
+        raise VideoNotesError("Tylko ukończoną i spójną sesję można połączyć do WAV.")
+    paths = _wav_paths(folder)
+    total_frames = 0
+    for part in paths:
+        with wave.open(str(part), "rb") as audio:
+            total_frames += audio.getnframes()
+    # Standard RIFF/WAV uses a 32-bit chunk size (including all headers).
+    expected_bytes = 44 + total_frames * 2
+    if expected_bytes >= 2**32:
+        raise VideoNotesError("Połączony plik przekroczyłby limit WAV 4 GB. Przetwarzaj części osobno.")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        if shutil.disk_usage(output.parent).free < expected_bytes:
+            raise VideoNotesError("Za mało wolnego miejsca na połączony plik WAV.")
+    except OSError as error:
+        raise VideoNotesError("Nie udało się sprawdzić dostępnego miejsca na dysku.") from error
+
+    temp_name: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=output.parent, prefix=".vn-join-",
+                                         suffix=".wav.tmp", delete=False) as temp:
+            temp_name = temp.name
+        # wave.open(path) recognizes .tmp just like any other output name.
+        with wave.open(temp_name, "wb") as merged:
+            merged.setnchannels(1)
+            merged.setsampwidth(2)
+            merged.setframerate(16_000)
+            merged.setnframes(total_frames)
+            for part in paths:
+                if part.is_symlink() or not part.is_file():
+                    raise VideoNotesError("Zmieniono plik źródłowy WAV podczas łączenia.")
+                with wave.open(str(part), "rb") as audio:
+                    if (audio.getnchannels(), audio.getsampwidth(), audio.getframerate()) != (1, 2, 16_000):
+                        raise VideoNotesError("Format WAV uległ zmianie podczas łączenia.")
+                    left = audio.getnframes()
+                    while left:
+                        take = min(left, 65_536)
+                        data = audio.readframes(take)
+                        if len(data) != take * 2:
+                            raise VideoNotesError("Źródłowy WAV został ucięty podczas łączenia.")
+                        merged.writeframesraw(data)
+                        left -= take
+        # Reopen and stream-verify the newly assembled PCM before publication.
+        verified = _inspect_single_wav(Path(temp_name))
+        if verified["duration_ms"] != total_frames * 1000 // 16_000:
+            raise VideoNotesError("Połączony WAV ma niepoprawną długość.")
+        try:
+            os.link(temp_name, output)
+        except FileExistsError as error:
+            raise VideoNotesError("Plik wynikowy już istnieje; nie nadpisuję go.") from error
+        except OSError as error:
+            raise VideoNotesError("Nie można bezpiecznie zapisać wyniku bez nadpisywania; spróbuj na dysku NTFS.") from error
+    except (OSError, wave.Error) as error:
+        raise VideoNotesError("Nie udało się połączyć WAV. Części oryginalne zachowano.") from error
+    finally:
+        if temp_name:
+            Path(temp_name).unlink(missing_ok=True)
+    return output
 
 
 def _stop_ffmpeg(proc: object) -> int:

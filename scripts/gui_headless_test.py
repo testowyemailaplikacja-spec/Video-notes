@@ -126,6 +126,34 @@ class GuiNotesHeadlessTest(unittest.TestCase):
         self.assertEqual(read_basic_notes(self.folder)[1]["edits"], {})
 
 
+    def test_multisegment_mic_status_never_silently_selects_first_part(self):
+        """Exercise actual Tk event handling with two recorded WAV pieces."""
+        old_source = "previous-existing-source.wav"
+        self.gui.source.set(old_source)
+        self.gui.events.put(("mic_complete", (self.folder, {
+            "status": "finished", "segments": [
+                {"name": "part-00000.wav"}, {"name": "part-00001.wav"}
+            ]
+        })))
+        self.gui._drain()
+        self.assertEqual(self.gui.source.get(), old_source)
+        self.assertIn("transkrybować CAŁE nagranie", self.gui.status.get())
+        self.assertEqual(str(self.gui.start_button["state"]), "normal")
+
+    def test_join_completion_selects_full_wav_and_clears_stale_track(self):
+        old_path = self.folder / "recording-full.wav"
+        self.gui.source.set("previous-file.mkv")
+        self.gui.streams = {"invalid previous track": 4}
+        self.gui.stream.set("invalid previous track")
+        self.gui.active = True
+        self.gui.events.put(("mic_join_complete", str(old_path)))
+        self.gui._drain()
+        self.assertEqual(self.gui.source.get(), str(old_path))
+        self.assertEqual(self.gui.stream.get(), "")
+        self.assertFalse(self.gui.streams)
+        self.assertFalse(self.gui.active)
+        self.assertIn("Połączono całe nagranie", self.gui.status.get())
+
     def test_basic_pdf_button_refuses_unsaved_draft(self):
         generate_basic_notes(self.folder)
         self.gui._show_notes()
