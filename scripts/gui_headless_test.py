@@ -150,7 +150,7 @@ class GuiNotesHeadlessTest(unittest.TestCase):
         self.gui.events.put(("mic_capture_state", "paused"))
         self.gui._drain()
         self.assertEqual(str(controls["resume"]["state"]), "normal")
-        self.assertIn("Wstrzymane", controls["status"].get())
+        self.assertIn("wstrzymane", controls["status"].get())
         self._button(controls["window"], "Wznów nagrywanie").invoke()
         self.assertTrue(self.gui.mic_resume.is_set())
         self.gui.events.put(("mic_capture_state", "recording"))
