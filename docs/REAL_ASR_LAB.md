@@ -57,3 +57,10 @@ Pierwsze rzeczywiste wykonanie porównania dwóch silników wykazało, że pakie
 Drugi test rzeczywistej inferencji ujawnił niezależny błąd zależności: faster-whisper 1.2.1 wywołuje `av.open(metadata_errors=...)`, lecz PyAV 19 usunął ten parametr. Objaw: `TypeError: open() got an unexpected keyword argument 'metadata_errors'`. W CI przypięto zgodną wersję **PyAV 18.1.0** obok `faster-whisper==1.2.1`; sam produkt wciąż nie instaluje żadnych pakietów automatycznie. Jest to tymczasowa macierz zgodności, którą należy zaktualizować po wydaniu poprawionej wersji faster-whisper i sprawdzeniu jej ponownie.
 
 Dowód aktualnego upstream: https://github.com/SYSTRAN/faster-whisper/issues/1589 . Wydanie stabilne musi zweryfikować licencje, lockfile/SBOM, zgodność obu pakietów i rzeczywisty Windows; udane CI Linux na TTS nie wystarcza do zamknięcia VN-00.
+
+
+## Dodatkowa bramka automatyczna: dwie ścieżki OBS + prawdziwy ASR (08.11.2026)
+
+Test `scripts/real_obs_multitrack_asr_smoke.py` tworzy w CI **oryginalne, syntetyczne** pliki MP4 (PL) i MKV (EN) z obrazem, cichą pierwszą ścieżką audio i mową TTS na **drugiej** ścieżce. Następnie wykonuje prawdziwy `FFprobe → FFmpeg → whisper.cpp CPU → zapis checkpointu → ręczna poprawka → cztery eksporty`, sprawdzając, że przy dwóch ścieżkach wymagany jest jawny wybór i że poprawki nie nadpisują surowego ASR ani pliku wejściowego.
+
+Test jest wykonywany w tym samym `vn-real-asr-smoke.yml` z tym samym wcześniej weryfikowanym modelem lokalnym. Status: **oczekuje na wynik workflow nowego PR**; sam zapis testu nie dowodzi PASS. Nawet pozytywny wynik nie jest odbiorem rzeczywistych nagrań OBS, WER/CER wykładu, długiej inferencji ani instalacji offline na fizycznym Windows. Nie wolno na jego podstawie zamknąć VN-00/VN-01.
