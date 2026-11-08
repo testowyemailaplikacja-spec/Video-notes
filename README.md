@@ -199,3 +199,7 @@ Polecenie `python -m videonotes bundle-sbom KATALOG_PAKIETU --output raport.spdx
 ## Test lokalnego środowiska (VN-00/VN-06)
 
 `python -m videonotes doctor --model C:\\Modele\\ggml-base.bin --workspace C:\\Notatki --source C:\\Nagrania\\test.mkv` pokazuje lokalnie diagnostykę binariów, ścieżek audio, wolnego dysku i SHA-256 modelu bez sieci czy logowania prywatnych ścieżek. Nie potwierdza realnej jakości ASR, fizycznego Windows ani licencji. [Instrukcja](docs/VN_OFFLINE_DIAGNOSTICS.md).
+
+## Opcjonalne OCR klatek/slajdów OBS (VN-03B)
+
+`python -m videonotes slide-ocr KATALOG_PROJEKTU --output slajdy.json` uruchamia lokalny Tesseract i FFmpeg na niewielkiej liczbie klatek wideo, a `slide-verify ... --file slajdy.json` sprawdza poprawność struktury raportu i SHA-256 źródła. Wymaga wcześniejszego zainstalowania Tesseract z odpowiednimi pakietami językowymi, nie pobiera modeli i **nie weryfikuje faktów** ani dokładności OCR. Szczegóły: [VN03B_SLIDE_OCR.md](docs/VN03B_SLIDE_OCR.md).
