@@ -865,6 +865,22 @@ class VideoNotesWindow:
         content = tk.Text(body, wrap="word", undo=False)
         content.pack(fill="both", expand=True)
         content.configure(state="disabled")
+        source_table = self._source_navigation_tree(body)
+
+        def refresh_source_list() -> None:
+            try:
+                verify_advanced_outline(folder)
+                data = load_json(folder / "exports" / "notes-advanced.json")
+            except VideoNotesError:
+                source_table.delete(*source_table.get_children())
+                return
+            quotes = []
+            for chapter in data["sections"]:
+                for category in chapter.get("template_focus", []):
+                    quotes.extend(category["citations"])
+                for topic in chapter["topics"]:
+                    quotes.extend(topic["citations"])
+            self._fill_source_navigation(source_table, quotes)
 
         def generate(*, docx: bool = False, pdf: bool = False) -> None:
             if self.active:
@@ -894,6 +910,7 @@ class VideoNotesWindow:
             content.delete("1.0", "end")
             content.insert("1.0", markdown)
             content.configure(state="disabled")
+            refresh_source_list()
             self.status.set("Konspekt źródłowy zapisano lokalnie: " + ", ".join(str(p) for p in targets))
 
         def verify() -> None:
@@ -926,6 +943,7 @@ class VideoNotesWindow:
             content.configure(state="normal")
             content.insert("1.0", saved.read_text(encoding="utf-8"))
             content.configure(state="disabled")
+            refresh_source_list()
             self.status.set("Otworzono zapisany konspekt. Sprawdź źródła lub opracuj ponownie.")
         else:
             generate()
