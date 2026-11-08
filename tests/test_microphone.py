@@ -205,7 +205,7 @@ class MicrophoneTest(unittest.TestCase):
             wav.setnchannels(1)
             wav.setsampwidth(2)
             wav.setframerate(16000)
-            wav.writeframes(b"\\x01\\x00" * 1600)
+            wav.writeframes(b"\x01\x00" * 1600)
         journal["segments"] = 2
         journal["duration_ms"] = 200
         journal_path.write_text(json.dumps(journal), encoding="utf-8")
@@ -222,8 +222,8 @@ class MicrophoneTest(unittest.TestCase):
             self.assertEqual(merged.getnchannels(), 1)
             self.assertEqual(merged.getframerate(), 16000)
             self.assertEqual(merged.getnframes(), 3200)
-            self.assertEqual(merged.readframes(1600), b"\\x00\\x00" * 1600)
-            self.assertEqual(merged.readframes(1600), b"\\x01\\x00" * 1600)
+            self.assertEqual(merged.readframes(1600), b"\x00\x00" * 1600)
+            self.assertEqual(merged.readframes(1600), b"\x01\x00" * 1600)
         self.assertEqual(first.read_bytes(), original_first)
         self.assertEqual(second.read_bytes(), original_second)
 
