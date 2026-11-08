@@ -4,7 +4,7 @@
 
 ## Co przygotować
 
-Na Windows/innym komputerze trzeba zainstalować lokalnie FFmpeg i FFprobe, dostarczyć lokalny `whisper-cli(.exe)` oraz kompatybilny model `ggml-*.bin`. Dla `faster-whisper` przygotuj lokalny folder modelu CTranslate2, zawierający co najmniej `config.json` i `model.bin`, oraz opcjonalny pakiet Pythona `faster-whisper` z zależnościami. **Nie wpisuj nazwy modelu z sieci zamiast lokalnej ścieżki**, program nie pobiera modeli automatycznie.
+Na Windows/innym komputerze trzeba zainstalować lokalnie FFmpeg i FFprobe, dostarczyć lokalny `whisper-cli(.exe)` oraz kompatybilny model `ggml-*.bin`. Dla `faster-whisper` przygotuj lokalny folder modelu CTranslate2, zawierający co najmniej `config.json`, `model.bin` i `vocabulary.txt`, oraz opcjonalny pakiet Pythona `faster-whisper` z zależnościami. **Nie wpisuj nazwy modelu z sieci zamiast lokalnej ścieżki**, program nie pobiera modeli automatycznie.
 
 Przygotuj legalny własny plik OBS MP4/MKV/WebM/WAV i ręcznie sprawdzony plik UTF-8 `wzorzec.txt` obejmujący dokładnie tę samą część nagrania.
 
@@ -37,3 +37,23 @@ Model oraz binaria są pobierane **tylko przez workflow testowy** i nie trafiaj�
 Źródła komponentów: [whisper.cpp](https://github.com/ggml-org/whisper.cpp), [model multilingual tiny](https://huggingface.co/ggerganov/whisper.cpp/blob/main/ggml-tiny.bin) i [MIT dla Whisper oraz wag](https://github.com/openai/whisper/blob/main/README.md#license). Licencję i warunki całej przyszłej dystrybucji należy osobno skontrolować przed wydaniem.
 
 **Nie zamyka VN-00 ani VN-01:** prawdziwe PL/EN wykłady, ocena WER/CER przez człowieka, porównanie faster-whisper, pomiar na docelowym komputerze Windows, 2h, stabilny instalator i licencje redystrybucji nadal są wymagane. Wynik workflow trzeba zweryfikować przed zmianą statusu.
+
+## Porównanie dwóch prawdziwych lokalnych silników na syntetycznym TTS (08.11.2026)
+
+Workflow `vn-real-asr-smoke.yml` po osobnym teście prawdziwego `whisper.cpp` może dodatkowo uruchomić **rzeczywisty lokalny benchmark dwusilnikowy** dla tych samych próbek eSpeak NG (PL i EN). Dla Whisper.cpp wykorzystuje commit `6a8addd258eadd6563f8c582e8acc535e6325364` i znany SHA-256 wielojęzycznego modelu GGML tiny. Dla `faster-whisper` instaluje opcjonalny pakiet tylko na jednorazowej maszynie CI i pobiera lokalną konwersję CTranslate2 `Systran/faster-whisper-tiny` z przypiętej rewizji `d90ca5fe260221311c53c58e660288d3deb8d356`; model.bin musi mieć SHA-256 `dcb76c6586fc06cbdac6dd21f14cfd129cc4cdd9dce19bf4ffa62e59cbe6e6d1`.
+
+Ten sam fragment WAV mono/PCM 16 kHz trafia osobno do dwóch prawdziwych procesów CPU przez funkcję `benchmark-real`, z ręcznie zadanym wzorcem odpowiadającym oryginalnemu tekstowi syntezatora. Wynik zawiera **WER, CER, czas i obserwowane maksimum RSS** przez lokalny psutil. Wyniki benchmarków pozostają tylko w katalogu tymczasowym runnera i nie zawierają pełnego tekstu nagrań ani transkrypcji. Wzorzec TTS nie jest równoważny nagraniu naturalnej mowy z sali.
+
+Nie porównuje to dwóch technologii na identycznym formacie/kwantyzacji wag (GGML vs CTranslate2 int8), a ani wynik CI, ani pomiar na współdzielonej maszynie wirtualnej nie przesądzają o wyborze silnika, jakości naturalnych PL/EN wykładów ani wydajności docelowego Windows. Modele nie są dystrybuowane w produkcie, a warunki licencyjne wymagają osobnego odbioru wydawniczego.
+
+Źródła: [faster-whisper](https://github.com/SYSTRAN/faster-whisper), [oficjalny model tiny CTranslate2](https://huggingface.co/Systran/faster-whisper-tiny) (MIT), [whisper.cpp](https://github.com/ggml-org/whisper.cpp).
+
+### Wymagany plik `vocabulary.txt` (diagnoza CI 08.11.2026)
+
+Pierwsze rzeczywiste wykonanie porównania dwóch silników wykazało, że pakiet modelu CTranslate2 z samymi `model.bin`, `config.json` i `tokenizer.json` jest niekompletny: `faster-whisper` zwraca błąd `Cannot load the vocabulary from the model directory`. Poprawiono testowy zestaw na pinowane pliki obejmujące `vocabulary.txt` oraz dodano wcześniejszą walidację tego wymogu w aplikacji, aby nie rozpoczynać benchmarku z błędnym modelem. Dopiero pełny pozytywny przebieg obu silników uzasadnia wpisanie WER/CER i RSS jako przetestowanych.
+
+### Zgodność PyAV przy faster-whisper 1.2.1
+
+Drugi test rzeczywistej inferencji ujawnił niezależny błąd zależności: faster-whisper 1.2.1 wywołuje `av.open(metadata_errors=...)`, lecz PyAV 19 usunął ten parametr. Objaw: `TypeError: open() got an unexpected keyword argument 'metadata_errors'`. W CI przypięto zgodną wersję **PyAV 18.1.0** obok `faster-whisper==1.2.1`; sam produkt wciąż nie instaluje żadnych pakietów automatycznie. Jest to tymczasowa macierz zgodności, którą należy zaktualizować po wydaniu poprawionej wersji faster-whisper i sprawdzeniu jej ponownie.
+
+Dowód aktualnego upstream: https://github.com/SYSTRAN/faster-whisper/issues/1589 . Wydanie stabilne musi zweryfikować licencje, lockfile/SBOM, zgodność obu pakietów i rzeczywisty Windows; udane CI Linux na TTS nie wystarcza do zamknięcia VN-00.

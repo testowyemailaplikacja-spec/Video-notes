@@ -73,3 +73,88 @@ jobs:
             --whisper "$RUNNER_TEMP/whisper-cpp/build/bin/whisper-cli" \
             --model "$RUNNER_TEMP/ggml-tiny.bin" \
             --pl "$RUNNER_TEMP/pl.wav" --en "$RUNNER_TEMP/en.wav"
+      - name: Install optional CTranslate2 inference and memory measurement (CI only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --quiet 'faster-whisper==1.2.1' 'av==18.1.0' 'psutil>=6,<8'
+      - name: Obtain verified multilingual faster-whisper tiny CTranslate2 model
+        shell: bash
+        run: |
+          set -euo pipefail
+          HF_REV=d90ca5fe260221311c53c58e660288d3deb8d356
+          MODEL_DIR="$RUNNER_TEMP/faster-tiny"
+          mkdir -p "$MODEL_DIR"
+          for name in model.bin config.json tokenizer.json vocabulary.txt; do
+            curl --fail --location --silent --show-error --retry 3 --retry-delay 2 \
+              --connect-timeout 30 --max-time 240 \
+              --output "$MODEL_DIR/$name" \
+              "https://huggingface.co/Systran/faster-whisper-tiny/resolve/$HF_REV/$name"
+          done
+          echo "dcb76c6586fc06cbdac6dd21f14cfd129cc4cdd9dce19bf4ffa62e59cbe6e6d1  $MODEL_DIR/model.bin" | sha256sum -c -
+          test -s "$MODEL_DIR/config.json"
+          test -s "$MODEL_DIR/tokenizer.json"
+          test -s "$MODEL_DIR/vocabulary.txt"
+      - name: Diagnose optional CPU inference with synthetic audio only, redacting transcript and paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          try:
+              import faster_whisper
+              from faster_whisper import WhisperModel
+              import av
+              assert av.__version__.split(".")[0] == "18"
+              print("faster-whisper module import: OK, pinned PyAV 18")
+              model = WhisperModel(str(Path(os.environ["RUNNER_TEMP"]) / "faster-tiny"),
+                                   device="cpu", compute_type="int8", cpu_threads=4,
+                                   num_workers=1, local_files_only=True)
+              print("faster-whisper model initialization: OK")
+              segments, info = model.transcribe(str(Path(os.environ["RUNNER_TEMP"]) / "pl.wav"),
+                                                language="pl", beam_size=5,
+                                                vad_filter=False, condition_on_previous_text=True)
+              count = sum(1 for part in segments if part.text.strip())
+              print("faster-whisper synthetic PL inference segments:", count)
+              if count < 1:
+                  raise RuntimeError("Empty synthetic TTS result")
+          except Exception as error:
+              detail = str(error).replace(os.environ["RUNNER_TEMP"], "<ephemeral-runner>")
+              print("faster-whisper failed with class", type(error).__name__, "synthetic model error:", detail[:500])
+              # Error is from an ephemeral downloaded model and original TTS, never private user audio.
+              raise SystemExit(2)
+          PY
+      - name: Compare two real local CPU engines on exactly the same PL and EN TTS WAV
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' 'To jest test nagrania wykładu. Router przekazuje pakiety pomiędzy sieciami. Program zamienia mowę na lokalną transkrypcję.' > "$RUNNER_TEMP/reference-pl.txt"
+          printf '%s\n' 'Hello. This is an offline audio test. A router connects two networks. The program converts speech to a local transcript.' > "$RUNNER_TEMP/reference-en.txt"
+          for language in pl en; do
+            python -m videonotes benchmark-real "$RUNNER_TEMP/$language.wav" \
+              --reference "$RUNNER_TEMP/reference-$language.txt" \
+              --cpp-executable "$RUNNER_TEMP/whisper-cpp/build/bin/whisper-cli" \
+              --cpp-model "$RUNNER_TEMP/ggml-tiny.bin" \
+              --faster-model-dir "$RUNNER_TEMP/faster-tiny" \
+              --language "$language" --threads 4 --duration-seconds 30 \
+              --output "$RUNNER_TEMP/bench-$language.json"
+          done
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path(os.environ["RUNNER_TEMP"])
+          for language in ("pl", "en"):
+              report = json.loads((root / f"bench-{language}.json").read_text("utf-8"))
+              assert report["local_subprocesses_executed"] is True
+              assert report["engine_binary_identity_independently_verified"] is False
+              assert len(report["accuracy"]) == 2
+              assert {row["label_supplied_by_user"] for row in report["accuracy"]} == {"whisper_cpp", "faster_whisper"}
+              assert all(row["reference_words"] > 5 for row in report["accuracy"])
+              assert all(row["wer"] >= 0 for row in report["accuracy"])
+              for label in ("whisper_cpp", "faster_whisper"):
+                  timing = report["timing_and_memory"][label]
+                  assert timing["wall_seconds"] > 0
+                  assert timing["ram_measured"] is True and timing["peak_rss_bytes"] > 0
+          print("Real two-engine PL/EN benchmark completed; WER/CER and RSS verified in ephemeral JSON.")
+          PY

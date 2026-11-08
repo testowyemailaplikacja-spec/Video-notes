@@ -15,8 +15,9 @@ from .storage import atomic_write
 
 def transcribe_local(wav: Path, model_path: Path, output: Path, *, language: str, threads: int) -> None:
     model_path = Path(model_path).expanduser().resolve()
-    if not model_path.is_dir() or not (model_path / "config.json").is_file() or not (model_path / "model.bin").is_file():
-        raise VideoNotesError("Wymagany lokalny katalog modelu faster-whisper z config.json i model.bin.")
+    required = ("config.json", "model.bin", "vocabulary.txt")
+    if not model_path.is_dir() or any(not (model_path / part).is_file() for part in required):
+        raise VideoNotesError("Model faster-whisper wymaga lokalnych plików config.json, model.bin i vocabulary.txt.")
     if language not in {"pl", "en", "auto"} or not 1 <= threads <= 64:
         raise VideoNotesError("Nieobsługiwane ustawienia języka lub CPU.")
     os.environ["HF_HUB_OFFLINE"] = "1"

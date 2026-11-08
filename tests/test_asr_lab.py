@@ -33,6 +33,7 @@ class LocalASRLabTest(unittest.TestCase):
         self.model_dir.mkdir()
         (self.model_dir / "config.json").write_text('{"fake": true}')
         (self.model_dir / "model.bin").write_bytes(b"fake ct2 model")
+        (self.model_dir / "vocabulary.txt").write_text("fake vocabulary for CI-only model test", encoding="utf-8")
         self.report = self.root / "report.json"
 
     def _stub(self, command):
@@ -95,6 +96,26 @@ class LocalASRLabTest(unittest.TestCase):
             with self.subTest(case=options), self.assertRaises(VideoNotesError):
                 run_real_benchmark(self.source, self.reference, **defaults)
 
+    @patch("videonotes.asr_lab.executable", return_value="/tmp/stub-whisper-cli")
+    @patch("videonotes.asr_lab.probe")
+    @patch("videonotes.asr_lab.extract_chunk")
+    def test_benchmark_error_identifies_engine_but_not_spoken_text(self, extract, probe, executable):
+        probe.return_value = {
+            "source": str(self.source), "duration_ms": 3000,
+            "audio_streams": [{"index": 1, "codec": "pcm", "language": "pl", "channels": 1}],
+        }
+        extract.side_effect = lambda path, track, *, start_ms, duration_ms, destination, ffmpeg: destination.write_bytes(self.source.read_bytes())
+        def private_failure(command):
+            raise VideoNotesError("SECRET: a real transcript from the user")
+        with self.assertRaisesRegex(VideoNotesError, "whisper_cpp") as received:
+            run_real_benchmark(
+                self.source, self.reference, cpp_executable="whisper-cli",
+                cpp_model=self.model, faster_model_dir=self.model_dir,
+                stream=1, process_runner=private_failure,
+            )
+        self.assertNotIn("SECRET", str(received.exception))
+        self.assertNotIn("transcript from the user", str(received.exception))
+
     def test_subprocess_runner_hides_stdout_and_stderr_even_on_error(self):
         with self.assertRaisesRegex(VideoNotesError, "błędem") as received:
             _run_process([sys.executable, "-c", "import sys;print('SECRET RECORDING');print('private model',file=sys.stderr);sys.exit(2)"])
@@ -122,6 +143,19 @@ class LocalASRLabTest(unittest.TestCase):
         self.assertEqual(calls[0][1]["device"], "cpu")
         self.assertEqual(result.read_text("utf-8"), "Pierwszy fragment\nDrugi fragment\n")
         self.assertEqual(calls[0][1]["cpu_threads"], 2)
+
+    def test_missing_ct2_vocabulary_fails_without_running_engine(self):
+        (self.model_dir / "vocabulary.txt").unlink()
+        target = self.root / "missing-vocab.txt"
+        with self.assertRaisesRegex(VideoNotesError, "vocabulary.txt"):
+            transcribe_local(self.source, self.model_dir, target, language="pl", threads=2)
+        self.assertFalse(target.exists())
+        with self.assertRaisesRegex(VideoNotesError, "vocabulary.txt"):
+            run_real_benchmark(
+                self.source, self.reference, cpp_executable="test",
+                cpp_model=self.model, faster_model_dir=self.model_dir,
+                process_runner=self._stub,
+            )
 
     def test_faster_worker_rejects_absent_local_dir_without_import(self):
         with self.assertRaises(VideoNotesError):
