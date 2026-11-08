@@ -51,3 +51,9 @@ Nie porównuje to dwóch technologii na identycznym formacie/kwantyzacji wag (GG
 ### Wymagany plik `vocabulary.txt` (diagnoza CI 08.11.2026)
 
 Pierwsze rzeczywiste wykonanie porównania dwóch silników wykazało, że pakiet modelu CTranslate2 z samymi `model.bin`, `config.json` i `tokenizer.json` jest niekompletny: `faster-whisper` zwraca błąd `Cannot load the vocabulary from the model directory`. Poprawiono testowy zestaw na pinowane pliki obejmujące `vocabulary.txt` oraz dodano wcześniejszą walidację tego wymogu w aplikacji, aby nie rozpoczynać benchmarku z błędnym modelem. Dopiero pełny pozytywny przebieg obu silników uzasadnia wpisanie WER/CER i RSS jako przetestowanych.
+
+### Zgodność PyAV przy faster-whisper 1.2.1
+
+Drugi test rzeczywistej inferencji ujawnił niezależny błąd zależności: faster-whisper 1.2.1 wywołuje `av.open(metadata_errors=...)`, lecz PyAV 19 usunął ten parametr. Objaw: `TypeError: open() got an unexpected keyword argument 'metadata_errors'`. W CI przypięto zgodną wersję **PyAV 18.1.0** obok `faster-whisper==1.2.1`; sam produkt wciąż nie instaluje żadnych pakietów automatycznie. Jest to tymczasowa macierz zgodności, którą należy zaktualizować po wydaniu poprawionej wersji faster-whisper i sprawdzeniu jej ponownie.
+
+Dowód aktualnego upstream: https://github.com/SYSTRAN/faster-whisper/issues/1589 . Wydanie stabilne musi zweryfikować licencje, lockfile/SBOM, zgodność obu pakietów i rzeczywisty Windows; udane CI Linux na TTS nie wystarcza do zamknięcia VN-00.
