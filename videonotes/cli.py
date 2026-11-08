@@ -12,6 +12,7 @@ from .exports import edit_segment, export_project
 from .media import probe
 from .microphone import record_microphone, recording_status, list_microphone_devices, join_finished_recording
 from .audio_diagnostics import analyze_finished_recording
+from .recovery_audio import inspect_recoverable_recording, salvage_recording
 from .notes import generate_basic_notes, edit_note_point, export_basic_notes, export_basic_notes_text, export_basic_notes_docx
 from .advanced_notes import export_advanced_outline
 from .study_guide import export_study_guide, verify_study_guide
@@ -151,6 +152,13 @@ def parser() -> argparse.ArgumentParser:
     mic.add_argument("--ffmpeg", default="ffmpeg")
     mic_status = sub.add_parser("record-status", help="Sprawdź lokalne pliki nagrania i dziennik sesji")
     mic_status.add_argument("folder", type=Path)
+    recovery_info = sub.add_parser("record-recovery-status", help="Sprawdź bez zmian plików, które poprawne WAV da się odzyskać po awarii")
+    recovery_info.add_argument("folder", type=Path)
+    recovery = sub.add_parser("record-salvage", help="Skopiuj tylko poprawny ciągły początek przerwanego nagrania do NOWEGO WAV")
+    recovery.add_argument("folder", type=Path)
+    recovery.add_argument("--output", required=True, type=Path)
+    recovery.add_argument("--confirm-stopped", required=True, action="store_true",
+                          help="Potwierdź, że FFmpeg już nie nagrywa, a wynik może być niekompletny")
     mic_analyze = sub.add_parser("record-analyze", help="Sprawdź lokalnie głośność, ciszę i przesterowanie ukończonego WAV")
     mic_analyze.add_argument("folder", type=Path, help="Katalog ukończonej sesji mikrofonowej")
     mic_join = sub.add_parser("record-join", help="Połącz ukończoną sesję z wielu części WAV bez nadpisywania")
@@ -304,6 +312,12 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(result, ensure_ascii=False, indent=2))
         elif args.action == "record-status":
             print(json.dumps(recording_status(args.folder), ensure_ascii=False, indent=2))
+        elif args.action == "record-recovery-status":
+            print(json.dumps(inspect_recoverable_recording(args.folder), ensure_ascii=False, indent=2))
+        elif args.action == "record-salvage":
+            print(json.dumps(salvage_recording(
+                args.folder, args.output, confirm_stopped=args.confirm_stopped
+            ), ensure_ascii=False, indent=2))
         elif args.action == "record-analyze":
             print(json.dumps(analyze_finished_recording(args.folder), ensure_ascii=False, indent=2))
         elif args.action == "record-join":
