@@ -136,8 +136,10 @@ class PrivateInstallerTest(unittest.TestCase):
             "--iscc", str(self.compiler), "--output", str(self.output)
         ]
         with contextlib.redirect_stderr(io.StringIO()) as stderr:
-            self.assertEqual(main(args), 2)
-        self.assertIn("internal-only", stderr.getvalue())
+            with self.assertRaises(SystemExit) as raised:
+                main(args)
+        self.assertEqual(raised.exception.code, 2)
+        self.assertIn("--internal-only", stderr.getvalue())
         with patch("videonotes.installer.sys.platform", "win32"), \
              patch("videonotes.cli.build_internal_installer",
                    return_value={"distribution": "internal-only", "release_ready": False}):
