@@ -112,3 +112,9 @@ Wymagany jest stan `finished` oraz prawidłowe części PCM mono 16 kHz/16 bit. 
 **Interpretacja:** RMS poniżej –38 dBFS może oznaczać zbyt niski poziom; szczyt bliski 0 dBFS lub ponad 0,5% próbek bliskich maksimum może wskazywać na przesterowanie; cisza jest szacowana z 2-sekundowych okien o RMS poniżej –45 dBFS. Są to jedynie wskazówki, a nie miernik jakości mowy. Brak ostrzeżeń nie gwarantuje prawidłowej treści, braku szumu, poprawności diarizacji ani transkrypcji ASR. Weryfikacja **nie zastępuje odsłuchu ani testu prawdziwego urządzenia Windows**.
 
 Testy automatyczne obejmują rzeczywiste oryginalne PCM: sinusoidalną mowopodobną falę, ciszę, przesterowanie, uszkodzenie WAV, sesje `paused` / `needs_review`, starsze dzienniki bez SHA, CLI i rzeczywisty podgląd Tk na Linux/Windows CI. Nie wykorzystują prywatnych nagrań użytkownika.
+
+## Rzeczywisty proces FFmpeg — próba pełnego cyklu Pauza/Wznów (08.11.2026)
+
+Po testach jednostkowych z atrapą uruchamiana jest również osobna bramka CI `.github/workflows/vn-real-mic-pause.yml`. Korzysta z faktycznego procesu **FFmpeg** na Linux i lokalnego generatora `lavfi sine` zamiast mikrofonu. Program przeprowadza **dwa faktyczne ujęcia**, celowo pauzuje przez polecenie `q` (FFmpeg finalizuje WAV), wznowienie wykonuje do kolejnego prywatnego katalogu, a po stopie kontroluje status `finished`, SHA-256, dwie różne próbki, niezmienność wcześniejszej części, brak pozostałych tymczasowych katalogów, bezstratne sklejenie i analizę poziomu dźwięku.
+
+Nie jest to atrapa procesu nagrywającego — przetwarzanie WAV, sterowanie stdin, segmentowy muxer i dekodowanie PCM są wykonywane rzeczywiście. **Źródłem jest sztuczna fala sinusoidalna; test nie otwiera mikrofonu Windows, nie sprawdza DirectShow, uprawnień, loopback ani zachowania po wielu godzinach.** Dopiero po zielonej akcji CI można oznaczyć podtest jako PASS. Nie oznacza to ukończenia VN-04.
