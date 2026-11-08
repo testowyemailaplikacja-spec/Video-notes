@@ -4,7 +4,7 @@
 
 ## Co przygotować
 
-Na Windows/innym komputerze trzeba zainstalować lokalnie FFmpeg i FFprobe, dostarczyć lokalny `whisper-cli(.exe)` oraz kompatybilny model `ggml-*.bin`. Dla `faster-whisper` przygotuj lokalny folder modelu CTranslate2, zawierający co najmniej `config.json` i `model.bin`, oraz opcjonalny pakiet Pythona `faster-whisper` z zależnościami. **Nie wpisuj nazwy modelu z sieci zamiast lokalnej ścieżki**, program nie pobiera modeli automatycznie.
+Na Windows/innym komputerze trzeba zainstalować lokalnie FFmpeg i FFprobe, dostarczyć lokalny `whisper-cli(.exe)` oraz kompatybilny model `ggml-*.bin`. Dla `faster-whisper` przygotuj lokalny folder modelu CTranslate2, zawierający co najmniej `config.json`, `model.bin` i `vocabulary.txt`, oraz opcjonalny pakiet Pythona `faster-whisper` z zależnościami. **Nie wpisuj nazwy modelu z sieci zamiast lokalnej ścieżki**, program nie pobiera modeli automatycznie.
 
 Przygotuj legalny własny plik OBS MP4/MKV/WebM/WAV i ręcznie sprawdzony plik UTF-8 `wzorzec.txt` obejmujący dokładnie tę samą część nagrania.
 
@@ -47,3 +47,7 @@ Ten sam fragment WAV mono/PCM 16 kHz trafia osobno do dwóch prawdziwych proces�
 Nie porównuje to dwóch technologii na identycznym formacie/kwantyzacji wag (GGML vs CTranslate2 int8), a ani wynik CI, ani pomiar na współdzielonej maszynie wirtualnej nie przesądzają o wyborze silnika, jakości naturalnych PL/EN wykładów ani wydajności docelowego Windows. Modele nie są dystrybuowane w produkcie, a warunki licencyjne wymagają osobnego odbioru wydawniczego.
 
 Źródła: [faster-whisper](https://github.com/SYSTRAN/faster-whisper), [oficjalny model tiny CTranslate2](https://huggingface.co/Systran/faster-whisper-tiny) (MIT), [whisper.cpp](https://github.com/ggml-org/whisper.cpp).
+
+### Wymagany plik `vocabulary.txt` (diagnoza CI 08.11.2026)
+
+Pierwsze rzeczywiste wykonanie porównania dwóch silników wykazało, że pakiet modelu CTranslate2 z samymi `model.bin`, `config.json` i `tokenizer.json` jest niekompletny: `faster-whisper` zwraca błąd `Cannot load the vocabulary from the model directory`. Poprawiono testowy zestaw na pinowane pliki obejmujące `vocabulary.txt` oraz dodano wcześniejszą walidację tego wymogu w aplikacji, aby nie rozpoczynać benchmarku z błędnym modelem. Dopiero pełny pozytywny przebieg obu silników uzasadnia wpisanie WER/CER i RSS jako przetestowanych.
