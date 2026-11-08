@@ -33,6 +33,7 @@ class LocalASRLabTest(unittest.TestCase):
         self.model_dir.mkdir()
         (self.model_dir / "config.json").write_text('{"fake": true}')
         (self.model_dir / "model.bin").write_bytes(b"fake ct2 model")
+        (self.model_dir / "vocabulary.txt").write_text("fake vocabulary for CI-only model test", encoding="utf-8")
         self.report = self.root / "report.json"
 
     def _stub(self, command):
@@ -142,6 +143,19 @@ class LocalASRLabTest(unittest.TestCase):
         self.assertEqual(calls[0][1]["device"], "cpu")
         self.assertEqual(result.read_text("utf-8"), "Pierwszy fragment\nDrugi fragment\n")
         self.assertEqual(calls[0][1]["cpu_threads"], 2)
+
+    def test_missing_ct2_vocabulary_fails_without_running_engine(self):
+        (self.model_dir / "vocabulary.txt").unlink()
+        target = self.root / "missing-vocab.txt"
+        with self.assertRaisesRegex(VideoNotesError, "vocabulary.txt"):
+            transcribe_local(self.source, self.model_dir, target, language="pl", threads=2)
+        self.assertFalse(target.exists())
+        with self.assertRaisesRegex(VideoNotesError, "vocabulary.txt"):
+            run_real_benchmark(
+                self.source, self.reference, cpp_executable="test",
+                cpp_model=self.model, faster_model_dir=self.model_dir,
+                process_runner=self._stub,
+            )
 
     def test_faster_worker_rejects_absent_local_dir_without_import(self):
         with self.assertRaises(VideoNotesError):
