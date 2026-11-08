@@ -197,7 +197,12 @@
       }
       var filename = button.getAttribute("data-export");
       try {
-        var payload = core.renderExport(doc, edits, filename);
+        if (filename === "web-corrections.json" && !Object.keys(edits).length) {
+          message("Brak zapisanych poprawek do przeniesienia. Najpierw popraw tekst i zapisz zmianę.", false);
+          return;
+        }
+        var payload = filename === "web-corrections.json" ?
+          core.renderCorrections(doc, edits) : core.renderExport(doc, edits, filename);
         var mime = filename.endsWith(".json") ? "application/json;charset=utf-8" :
           "text/plain;charset=utf-8";
         var blob = new Blob([payload], {type: mime});

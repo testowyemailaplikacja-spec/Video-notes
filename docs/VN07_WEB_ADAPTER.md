@@ -52,3 +52,7 @@ W SRT i VTT każdy segment pozostaje jednym cue: wielowierszowe poprawki są ł�
 Dodano `scripts/browser-smoke.cjs` uruchamiany w osobnej pracy GitHub Actions na Ubuntu 24.04. Skrypt otwiera **rzeczywiste** `web/index.html` przez `file://` w headless Chromium/Chrome, korzystając z lokalnego Chrome DevTools Protocol i Node 22 (bez npm, zewnętrznych API i prywatnych plików). Sprawdza import syntetycznego JSON, wybranie i poprawienie segmentu, odmowę eksportu niezapisanego szkicu, lokalną treść poprawionego TXT, odmowę utraty poprawek przy imporcie oraz brak zasobów HTTP(S) w rejestrze ładowania strony.
 
 Ten test potwierdza zachowanie Chromium na runnerze Linux **dopiero po zielonym przebiegu workflow**. Nie jest testem prawdziwego użytkownika Windows w Chrome/Edge/Firefox, dostępności czy wydajności 50 000 segmentów. Nie można na tej podstawie oznaczyć WEB-01/WEB-02 ani VN-07 jako w pełni odebranych.
+
+## Przenoszenie poprawek do projektu desktopowego (08.11.2026)
+
+Lokalny edytor udostępnia dodatkowy przycisk **Poprawki do programu (JSON)**. Pobierana paczka zawiera tylko zmienione segmenty, ich identyfikatory i czasy oraz tekst przed/po korekcie. Komenda `import-web-edits` w Pythonie pozwala najpierw zobaczyć plan zmian, a dopiero z flagą `--apply` zapisać je do osobnego pliku `edits.json`. Konflikt tekstu lub tożsamości segmentu blokuje całą operację bez częściowego zapisu. Szczegóły, ograniczenia i testy: [VN07_ROUNDTRIP_EDITS.md](VN07_ROUNDTRIP_EDITS.md). Nie jest to synchronizacja portalu ani pełny odbiór VN-07.
