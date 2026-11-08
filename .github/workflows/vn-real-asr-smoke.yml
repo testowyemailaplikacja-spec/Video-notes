@@ -5,6 +5,7 @@ on:
     paths:
       - 'scripts/real_asr_smoke.py'
       - 'scripts/real_obs_multitrack_asr_smoke.py'
+      - 'scripts/real_resume_asr_smoke.py'
       - 'videonotes/asr.py'
       - 'videonotes/pipeline.py'
       - '.github/workflows/vn-real-asr-smoke.yml'
@@ -82,6 +83,14 @@ jobs:
             --whisper "$RUNNER_TEMP/whisper-cpp/build/bin/whisper-cli" \
             --model "$RUNNER_TEMP/ggml-tiny.bin" \
             --pl "$RUNNER_TEMP/pl.wav" --en "$RUNNER_TEMP/en.wav"
+      - name: Real Whisper checkpoint cancellation and resume on 34s two-track OBS-like MKV
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m scripts.real_resume_asr_smoke \
+            --whisper "$RUNNER_TEMP/whisper-cpp/build/bin/whisper-cli" \
+            --model "$RUNNER_TEMP/ggml-tiny.bin" \
+            --pl "$RUNNER_TEMP/pl.wav"
       - name: Install optional CTranslate2 inference and memory measurement (CI only)
         shell: bash
         run: |
