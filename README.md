@@ -203,3 +203,7 @@ Polecenie `python -m videonotes bundle-sbom KATALOG_PAKIETU --output raport.spdx
 ## Opcjonalne OCR klatek/slajdów OBS (VN-03B)
 
 `python -m videonotes slide-ocr KATALOG_PROJEKTU --output slajdy.json` uruchamia lokalny Tesseract i FFmpeg na niewielkiej liczbie klatek wideo, a `slide-verify ... --file slajdy.json` sprawdza poprawność struktury raportu i SHA-256 źródła. Wymaga wcześniejszego zainstalowania Tesseract z odpowiednimi pakietami językowymi, nie pobiera modeli i **nie weryfikuje faktów** ani dokładności OCR. Szczegóły: [VN03B_SLIDE_OCR.md](docs/VN03B_SLIDE_OCR.md).
+
+## Szkic semantyczny offline z opcjonalnym lokalnym llama.cpp (VN-02/03)
+
+Polecenie `python -m videonotes semantic-draft KATALOG_PROJEKTU --model C:\\Modele\\model.gguf --llama-cli llama-cli --output szkic.json` przygotowuje odrębne szkice oparte na wybranych segmentach transkrypcji. `semantic-verify --file szkic.json` sprawdza powiązania z cytatami, a `semantic-export --file szkic.json --output szkic.md` tworzy czytelny plik. Nie wymaga sieci, ale wymaga zainstalowanego lokalnie binarium i modelu GGUF. **To nie jest automatyczna weryfikacja merytoryczna**, a wszystkie twierdzenia modelu muszą być sprawdzone przez człowieka. [Ograniczenia i instrukcja](docs/VN_SEMANTIC_DRAFT.md).
