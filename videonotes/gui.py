@@ -21,7 +21,7 @@ from .study_guide import export_study_guide, verify_study_guide
 from .pdf_export import export_basic_notes_pdf
 from .note_revisions import regenerate_basic_notes, list_note_versions, restore_note_version, recover_interrupted_note_update
 from .pipeline import create_project, transcribe_project
-from .storage import read_project
+from .storage import read_project, load_json
 
 
 class VideoNotesWindow:
@@ -677,6 +677,53 @@ class VideoNotesWindow:
         self.segments.see(segment_id)
         self.status.set(f"Źródło {segment_id} — możesz odsłuchać oryginał i poprawić tekst.")
         return True
+
+    def _source_navigation_tree(self, parent: ttk.Frame) -> ttk.Treeview:
+        """Reusable clickable, keyboard-accessible source list for notes."""
+        container = ttk.LabelFrame(parent, text="Źródła — wybierz cytat i przejdź do edytora")
+        container.pack(fill="x", pady=5)
+        table = ttk.Treeview(
+            container, columns=("time", "text"), show="headings",
+            selectmode="browse", height=5,
+        )
+        table.heading("time", text="Czas")
+        table.heading("text", text="Dosłowny cytat z transkrypcji")
+        table.column("time", width=90, stretch=False)
+        table.column("text", width=600)
+        table.pack(side="left", fill="x", expand=True)
+        bar = ttk.Scrollbar(container, orient="vertical", command=table.yview)
+        table.configure(yscrollcommand=bar.set)
+        bar.pack(side="right", fill="y")
+
+        def navigate(_event=None) -> None:
+            selected = table.selection()
+            if not selected:
+                messagebox.showinfo("Źródło", "Zaznacz cytat, aby przejść do transkrypcji.")
+                return
+            self._jump_to_source(selected[0])
+
+        table.bind("<Double-1>", navigate)
+        ttk.Button(parent, text="Przejdź do zaznaczonego źródła", command=navigate).pack(anchor="e")
+        return table
+
+    def _fill_source_navigation(self, table: ttk.Treeview, quotes) -> None:
+        """Bind only literal verified segment IDs, capped for huge lectures."""
+        table.delete(*table.get_children())
+        seen: set[str] = set()
+        for quote in quotes:
+            identifier = quote["segment_id"]
+            if identifier in seen:
+                continue
+            seen.add(identifier)
+            table.insert(
+                "", "end", iid=identifier,
+                values=(
+                    f"{quote['start_ms']/1000:.2f}s",
+                    quote["text"].replace("\n", " ")[:180],
+                ),
+            )
+            if len(seen) >= 2000:
+                break
 
     def _save_edit(self) -> None:
         if self.active:
