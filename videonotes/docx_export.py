@@ -141,6 +141,12 @@ def render_advanced_docx(outline: dict) -> bytes:
     _paragraph(body, "Konspekt źródłowy, nie opracowanie AI. Cytaty wymagają kontroli z nagraniem.")
     for section in outline["sections"]:
         _paragraph(body, section["heading"], "Heading1")
+        for focus in section.get("template_focus", []):
+            _paragraph(body, focus["heading"] + " — cytaty ze źródła", "Heading2")
+            for item in focus["citations"]:
+                _paragraph(body, "Źródło " + _clock(item["start_ms"]) + "–" +
+                           _clock(item["end_ms"]) + " · " + item["segment_id"], "Caption")
+                _paragraph(body, item["text"], "Quote")
         for topic in section["topics"]:
             _paragraph(body, topic["heading"], "Heading2")
             for citation in topic["citations"]:

@@ -14,7 +14,7 @@ import time
 import zipfile
 from pathlib import Path
 
-from videonotes.advanced_notes import export_advanced_outline
+from videonotes.advanced_notes import export_advanced_outline, verify_advanced_outline
 from videonotes.errors import VideoNotesError
 from videonotes.exports import edit_segment, export_project
 from videonotes.media import probe
@@ -123,6 +123,19 @@ def main() -> int:
                 expected_text = corrected_text if citation["segment_id"] == first["id"] else original["text"]
                 if citation["text"] != expected_text:
                     raise VideoNotesError("Konspekt zawiera tekst spoza transkrypcji.")
+            for chapter in doc["sections"]:
+                for focus in chapter["template_focus"]:
+                    for quote in focus["citations"]:
+                        original = corrected_source.get(quote["segment_id"])
+                        if (not original or quote["start_ms"] != original["start_ms"] or
+                                quote["end_ms"] != original["end_ms"]):
+                            raise VideoNotesError("Szablon nie zachował źródła/czasu z prawdziwego ASR.")
+                        expected_text = corrected_text if quote["segment_id"] == first["id"] else original["text"]
+                        if quote["text"] != expected_text:
+                            raise VideoNotesError("Szablon do nauki dopisał tekst spoza ASR.")
+            validated_outline = verify_advanced_outline(project_dir)
+            if not validated_outline["verified"] or validated_outline["source_sha256"] != doc["source_sha256"]:
+                raise VideoNotesError("Zaawansowane notatki nie przeszły niezależnej weryfikacji.")
             if not advanced[2].stat().st_size > 1000:
                 raise VideoNotesError("Pusty DOCX konspektu.")
             with zipfile.ZipFile(advanced[2]) as word:
@@ -170,6 +183,7 @@ def main() -> int:
                 "raw_asr_preserved": True,
                 "advanced_outline_citations_checked": len(citations),
                 "source_grounded_advanced_md_json_docx": True,
+                "advanced_template_source_verification": True,
                 "source_only_study_guide_md_json_docx": True,
                 "source_only_study_guide_verified_against_whisper": True,
                 "accuracy_evaluated": False,

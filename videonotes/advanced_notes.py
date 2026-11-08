@@ -7,8 +7,9 @@ from collections import Counter
 from pathlib import Path
 
 from .errors import VideoNotesError
+from .contracts import sha256_file
 from .notes import STOPWORDS, _hash, _select, _source
-from .storage import atomic_write, read_project
+from .storage import atomic_write, read_project, load_json
 
 SCHEMA = "videonotes-source-outline-v1"
 TEMPLATES = {
@@ -18,6 +19,75 @@ TEMPLATES = {
     "study": "Materiał do nauki",
 }
 DETAIL_POINTS = {"brief": 4, "standard": 10, "full": 24}
+
+
+# These are keyword HINTS for selecting exact spoken quotations, not factual
+# extraction, entity recognition or a generative summary. Pattern labels must
+# never turn into claims unless a human checks the corresponding recording.
+TEMPLATE_SIGNALS = {
+    "lecture": [
+        ("definition_hints", "Możliwe definicje", re.compile(
+            r"\b(?:oznacza|definicja|definiujemy|nazywamy|means|is defined as)\b", re.I)),
+        ("examples", "Przykłady podane w wypowiedzi", re.compile(
+            r"\b(?:na przykład|przykładowo|for example|for instance)\b", re.I)),
+        ("uncertain", "Wypowiedzi wymagające sprawdzenia", re.compile(
+            r"\b(?:chyba|prawdopodobnie|być może|nie wiem|probably|maybe|not sure)\b", re.I)),
+    ],
+    "tutorial": [
+        ("procedures", "Wypowiedziane kroki i polecenia", re.compile(
+            r"\b(?:krok|najpierw|następnie|potem|kliknij|uruchom|wpisz|wybierz|"
+            r"skonfiguruj|zapisz|first|next|then|click|run|enter|configure)\b", re.I)),
+        ("checks", "Wskazówki sprawdzenia wyniku", re.compile(
+            r"\b(?:sprawdź|zweryfikuj|upewnij|testuj|verify|check|confirm|test)\b", re.I)),
+        ("warnings", "Wypowiedziane ostrzeżenia", re.compile(
+            r"\b(?:uwaga|nie wolno|ostrożnie|błąd|niebezpieczne|warning|caution|error)\b", re.I)),
+    ],
+    "meeting": [
+        ("decisions", "Wypowiedzi o decyzjach", re.compile(
+            r"\b(?:ustalono|postanowiono|zdecydowano|decyzja|decydujemy|"
+            r"agreed|decided|decision)\b", re.I)),
+        ("tasks", "Wypowiedzi o zadaniach", re.compile(
+            r"\b(?:zadanie|do zrobienia|termin|odpowiedzialny|wyślij|"
+            r"action item|todo|to.do|deadline|assigned)\b", re.I)),
+        ("unclear", "Pytania i sprawy otwarte", re.compile(
+            r"\b(?:nie wiem|do wyjaśnienia|brakuje|open question|not sure)\b", re.I)),
+    ],
+    "study": [
+        ("definitions", "Pojęcia i możliwe definicje", re.compile(
+            r"\b(?:definicja|oznacza|nazywamy|to jest|means|is defined as)\b", re.I)),
+        ("examples", "Przykłady do powtórzenia", re.compile(
+            r"\b(?:na przykład|przykładowo|for example|for instance)\b", re.I)),
+        ("uncertain", "Pytania i fragmenty do powtórzenia", re.compile(
+            r"\b(?:chyba|prawdopodobnie|być może|nie wiem|maybe|not sure)\b", re.I)),
+    ],
+}
+
+
+def _template_focus(rows: list[dict], originals: dict[str, dict],
+                    template: str, detail: str) -> list[dict]:
+    """Return exact citations across the WHOLE interval, not merely top N."""
+    focus = []
+    quota = {"brief": 2, "standard": 4, "full": 8}[detail]
+    for code, title, pattern in TEMPLATE_SIGNALS[template]:
+        matches = []
+        for row in rows:
+            if not (pattern.search(row["text"]) or (
+                code in ("unclear", "uncertain") and "?" in row["text"]
+            )):
+                continue
+            src = originals[row["id"]]
+            matches.append({
+                "segment_id": row["id"],
+                "start_ms": row["start_ms"],
+                "end_ms": src["end_ms"],
+                "text": row["text"],
+                "label": _category(row["text"]),
+            })
+            if len(matches) >= quota:
+                break
+        if matches:
+            focus.append({"id": code, "heading": title, "citations": matches})
+    return focus
 UNCERTAIN = re.compile(r"\b(?:chyba|prawdopodobnie|nie wiem|być może|maybe|probably|not sure)\b", re.I)
 EXAMPLE = re.compile(r"\b(?:na przykład|przykładowo|for example|for instance)\b", re.I)
 DEFINITION = re.compile(r"\b(?:definicja|oznacza|nazywamy|to jest|is defined as|means)\b", re.I)
@@ -116,10 +186,12 @@ def build_advanced_outline(folder: Path, *, template: str = "lecture", detail: s
             "id": f"section-{index:06d}",
             "heading": f"Część {len(sections) + 1} · {_clock(index * span)}–{_clock(min(duration, (index + 1) * span))}",
             "topics": topics,
+            "template_focus": _template_focus(rows, source_by_id, template, detail),
         })
     return {
         "schema": SCHEMA, "project_id": project["id"], "source_sha256": _hash(source),
         "method": "source-linked-extractive-outline-v1", "template": template,
+        "template_feature": "source-only-highlight-categories-v1",
         "detail": detail, "section_minutes": section_minutes,
         "title": TEMPLATES[template], "complete": True, "sections": sections,
         "limitations": [
@@ -145,6 +217,15 @@ def render_advanced_markdown(outline: dict) -> str:
               "wypowiedz": "cytat źródłowy"}
     for section in outline["sections"]:
         lines.extend(["## " + section["heading"], ""])
+        for focus in section.get("template_focus", []):
+            lines.extend(["### " + focus["heading"] + " (cytaty, bez interpretacji)", ""])
+            for item in focus["citations"]:
+                lines.extend([
+                    f"Źródło {_clock(item['start_ms'])}–{_clock(item['end_ms'])} · {item['segment_id']}",
+                    "",
+                ])
+                lines.extend("    " + line for line in item["text"].splitlines())
+                lines.append("")
         for topic in section["topics"]:
             lines.extend(["### " + topic["heading"], ""])
             for item in topic["citations"]:
@@ -185,3 +266,44 @@ def export_advanced_outline(folder: Path, *, template: str = "lecture", detail: 
         atomic_write(pdf, pdf_content)
         paths.append(pdf)
     return tuple(paths)
+
+def verify_advanced_outline(folder: Path, *, document: Path | None = None) -> dict:
+    """Read-only full JSON recheck against current corrected local transcript.
+
+    A correct quotation is NOT automatically a correct ASR recognition/fact.
+    The method never writes, interprets audio, or invokes any remote model.
+    """
+    root = Path(folder)
+    candidate = Path(document) if document is not None else root / "exports" / "notes-advanced.json"
+    if candidate.is_symlink() or not candidate.is_file():
+        raise VideoNotesError("Nie znaleziono zwykłego pliku JSON konspektu do weryfikacji.")
+    saved = load_json(candidate)
+    if not isinstance(saved, dict) or saved.get("schema") != SCHEMA:
+        raise VideoNotesError("Nieobsługiwany format konspektu.")
+    template, detail, section = saved.get("template"), saved.get("detail"), saved.get("section_minutes")
+    if (type(template) is not str or template not in TEMPLATES or
+            type(detail) is not str or detail not in DETAIL_POINTS or
+            type(section) is not int or not 1 <= section <= 60):
+        raise VideoNotesError("Nieprawidłowe parametry zapisanego konspektu.")
+    expected = build_advanced_outline(root, template=template, detail=detail, section_minutes=section)
+    if saved.get("project_id") != expected["project_id"]:
+        raise VideoNotesError("Konspekt pochodzi z innego projektu.")
+    if saved.get("source_sha256") != expected["source_sha256"]:
+        raise VideoNotesError("Konspekt jest nieaktualny wobec poprawionej transkrypcji.")
+    if saved != expected:
+        raise VideoNotesError("Zapisany konspekt zawiera zmienione cytaty, czasy, etykiety lub sekcje.")
+    return {
+        "schema": SCHEMA,
+        "verified": True,
+        "project_id": expected["project_id"],
+        "source_sha256": expected["source_sha256"],
+        "document_sha256": sha256_file(candidate),
+        "template": expected["template"],
+        "sections": len(expected["sections"]),
+        "topic_citations": sum(len(t["citations"]) for sec in expected["sections"] for t in sec["topics"]),
+        "template_focus_citations": sum(len(g["citations"]) for sec in expected["sections"] for g in sec["template_focus"]),
+        "report_contains_private_text": False,
+        "cryptographic_signature_verified": False,
+        "semantic_truth_verified": False,
+    }
+
