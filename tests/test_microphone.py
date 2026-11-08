@@ -5,6 +5,7 @@ import io
 import json
 import hashlib
 import subprocess
+import shutil
 import tempfile
 import threading
 import unittest
@@ -152,6 +153,32 @@ class MicrophoneTest(unittest.TestCase):
         resumed = capture_command("ffmpeg", "Mic", self.folder / "part-%05d.wav",
                                   start_number=123)
         self.assertEqual(resumed[resumed.index("-segment_start_number") + 1], "123")
+        self.assertIn("-n", resumed)
+        self.assertNotIn("-y", resumed)
+
+    @unittest.skipUnless(shutil.which("ffmpeg"), "Real FFmpeg executable required")
+    def test_real_ffmpeg_segment_start_and_no_clobber(self):
+        """Actual ffmpeg segment muxer must honor offset and protect old files."""
+        self.folder.mkdir(parents=True)
+        out = self.folder / "part-%05d.wav"
+        args = [
+            "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-n",
+            "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=16000:duration=0.3",
+            "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le",
+            "-f", "segment", "-segment_time", "7200",
+            "-segment_start_number", "4", "-segment_format", "wav", str(out)
+        ]
+        first = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                               timeout=30, check=False)
+        self.assertEqual(first.returncode, 0, first.stderr[-500:])
+        original = (self.folder / "part-00004.wav").read_bytes()
+        self.assertGreater(len(original), 1024)
+        self.assertEqual([p.name for p in self.folder.glob("part-*.wav")],
+                         ["part-00004.wav"])
+        repeated = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                  timeout=30, check=False)
+        self.assertNotEqual(repeated.returncode, 0)
+        self.assertEqual((self.folder / "part-00004.wav").read_bytes(), original)
 
     def test_shell_free_command_and_two_hour_segmentation(self):
         cmd = capture_command("ffmpeg", 'Mic "quoted"', self.folder / "part-%05d.wav", max_seconds=3600)
