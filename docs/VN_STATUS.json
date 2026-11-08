@@ -20,7 +20,8 @@
         "PR #3: WER/CER text-only harness",
         "PR #7: code for actual local whisper.cpp vs faster-whisper CPU comparison on same audio (CI mocks only)",
         "PR #52: real local whisper.cpp CPU multilingual tiny PL/EN TTS 13.004s/11.315s, 3/2 nonempty recognized segments and source-grounded exports; pinned model verified, ephemeral CI 42426108460 PASS. Synthetic voices, NO natural speech WER/CER/Windows.",
-        "PR #55: real whisper.cpp vs faster-whisper PL/EN multilingual tiny CPU on same local synthetic TTS WAV; verified model SHA, WER/CER, elapsed time and peak RSS for both engines in GitHub Actions 42428095863 PASS; no natural lecture or physical Windows acceptance."
+        "PR #55: real whisper.cpp vs faster-whisper PL/EN multilingual tiny CPU on same local synthetic TTS WAV; verified model SHA, WER/CER, elapsed time and peak RSS for both engines in GitHub Actions 42428095863 PASS; no natural lecture or physical Windows acceptance.",
+        "PR #87: read-only offline `doctor` CLI: actual FFmpeg/FFprobe version preflight, local model SHA-256/size, optional media metadata and disk space, privacy-redacted JSON. All 7 source/browser Linux+Windows, private synthetic installer and Windows DEV EXE CI jobs PASS (42497172591, 42497172589, 42497172532). NOT real ASR inference, human speech WER/CER or physical Windows acceptance."
       ],
       "blockers": [
         "Real local PL/EN ASR benchmarks on legal OBS clips",
@@ -154,11 +155,13 @@
         "PR #22: atomic no-clobber portable backup output, concurrent-name race and unsupported filesystem tests; Linux/Windows CI and DEV EXE PASS",
         "PR #25: secure portable backup of note-revision history with per-snapshot validation and restore/undo regression; Linux/Windows CI and Windows DEV EXE PASS",
         "PR #40: atomically publish pre-verified internal bundle directory without replacing racing empty destination: Windows rename, Linux renameat2(RENAME_NOREPLACE); race regression, Linux/Windows source+browser CI and Windows DEV EXE PASS; no actual installer or hardware test.",
-        "PR #73: genuine Inno Setup private Windows offline EXE builder from exact locally verified owner-provided app/FFmpeg/FFprobe/Whisper/model bundle, atomic no-clobber, per-user installation/uninstall; Windows hosted CI compiled a REAL Inno installer with intentionally unusable synthetic binaries, silently installed, checked hashes and uninstalled, 7/7 PASS (42475888625, 42475888581, 42475888631). Not genuine model runtime offline hardware, release license, signing, or public distribution."
+        "PR #73: genuine Inno Setup private Windows offline EXE builder from exact locally verified owner-provided app/FFmpeg/FFprobe/Whisper/model bundle, atomic no-clobber, per-user installation/uninstall; Windows hosted CI compiled a REAL Inno installer with intentionally unusable synthetic binaries, silently installed, checked hashes and uninstalled, 7/7 PASS (42475888625, 42475888581, 42475888631). Not genuine model runtime offline hardware, release license, signing, or public distribution.",
+        "PR #86: internal-only SPDX 2.3 file inventory with five exact bundle-manifest SHA-256 files, license=NOASSERTION, verification before/after and no-clobber export outside bundle; Linux+Windows, browser, Inno synthetic install and Windows DEV EXE CI 7/7 PASS (42496858013, 42496858049, 42496858068). No legal clearance, AV/signing or public release.",
+        "PR #87: read-only local `doctor` dependency/disk/model/media checks; 7/7 CI jobs PASS (42497172591, 42497172589, 42497172532). Exposes all unsatisfied hardware/license/asr acceptance flags as false."
       ],
       "blockers": [
         "Public release-quality and signed Windows installer with legally cleared model/runtime; private Inno Setup EXE with user-supplied dependencies exists and synthetic install/uninstall CI passes",
-        "Windows installation offline, antivirus, licensing and SBOM",
+        "Offline physical Windows installer and antivirus, unresolved licenses and external SBOM/legal approval (local private SPDX inventory with NOASSERTION exists)",
         "Recovery and long-run performance",
         "Signed release policy",
         "Private Inno installer bundles owner-supplied FFmpeg/Whisper/model after local SHA-256 verification, but no physical Windows offline test with genuine licensed model, AV, signing, SBOM or redistributable release"
@@ -177,7 +180,8 @@
         "PR #32: actual headless Chrome and Edge file:// smoke on Windows GitHub Actions runner, alongside Linux Chromium/source CI PASS; no physical Windows accessibility/Firefox acceptance.",
         "PR #33: 50,000 synthetic segments imported/searched/paginated in real Chromium Linux, Chrome and Edge Windows CI, keyboard focus/ARIA and no HTTP(S) resource requests PASS; 207ms Linux, 160ms Chrome Windows, 109ms Edge Windows CI; not physical screen-reader or full WEB-02 acceptance.",
         "PR #35: real headless Firefox file:// WebDriver on Ubuntu runner, local import/edit/export and synthetic 50k/focus scenario PASS alongside 4 existing CI jobs, workflow 42416372511; not physical Windows Firefox or screen-reader acceptance.",
-        "PR #70: genuine Tkinter widget interactions run on GitHub-hosted Windows 3.13 VM as well as Ubuntu Xvfb, without skipping, with note history/crash/draft guards and full-WAV selection, source/browser and GUI CI 7/7 PASS (42469389311 and 42469389310). Does not constitute physical Windows, screen reader or full offline installation acceptance."
+        "PR #70: genuine Tkinter widget interactions run on GitHub-hosted Windows 3.13 VM as well as Ubuntu Xvfb, without skipping, with note history/crash/draft guards and full-WAV selection, source/browser and GUI CI 7/7 PASS (42469389311 and 42469389310). Does not constitute physical Windows, screen reader or full offline installation acceptance.",
+        "PR #85: local browser web-corrections-v1 patch (only changed segments, ID/time/before/after) + desktop CLI `import-web-edits` preview and opt-in --apply with conflict rejection and raw-ASR preservation; real Chrome/Edge Windows, Firefox/Chromium Linux, source Windows/Linux, private Inno synthetic install, Windows DEV EXE 7/7 CI PASS (42496562215, 42496562164, 42496562085); merged to develop `deaef2a4`. Not a Wiedora portal deployment or full web ASR."
       ],
       "blockers": [
         "Physical Windows Firefox/Chrome/Edge browser tests, keyboard and screen-reader accessibility acceptance; headless Firefox Linux and Chrome/Edge Windows CI are not human acceptance",
@@ -1074,7 +1078,8 @@
     "PR #39/40/41 merged after passing post-head Linux/Windows source, real-browser CI and Windows DEV EXE checks on 2026-11-07. They address export preflight, no-clobber private bundle publication, and literal source-derived topic hints. No complete physical Windows/ASR/human semantics acceptance; 0/9 VN DONE unchanged.",
     "PR #43–45 merged on 2026-11-07 after applicable Linux/Windows source/browser and Windows DEV EXE checks. MP4/MKV real FFmpeg + fake subprocess CLI does not verify true PL/EN ASR; DOCX OOXML tests do not verify Word GUI; recording crash report test is synthetic, not physical device recovery.",
     "2026-11-07 PR #47–49 accepted on verified CI only: 50k extractive selection equivalence; GUI history restoration with backup API compatibility; crucial real LibreOffice DOCX import bug was reproduced and fixed via canonical default OPC namespaces. None of these verifies real ASR, full physical Windows UI, licensed offline installer, or human semantic-note quality.",
-    "2026-11-08: PR #51–54 and #56–57 CI-verified and merged: durable note transaction intent, true whisper.cpp TTS PL/EN, Xvfb Tk GUI, optional LibreOffice PDF, actual 121min compressed FFmpeg with stub ASR, PID-only stale note lock recovery. No human-lecture ASR, 2h real Whisper or physical Windows installer; 0/9 stages DONE unchanged."
+    "2026-11-08: PR #51–54 and #56–57 CI-verified and merged: durable note transaction intent, true whisper.cpp TTS PL/EN, Xvfb Tk GUI, optional LibreOffice PDF, actual 121min compressed FFmpeg with stub ASR, PID-only stale note lock recovery. No human-lecture ASR, 2h real Whisper or physical Windows installer; 0/9 stages DONE unchanged.",
+    "2026-11-08: PR #85/#86/#87 fully CI-verified and squash-merged into develop: browser→desktop safe correction patch; internal SPDX 2.3 inventory with unverified licenses; read-only offline dependency/model/media/disk preflight. GitHub Actions 42496562215/62164/62085; 42496858013/58049/58068; 42497172591/72589/72532: 7/7 jobs per PR PASS. No natural lectures, physical Windows microphone/loopback/offline, signed/licensed installer or Wiedora staging integration. VN-00..VN-07 still W TRAKCIE, VN-08 PLANOWANE, 0 DONE."
   ],
   "last_verified_develop_before_pr8": "344e227571ba09802da8a8bea7c50498473dc2e6"
 }
