@@ -18,6 +18,8 @@ from .recovery_audio import salvage_recording
 from .notes import generate_basic_notes, read_basic_notes, edit_note_point, export_basic_notes, export_basic_notes_docx
 from .advanced_notes import export_advanced_outline, verify_advanced_outline
 from .study_guide import export_study_guide, verify_study_guide
+from .semantic_draft import create_semantic_draft, verify_semantic_draft, export_semantic_markdown, SCHEMA as SEMANTIC_SCHEMA
+from .slide_ocr import extract_slide_ocr, verify_slide_ocr, SCHEMA as SLIDE_SCHEMA
 from .pdf_export import export_basic_notes_pdf
 from .note_revisions import regenerate_basic_notes, list_note_versions, restore_note_version, recover_interrupted_note_update
 from .pipeline import create_project, transcribe_project
@@ -39,6 +41,7 @@ class VideoNotesWindow:
         self.events: queue.Queue[tuple[str, object]] = queue.Queue()
         self.cancel = threading.Event()
         self.active = False
+        self.optional_analysis_active = False
         self.mic_stop = threading.Event()
         self.mic_pause = threading.Event()
         self.mic_resume = threading.Event()
@@ -81,6 +84,7 @@ class VideoNotesWindow:
         ttk.Button(outer, text="Notatka podstawowa — wybrane cytaty z transkrypcji", command=self._show_notes).pack(anchor="w", pady=(0, 7))
         ttk.Button(outer, text="Konspekt źródłowy — rozdziały i cytaty (VN-03)", command=self._show_advanced).pack(anchor="w", pady=(0, 7))
         ttk.Button(outer, text="Przewodnik do nauki — cytaty, pojęcia i pytania (VN-02/03)", command=self._show_study_guide).pack(anchor="w", pady=(0, 7))
+        ttk.Button(outer, text="OCR slajdów i lokalne szkice AI (wymagają kontroli)", command=self._show_optional_analysis).pack(anchor="w", pady=(0, 7))
         ttk.Button(outer, text="Nagraj mikrofon — nowa sesja WAV (Windows)", command=self._show_mic_recorder).pack(anchor="w", pady=(0, 7))
         ttk.Button(outer, text="Połącz części ukończonego nagrania WAV do transkrypcji", command=self._join_finished_recording_dialog).pack(anchor="w", pady=(0, 7))
         ttk.Button(outer, text="Odzyskaj czytelne WAV po awarii (może być niekompletne)", command=self._salvage_mic_recording).pack(anchor="w", pady=(0, 7))
@@ -110,6 +114,10 @@ class VideoNotesWindow:
     def _on_app_close(self) -> None:
         """Do not orphan a live FFmpeg subprocess when the GUI closes."""
         if self.active:
+            if self.optional_analysis_active:
+                messagebox.showwarning("Video Notes",
+                    "Trwa lokalne opracowanie lub OCR. Poczekaj na zapis wyniku przed zamknięciem programu.")
+                return
             if self.mic_controls and self.mic_controls["window"].winfo_exists():
                 self.mic_stop.set()
                 messagebox.showwarning("Video Notes",
@@ -557,6 +565,21 @@ class VideoNotesWindow:
                     else:
                         self.status.set(str(data))
                         messagebox.showwarning("Połącz WAV", str(data))
+                elif kind in {"optional_complete", "optional_failure"}:
+                    self.active = False
+                    self.optional_analysis_active = False
+                    self.start_button.configure(state="normal")
+                    self.resume_button.configure(state="normal")
+                    if kind == "optional_complete":
+                        label, report = data
+                        self.status.set(label + ": zapisano lokalny wynik, wymaga kontroli człowieka.")
+                        messagebox.showinfo("Analiza lokalna — do sprawdzenia",
+                            label + " zakończone. Cytaty i OCR wymagają weryfikacji; "
+                            "wynik nie stanowi potwierdzonych faktów. " + str(report.get("output", "")))
+                    else:
+                        label, reason = data
+                        self.status.set(label + ": nie zapisano nowego wyniku.")
+                        messagebox.showwarning("Analiza lokalna", reason)
                 elif kind == "progress":
                     done, total = data
                     self.progress["maximum"] = max(total, 1)
@@ -741,6 +764,130 @@ class VideoNotesWindow:
         except VideoNotesError as error:
             messagebox.showerror("Video Notes", str(error))
 
+
+
+    def _run_optional_analysis(self, label: str, action) -> None:
+        """Run explicitly requested local analysis without freezing Tk."""
+        if self.active:
+            messagebox.showwarning("Analiza lokalna", "Zakończ wcześniejszą operację przed rozpoczęciem nowej.")
+            return
+        if self._has_transcript_draft():
+            messagebox.showwarning("Analiza lokalna", "Najpierw zapisz niezapisaną poprawkę transkrypcji.")
+            return
+        self.active = True
+        self.optional_analysis_active = True
+        self.start_button.configure(state="disabled")
+        self.resume_button.configure(state="disabled")
+        self.status.set(label + ": trwa lokalne przetwarzanie bez chmury.")
+
+        def worker() -> None:
+            try:
+                report = action()
+                self.events.put(("optional_complete", (label, report)))
+            except Exception as error:
+                # Keep source files and prior exports; the backend uses
+                # no-clobber writes. Never call Tk from a worker thread.
+                self.events.put(("optional_failure", (label, str(error))))
+        threading.Thread(target=worker, name="vn-optional-local-analysis", daemon=True).start()
+
+    def _show_optional_analysis(self) -> None:
+        """Opt-in controls for unreviewed semantic drafts and slide OCR."""
+        if self.active:
+            messagebox.showwarning("Analiza lokalna", "Inna operacja już trwa.")
+            return
+        if not self.project.get().strip():
+            messagebox.showwarning("Analiza lokalna", "Najpierw wybierz katalog projektu.")
+            return
+        folder = Path(self.project.get())
+        try:
+            read_project(folder)
+        except VideoNotesError as error:
+            messagebox.showerror("Analiza lokalna", str(error))
+            return
+        window = tk.Toplevel(self.root)
+        window.title("Lokalna analiza opcjonalna — OCR slajdów i szkic AI")
+        window.geometry("800x420")
+        body = ttk.Frame(window, padding=16)
+        body.pack(fill="both", expand=True)
+        ttk.Label(body, text="Wszystkie wyniki są NIEZWERYFIKOWANE. Cytat nie potwierdza prawdziwości parafrazy, a OCR może się mylić.",
+                  wraplength=745).pack(anchor="w", pady=(0, 12))
+        ai = ttk.LabelFrame(body, text="Szkic semantyczny — własny lokalny llama.cpp i model GGUF", padding=10)
+        ai.pack(fill="x", pady=5)
+        llama_path = tk.StringVar(value="llama-cli")
+        model_path = tk.StringVar()
+        self._line(ai, "llama-cli (.exe)", llama_path,
+                   lambda: self._select_file(llama_path, [("Program Windows", "*.exe"), ("Wszystkie", "*.*")]))
+        self._line(ai, "Model .gguf", model_path,
+                   lambda: self._select_file(model_path, [("Model GGUF", "*.gguf"), ("Wszystkie", "*.*")]))
+        actions_ai = ttk.Frame(ai)
+        actions_ai.pack(fill="x", pady=4)
+
+        def make_semantic() -> None:
+            if not model_path.get().strip():
+                messagebox.showwarning("Szkic AI", "Wybierz własny lokalny model GGUF.")
+                return
+            destination = filedialog.asksaveasfilename(title="Zapisz NOWY niezweryfikowany szkic",
+                        defaultextension=".json", filetypes=[("JSON", "*.json")])
+            if destination:
+                self._run_optional_analysis("Szkic semantyczny", lambda: create_semantic_draft(
+                    folder, Path(destination), model=Path(model_path.get()),
+                    llama_cli=llama_path.get()))
+        ttk.Button(actions_ai, text="Utwórz szkic AI (niezweryfikowany)", command=make_semantic).pack(side="left", padx=4)
+
+        def export_draft() -> None:
+            source = filedialog.askopenfilename(title="Otwórz szkic semantyczny JSON",
+                                                filetypes=[("JSON", "*.json")])
+            if not source:
+                return
+            destination = filedialog.asksaveasfilename(title="Zapisz NOWY szkic Markdown",
+                                defaultextension=".md", filetypes=[("Markdown", "*.md")])
+            if destination:
+                self._run_optional_analysis("Eksport szkicu", lambda: export_semantic_markdown(
+                    folder, Path(source), Path(destination)))
+        ttk.Button(actions_ai, text="Eksportuj sprawdzalne cytaty do MD", command=export_draft).pack(side="left", padx=4)
+
+        slide = ttk.LabelFrame(body, text="OCR slajdów — lokalne FFmpeg i Tesseract", padding=10)
+        slide.pack(fill="x", pady=5)
+        controls = ttk.Frame(slide)
+        controls.pack(fill="x")
+        ttk.Label(controls, text="Język OCR:").pack(side="left")
+        ocr_lang = tk.StringVar(value="pol+eng")
+        ttk.Combobox(controls, textvariable=ocr_lang, state="readonly",
+                     values=["pol+eng", "pol", "eng"], width=9).pack(side="left", padx=5)
+        ttk.Label(controls, text="Co ile sekund:").pack(side="left", padx=(12, 4))
+        seconds = tk.StringVar(value="60")
+        ttk.Combobox(controls, textvariable=seconds, state="readonly",
+                     values=["30", "60", "120"], width=6).pack(side="left")
+
+        def make_ocr() -> None:
+            destination = filedialog.asksaveasfilename(title="Zapisz NOWY raport OCR",
+                        defaultextension=".json", filetypes=[("JSON", "*.json")])
+            if destination:
+                self._run_optional_analysis("OCR slajdów", lambda: extract_slide_ocr(
+                    folder, Path(destination), language=ocr_lang.get(),
+                    interval_seconds=int(seconds.get())))
+        ttk.Button(controls, text="Wykonaj OCR slajdów", command=make_ocr).pack(side="left", padx=12)
+
+        def check_existing() -> None:
+            source = filedialog.askopenfilename(title="Wybierz istniejący raport OCR lub szkic AI",
+                                                filetypes=[("JSON", "*.json")])
+            if not source:
+                return
+
+            def task():
+                data = load_json(Path(source))
+                if not isinstance(data, dict):
+                    raise VideoNotesError("Nieobsługiwany raport JSON.")
+                if data.get("schema") == SEMANTIC_SCHEMA:
+                    return verify_semantic_draft(folder, Path(source))
+                if data.get("schema") == SLIDE_SCHEMA:
+                    return verify_slide_ocr(folder, Path(source))
+                raise VideoNotesError("To nie jest raport lokalnej analizy Video Notes.")
+            self._run_optional_analysis("Sprawdzanie źródeł", task)
+        ttk.Button(body, text="Sprawdź cytaty / integralność istniejącego raportu", command=check_existing).pack(anchor="w", pady=8)
+        ttk.Label(body, text="Nie ma automatycznej publikacji ani synchronizacji z Wiedorą. "
+                  "Modele muszą być zainstalowane legalnie przez użytkownika.",
+                  wraplength=730).pack(anchor="w")
 
     def _show_study_guide(self) -> None:
         """Explicit local study-guide preview and optional offline exports."""

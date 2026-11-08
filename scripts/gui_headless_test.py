@@ -56,6 +56,53 @@ class GuiNotesHeadlessTest(unittest.TestCase):
         self.assertEqual(len(matches), 1, f"Expected precisely one button {label!r}")
         return matches[0]
 
+
+    def test_optional_local_analysis_dialog_exposes_controls_without_auto_processing(self):
+        with patch("videonotes.gui.extract_slide_ocr") as ocr, \
+             patch("videonotes.gui.create_semantic_draft") as semantic:
+            self.gui._show_optional_analysis()
+            self.root.update()
+            dialogs = [x for x in children(self.root)
+                       if isinstance(x, tk.Toplevel) and x.winfo_exists()
+                       and "Lokalna analiza opcjonalna" in x.title()]
+            self.assertEqual(len(dialogs), 1)
+            dialog = dialogs[0]
+            self._button(dialog, "Wykonaj OCR slajdów")
+            self._button(dialog, "Utwórz szkic AI (niezweryfikowany)")
+            self._button(dialog, "Eksportuj sprawdzalne cytaty do MD")
+            self._button(dialog, "Sprawdź cytaty / integralność istniejącego raportu")
+            ocr.assert_not_called()
+            semantic.assert_not_called()
+            self.assertFalse(self.gui.optional_analysis_active)
+
+    def test_optional_analysis_has_explicit_file_choice_and_background_completion(self):
+        import time
+        self.gui._show_optional_analysis()
+        self.root.update()
+        dialogs = [x for x in children(self.root)
+                   if isinstance(x, tk.Toplevel) and x.winfo_exists()
+                   and "Lokalna analiza opcjonalna" in x.title()]
+        self.assertEqual(len(dialogs), 1)
+        destination = str(self.folder / "ocr-report-new.json")
+        with patch("videonotes.gui.filedialog.asksaveasfilename", return_value=destination), \
+             patch("videonotes.gui.extract_slide_ocr", return_value={
+                 "output": destination, "frames": 1, "human_reviewed": False
+             }) as ocr, \
+             patch("videonotes.gui.messagebox.showinfo") as notice, \
+             patch("videonotes.gui.messagebox.showwarning") as warning:
+            self._button(dialogs[0], "Wykonaj OCR slajdów").invoke()
+            self.assertTrue(self.gui.optional_analysis_active)
+            for _ in range(100):
+                self.root.update()
+                if not self.gui.optional_analysis_active:
+                    break
+                time.sleep(0.02)
+            self.assertFalse(self.gui.optional_analysis_active)
+            ocr.assert_called_once()
+            self.assertIn("wymaga kontroli", self.gui.status.get())
+            notice.assert_called_once()
+            warning.assert_not_called()
+
     def test_version_history_button_opens_and_restores_selected_source_safe_snapshot(self):
         note = generate_basic_notes(self.folder, window_minutes=1)
         point = note["sections"][0]["points"][0]["id"]
