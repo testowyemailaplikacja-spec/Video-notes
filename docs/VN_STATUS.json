@@ -110,13 +110,16 @@
         "PR #45: after interrupted recording or needs_review journal, read-only record-status reports healthy earlier WAV parts separately from damaged or symlinked parts, never auto-marks finished or modifies audio; finished sessions still strictly validate. Linux 125 tests and 5/5 source/browser CI plus Windows DEV EXE PASS. Not physical microphone crash test.",
         "PR #63: fail-closed WAV payload validation catches real truncated PCM despite intact RIFF header; verified whole-part numbering and finished recording.json count/duration; synthetic Linux/Windows CI and Windows DEV EXE 6/6 PASS (42467300146, 42467300161). Does not prove physical crash recovery.",
         "PR #64: explicit offline CLI/GUI join of completed multi-part mic sessions into one lossless PCM WAV, no auto-selection of first part when multiple, original parts preserved, preflight disk/RIFF4GB and atomic no-clobber publication; actual Tk Xvfb + source/browser Linux/Windows + DEV EXE 7/7 PASS (42467815506, 42467815511, 42467815520). Not a physical 2h microphone test.",
-        "PR #66: new completed WAV sessions persist per-part SHA-256 and fail closed on silent PCM changes or missing fingerprint journal; legacy recordings report sha256_verified=false, existing parts are not modified; synthetic source/browser CI 42468276521 5/5 PASS and Windows DEV EXE 42468276515 PASS. No physical disk-failure or microphone test."
+        "PR #66: new completed WAV sessions persist per-part SHA-256 and fail closed on silent PCM changes or missing fingerprint journal; legacy recordings report sha256_verified=false, existing parts are not modified; synthetic source/browser CI 42468276521 5/5 PASS and Windows DEV EXE 42468276515 PASS. No physical disk-failure or microphone test.",
+        "PR #77: real GUI Pause/Resume/Stop buttons; FFmpeg closes WAV on pause, validates PCM/SHA and resumes at next numbered part without overwriting. Critical discovery: FFmpeg segment muxer ignores global -n, so each take uses isolated .vn-take staging and atomic no-clobber os.link before deleting temp names. Failed takes remain visible for manual review. Synthetic subprocess + real FFmpeg numbering, Linux/Windows source/browser, Tk Windows VM and Linux Xvfb, Windows DEV EXE 8/8 checks PASS (42479432972/42479432973/42479432971). No physical microphone.",
+        "PR #78: independent fully local record-analyze CLI and real Tk GUI WAV signal-level diagnostics: streaming RMS/peak dBFS, silence, clipping, per-part stats and warnings, no transcript/audio upload, refusal for paused/damaged sessions. Original synthetic PCM, Windows/Linux unit, genuine Tk, real Inno synthetic installer regression 9/9 checks PASS (42479769485/42479769582/42479769460/42479769480). Cannot infer natural speech quality or physical mic acceptance.",
+        "PR #79: actual subprocess FFmpeg sine lavfi capture (not mocked process), interactive q pause, two separate 440/880 Hz takes, WAV SHA/continuity/no-clobber, joins sample-exact, numerical quality analysis. Linux dedicated real-FFmpeg 42480072624 PASS and 5 standard source/browser Linux/Windows checks 42480072912 PASS (6/6). Synthetic source; no DirectShow USB mic or >2h hardware."
       ],
       "blockers": [
         "Physical Windows microphone permission and recording",
-        "Actual 2h session, pause/resume, device disconnect, disk full and crash-recovery tests",
-        "User acceptance of device picker and Start/Stop GUI",
-        "Installer bundling FFmpeg and offline model"
+        "Actual physical Windows 2h session including pause/resume, device unplug, disk full and crash/restart recovery; 2-take real FFmpeg lavfi and virtual Tk PASS do not replace hardware acceptance",
+        "Physical Windows user acceptance of device picker, Start/Pause/Resume/Stop GUI and post-capture signal diagnostics; genuine Tk Windows VM + Linux Xvfb CI PASS",
+        "Real physical offline Windows acceptance with owner-supplied licensed FFmpeg/Whisper/model within private Inno installer; CI synthetic setup PASS only"
       ]
     },
     {
@@ -125,7 +128,9 @@
       "evidence": [
         "PR #8: FFprobe/FFmpeg import MP3/M4A/FLAC/OGG/OPUS/MOV, common transcription pipeline",
         "GitHub Actions 42295088894: 66 Linux and 53 Windows source tests PASS, actual audio codecs on Linux",
-        "Optional DirectShow mic+loopback two-input mixing with explicit per-source consent, CLI and GUI (PR #14 merged, mock Linux/Windows tests passed)"
+        "Optional DirectShow mic+loopback two-input mixing with explicit per-source consent, CLI and GUI (PR #14 merged, mock Linux/Windows tests passed)",
+        "PR #78: signal quality on finished user-consented PCM, RMS/peak, clipping and silence in 2s bounded memory windows; CLI/GUI offline and Windows/Linux 9/9 checks PASS. System loopback and microphone mixing hardware remain untested.",
+        "PR #79: real FFmpeg two-take sine PCM and sample-exact WAV join plus amplitude analysis 6/6 checks PASS. This does not prove two-device DirectShow loopback or physical source synchronization."
       ],
       "blockers": [
         "Hardware Windows DirectShow loopback availability and explicit permissions",
@@ -883,6 +888,69 @@
       "scope": "PR #75 Windows DEV EXE smoke PASS, no signed public release",
       "windows_dev_executable": "PASS",
       "signed_release": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42479432972",
+      "scope": "PR #77 5/5 Linux/Windows source/browser checks, real FFmpeg segment collision regression, pause and staged WAV no-clobber",
+      "source_linux_windows_browser": "PASS",
+      "physical_microphone": false,
+      "real_human_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42479432973",
+      "scope": "PR #77 actual Tk GUI event transitions Pause/Resume/Stop on hosted Windows and Linux Xvfb; 2/2 PASS",
+      "real_tk_linux_and_hosted_windows": "PASS",
+      "physical_microphone": false,
+      "real_human_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42479432971",
+      "scope": "PR #77 Windows development EXE build smoke 1/1 PASS",
+      "windows_dev_executable": "PASS",
+      "physical_microphone": false,
+      "real_human_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42479769485",
+      "scope": "PR #78 WAV numeric signal analysis and core regressions, 5/5 Linux/Windows source/browser CI PASS",
+      "source_linux_windows_browser": "PASS",
+      "physical_microphone": false,
+      "real_human_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42479769582",
+      "scope": "PR #78 actual Tk read-only quality report and controls under hosted Windows + Linux Xvfb, 2/2 PASS",
+      "real_tk_linux_and_hosted_windows": "PASS",
+      "physical_microphone": false,
+      "real_human_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42479769460",
+      "scope": "PR #78 genuine Inno setup synthetic compile/install/verify/uninstall regression 1/1 PASS",
+      "inno_synthetic_installer": "PASS",
+      "physical_microphone": false,
+      "real_human_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42479769480",
+      "scope": "PR #78 Windows development EXE smoke 1/1 PASS",
+      "windows_dev_executable": "PASS",
+      "physical_microphone": false,
+      "real_human_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42480072624",
+      "scope": "PR #79 genuine FFmpeg process two-tone pause/resume -> private takes -> strict SHA -> sample-exact join -> signal quality; 1/1 PASS (not physical Windows mic)",
+      "real_ffmpeg_synthetic_pause_resume": "PASS",
+      "physical_microphone": false,
+      "real_human_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42480072912",
+      "scope": "PR #79 5/5 Linux/Windows source/browser full CI PASS",
+      "source_linux_windows_browser": "PASS",
+      "physical_microphone": false,
+      "real_human_lecture": false
     }
   ],
   "notes": [
