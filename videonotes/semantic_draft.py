@@ -225,6 +225,8 @@ def create_semantic_draft(folder: Path, output: Path, *, model: Path,
     current_project, _, _, current_fingerprint = _complete_source(Path(folder))
     if current_project["id"] != project["id"] or current_fingerprint != fingerprint:
         raise VideoNotesError("Transkrypcja zmieniła się podczas pracy modelu. Niczego nie zapisano.")
+    if sha256_file(source_model) != model_fingerprint:
+        raise VideoNotesError("Plik modelu zmienił się podczas opracowania; brak bezpiecznego odbioru.")
     result = {
         "schema": SCHEMA, "method": METHOD, "project_id": project["id"],
         "source_sha256": fingerprint, "model_sha256": model_fingerprint,
@@ -321,7 +323,7 @@ def export_semantic_markdown(folder: Path, document: Path, output: Path) -> dict
     ]
     for section in doc["sections"]:
         # Markdown heading cannot be generated directly from untrusted output.
-        heading = re.sub(r"[^\\w\\s.,:;ąćęłńóśźżĄĆĘŁŃÓŚŹŻ-]", " ", section["heading"])
+        heading = re.sub(r"[^\w\s.,:;ąćęłńóśźżĄĆĘŁŃÓŚŹŻ-]", " ", section["heading"])
         lines.extend(["## " + heading[:160].strip(), ""])
         for claim in section["claims"]:
             lines.append("### Do ręcznego sprawdzenia")
