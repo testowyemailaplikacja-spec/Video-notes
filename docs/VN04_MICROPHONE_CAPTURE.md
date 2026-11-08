@@ -95,3 +95,20 @@ Weryfikacja z **rzeczywistym FFmpeg na Linux CI** wykazała, że segmentowy muxe
 Każde nowe ujęcie (przed pauzą i po wznowieniu) zapisuje się teraz w odrębnym losowym katalogu `.vn-take-*`. Program sprawdza format i numery jego WAV, a następnie publikuje wszystkie fragmenty do katalogu sesji przez **atomowe dowiązania twarde bez możliwości zastąpienia istniejącego pliku**. Dopiero po pełnej publikacji usuwa zapasowe nazwy z katalogu roboczego. Istniejące części są chronione również w scenariuszu, gdy inny proces utworzy oczekiwany plik w ostatniej chwili.
 
 Po niepowodzeniu nagrania, uszkodzeniu fragmentu lub konflikcie zapisu ukryty katalog `.vn-take-*` **pozostaje na dysku** wraz z niezapisanymi jeszcze do sesji próbkami, zamiast być automatycznie kasowany. `record-status` zwraca nazwy tych katalogów w `pending_takes`; stan `needs_review` wymaga ręcznej kontroli. Nie przenoś, nie usuwaj ani nie uruchamiaj ponownie nagrywania w tym samym folderze, dopóki nie wykonasz bezpiecznej kopii. Nie jest to jeszcze automatyczne przywracanie przerwanego nagrania z bufora FFmpeg.
+
+## Lokalna diagnostyka głośności, ciszy i przesterowania (08.11.2026)
+
+Po zakończeniu nagrania wybierz w GUI **„Sprawdź jakość nagrania WAV — cisza i przesterowanie”** i wskaż katalog z `recording.json`. Program odczytuje strumieniowo wszystkie ukończone części WAV w oknach po 2 sekundy. Wyświetla liczbowy raport: średni poziom RMS w dBFS, szczyt (peak) w dBFS, udział próbek bliskich maksimum zakresu PCM (clipping), udział ciszy/bardzo cichych okien, najdłuższy cichy fragment, ostrzeżenia i parametry poszczególnych części. Nie zapisuje zawartości nagrania w raporcie, nie tworzy transkrypcji i nie korzysta z sieci ani z modelu AI.
+
+Polecenie terminalowe:
+
+```powershell
+python -m videonotes record-status C:\\Nagrania\\wyklad-001
+python -m videonotes record-analyze C:\\Nagrania\\wyklad-001
+```
+
+Wymagany jest stan `finished` oraz prawidłowe części PCM mono 16 kHz/16 bit. Dla nowych sesji sprawdzane są także sumy SHA-256; stare dzienniki bez hashy są wyraźnie oznaczane jako `sha256_verified=false`. Przerwane i wstrzymane sesje nie są automatycznie uznawane za kompletne. Weryfikacja czyta pliki bez ich edycji, w ograniczonych blokach i bez wczytywania całego wykładu do RAM.
+
+**Interpretacja:** RMS poniżej –38 dBFS może oznaczać zbyt niski poziom; szczyt bliski 0 dBFS lub ponad 0,5% próbek bliskich maksimum może wskazywać na przesterowanie; cisza jest szacowana z 2-sekundowych okien o RMS poniżej –45 dBFS. Są to jedynie wskazówki, a nie miernik jakości mowy. Brak ostrzeżeń nie gwarantuje prawidłowej treści, braku szumu, poprawności diarizacji ani transkrypcji ASR. Weryfikacja **nie zastępuje odsłuchu ani testu prawdziwego urządzenia Windows**.
+
+Testy automatyczne obejmują rzeczywiste oryginalne PCM: sinusoidalną mowopodobną falę, ciszę, przesterowanie, uszkodzenie WAV, sesje `paused` / `needs_review`, starsze dzienniki bez SHA, CLI i rzeczywisty podgląd Tk na Linux/Windows CI. Nie wykorzystują prywatnych nagrań użytkownika.

@@ -13,6 +13,7 @@ from .errors import VideoNotesError
 from .exports import edit_segment, export_project
 from .media import probe
 from .microphone import record_microphone, list_microphone_devices, join_finished_recording
+from .audio_diagnostics import analyze_finished_recording
 from .notes import generate_basic_notes, read_basic_notes, edit_note_point, export_basic_notes, export_basic_notes_docx
 from .advanced_notes import export_advanced_outline
 from .study_guide import export_study_guide, verify_study_guide
@@ -79,6 +80,7 @@ class VideoNotesWindow:
         ttk.Button(outer, text="Przewodnik do nauki — cytaty, pojęcia i pytania (VN-02/03)", command=self._show_study_guide).pack(anchor="w", pady=(0, 7))
         ttk.Button(outer, text="Nagraj mikrofon — nowa sesja WAV (Windows)", command=self._show_mic_recorder).pack(anchor="w", pady=(0, 7))
         ttk.Button(outer, text="Połącz części ukończonego nagrania WAV do transkrypcji", command=self._join_finished_recording_dialog).pack(anchor="w", pady=(0, 7))
+        ttk.Button(outer, text="Sprawdź jakość nagrania WAV — cisza i przesterowanie", command=self._inspect_recording_quality).pack(anchor="w", pady=(0, 7))
         self.status = tk.StringVar(value="Gotowe. Wybierz plik i lokalny model.")
         ttk.Label(outer, textvariable=self.status, wraplength=700).pack(anchor="w", pady=4)
         self.progress = ttk.Progressbar(outer, orient="horizontal", mode="determinate")
@@ -179,6 +181,68 @@ class VideoNotesWindow:
             except Exception:
                 self.events.put(("error", "Wewnętrzny błąd. Projekt zachowany; sprawdź log testowy przed wznowieniem."))
         threading.Thread(target=worker, name="vn-transcribe", daemon=True).start()
+
+    def _inspect_recording_quality(self) -> None:
+        """Read only numerical audio quality, without showing or uploading speech."""
+        if self.active:
+            messagebox.showwarning("Video Notes", "Poczekaj na zakończenie innej operacji.")
+            return
+        selected = filedialog.askdirectory(title="Wybierz ukończoną sesję WAV do analizy jakości")
+        if not selected:
+            return
+        folder = Path(selected)
+        self.active = True
+        self.start_button.configure(state="disabled")
+        self.resume_button.configure(state="disabled")
+        self.status.set("Lokalna analiza poziomu dźwięku i ciszy — bez wysyłki danych...")
+        def work() -> None:
+            try:
+                result = analyze_finished_recording(folder)
+                self.events.put(("mic_quality_complete", result))
+            except VideoNotesError as error:
+                self.events.put(("mic_quality_failure", str(error)))
+            except Exception:
+                self.events.put(("mic_quality_failure",
+                                 "Nie udało się sprawdzić WAV; nagranie pozostawiono bez zmian."))
+        threading.Thread(target=work, daemon=True, name="vn-wav-quality").start()
+
+    def _show_recording_quality_report(self, result: dict) -> None:
+        """Present private numeric findings in real Windows/Tk widgets."""
+        if result.get("schema") != "videonotes-wav-diagnostics-v1":
+            raise VideoNotesError("Niepoprawny raport diagnostyki WAV.")
+        window = tk.Toplevel(self.root)
+        window.title("Kontrola nagrania — głośność, cisza i clipping")
+        window.geometry("740x530")
+        frame = ttk.Frame(window, padding=12)
+        frame.pack(fill="both", expand=True)
+        ttk.Label(frame, text="Analiza sygnału, nie odsłuch. Wynik nie potwierdza jakości mowy ani poprawności ASR.",
+                  wraplength=700).pack(anchor="w")
+        details = tk.Text(frame, wrap="word")
+        details.pack(fill="both", expand=True, pady=8)
+        lines = [
+            "Czas nagrania: {:.1f} s".format(result["duration_ms"] / 1000),
+            f"Liczba plików WAV: {result['part_count']}",
+            f"Średni poziom (RMS): {result['rms_dbfs']} dBFS",
+            f"Szczyt sygnału (peak): {result['peak_dbfs']} dBFS",
+            f"Próbki bliskie przesterowaniu: {result['clipped_sample_ratio'] * 100:.2f}%",
+            f"Cisza / bardzo niski poziom: {result['silent_ratio'] * 100:.2f}%",
+            f"Najdłuższy wykryty cichy fragment: {result['longest_silence_ms']/1000:.1f} s",
+            f"SHA-256 zweryfikowano: {'tak' if result['sha256_verified'] else 'nie — starsza sesja'}",
+            "",
+            "Ostrzeżenia:",
+        ]
+        lines.extend(result["warnings"] or ["Nie wykryto oczywistych problemów z poziomem; odsłuch jest nadal potrzebny."])
+        lines.extend(["", "Pierwsze części nagrania:"])
+        for part in result["parts"][:100]:
+            lines.append(
+                f"{part['name']}: RMS {part['rms_dbfs']} dBFS · peak {part['peak_dbfs']} dBFS"
+                f" · cisza {part['silent_duration_ms']/1000:.1f} s"
+            )
+        if len(result["parts"]) > 100:
+            lines.append("Pozostałe części pominięto w podglądzie; pełny raport dostępny w CLI.")
+        details.insert("1.0", "\n".join(lines))
+        details.configure(state="disabled")
+        ttk.Button(frame, text="Zamknij", command=window.destroy).pack(anchor="e")
 
     def _join_finished_recording_dialog(self) -> None:
         """Opt-in lossless assembly: do not silently transcribe only first 2h."""
@@ -399,6 +463,19 @@ class VideoNotesWindow:
                         messagebox.showwarning("Nagrywanie mikrofonu", message)
                     if self.mic_controls and self.mic_controls["window"].winfo_exists():
                         self.mic_controls["status"].set(message)
+                elif kind in {"mic_quality_complete", "mic_quality_failure"}:
+                    self.active = False
+                    self.start_button.configure(state="normal")
+                    self.resume_button.configure(state="normal")
+                    if kind == "mic_quality_complete":
+                        summary = (f"Kontrola WAV: RMS {data['rms_dbfs']} dBFS, "
+                                   f"peak {data['peak_dbfs']} dBFS, "
+                                   f"cisza {data['silent_ratio'] * 100:.1f}%")
+                        self.status.set(summary)
+                        self._show_recording_quality_report(data)
+                    else:
+                        self.status.set(str(data))
+                        messagebox.showwarning("Kontrola nagrania WAV", str(data))
                 elif kind in {"mic_join_complete", "mic_join_failure"}:
                     self.active = False
                     self.start_button.configure(state="normal")

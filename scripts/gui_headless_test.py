@@ -131,6 +131,42 @@ class GuiNotesHeadlessTest(unittest.TestCase):
         self.assertEqual(read_basic_notes(self.folder)[1]["edits"], {})
 
 
+    def test_real_tk_audio_quality_report_is_numerical_and_read_only(self):
+        button = self._button(
+            self.root, "Sprawdź jakość nagrania WAV — cisza i przesterowanie"
+        )
+        self.assertIsNotNone(button)
+        report = {
+            "schema": "videonotes-wav-diagnostics-v1",
+            "duration_ms": 6000, "part_count": 2,
+            "rms_dbfs": -14.20, "peak_dbfs": -0.10,
+            "clipped_sample_ratio": 0.10, "silent_ratio": 0.33,
+            "longest_silence_ms": 2000, "sha256_verified": True,
+            "warnings": ["Wykryto clipping"],
+            "parts": [
+                {"name": "part-00000.wav", "rms_dbfs": -14.2,
+                 "peak_dbfs": -0.1, "silent_duration_ms": 2000},
+            ],
+        }
+        self.gui.active = True
+        self.gui.start_button.configure(state="disabled")
+        self.gui.events.put(("mic_quality_complete", report))
+        self.gui._drain()
+        windows = [
+            item for item in children(self.root) if isinstance(item, tk.Toplevel)
+            and item.winfo_exists() and "Kontrola nagrania" in item.title()
+        ]
+        self.assertEqual(len(windows), 1)
+        editor = next(x for x in children(windows[0]) if isinstance(x, tk.Text))
+        rendered = editor.get("1.0", "end-1c")
+        self.assertIn("RMS", rendered)
+        self.assertIn("6.0 s", rendered)
+        self.assertIn("clipping", rendered)
+        self.assertNotIn("Wykład dotyczy", rendered)
+        self.assertEqual(str(editor["state"]), "disabled")
+        self.assertFalse(self.gui.active)
+        self.assertEqual(str(self.gui.start_button["state"]), "normal")
+
     def test_mic_real_tk_pause_resume_stop_controls_and_events(self):
         """Tests real widgets on Linux Xvfb + Windows VM, not physical mic."""
         self.gui._show_mic_recorder()
