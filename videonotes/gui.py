@@ -16,7 +16,7 @@ from .microphone import record_microphone, list_microphone_devices, join_finishe
 from .audio_diagnostics import analyze_finished_recording
 from .recovery_audio import salvage_recording
 from .notes import generate_basic_notes, read_basic_notes, edit_note_point, export_basic_notes, export_basic_notes_docx
-from .advanced_notes import export_advanced_outline
+from .advanced_notes import export_advanced_outline, verify_advanced_outline
 from .study_guide import export_study_guide, verify_study_guide
 from .pdf_export import export_basic_notes_pdf
 from .note_revisions import regenerate_basic_notes, list_note_versions, restore_note_version, recover_interrupted_note_update
@@ -687,38 +687,118 @@ class VideoNotesWindow:
         generate()
 
     def _show_advanced(self) -> None:
-        """Read-only local Markdown preview, without cloud processing."""
+        """Configurable source-only templates with safe citations and audit."""
         if self.active:
-            messagebox.showwarning("Video Notes", "Zakończ transkrypcję przed tworzeniem konspektu.")
+            messagebox.showwarning("Video Notes", "Zakończ nagrywanie lub transkrypcję przed opracowaniem konspektu.")
             return
         if not self.project.get().strip():
             messagebox.showwarning("Video Notes", "Wskaż katalog projektu.")
             return
-        try:
-            markdown, structured = export_advanced_outline(Path(self.project.get()))
-        except VideoNotesError as error:
-            messagebox.showerror("Konspekt źródłowy", str(error))
-            return
-        preview = tk.Toplevel(self.root)
-        preview.title("Konspekt źródłowy — wersja ekstrakcyjna")
-        preview.geometry("900x620")
-        body = ttk.Frame(preview, padding=10)
+        folder = Path(self.project.get())
+        window = tk.Toplevel(self.root)
+        window.title("Konspekt źródłowy — szablony wykład / instruktaż / spotkanie / nauka")
+        window.geometry("970x660")
+        body = ttk.Frame(window, padding=10)
         body.pack(fill="both", expand=True)
-        ttk.Label(body, text="Cytaty podzielone na rozdziały czasowe, nie streszczenie AI.",
-                  wraplength=850).pack(anchor="w")
-        content = tk.Text(body, wrap="word")
+        ttk.Label(
+            body,
+            text="Kategorie są wskazówkami. Wszystkie pozycje to dosłowne cytaty ze źródła, nie semantyczne podsumowanie AI.",
+            wraplength=900,
+        ).pack(anchor="w")
+        row = ttk.Frame(body)
+        row.pack(fill="x", pady=8)
+        templates = {
+            "Wykład": "lecture",
+            "Instruktaż": "tutorial",
+            "Spotkanie": "meeting",
+            "Nauka": "study",
+        }
+        details = {"Krótki": "brief", "Standardowy": "standard", "Pełny": "full"}
+        selected_template = tk.StringVar(value="Wykład")
+        selected_detail = tk.StringVar(value="Standardowy")
+        minutes = tk.StringVar(value="10")
+        ttk.Label(row, text="Rodzaj").pack(side="left")
+        ttk.Combobox(
+            row, state="readonly", textvariable=selected_template,
+            values=list(templates), width=13,
+        ).pack(side="left", padx=(4, 12))
+        ttk.Label(row, text="Szczegółowość").pack(side="left")
+        ttk.Combobox(
+            row, state="readonly", textvariable=selected_detail,
+            values=list(details), width=13,
+        ).pack(side="left", padx=(4, 12))
+        ttk.Label(row, text="Część (min)").pack(side="left")
+        ttk.Combobox(
+            row, state="readonly", textvariable=minutes,
+            values=["5", "10", "15", "30", "60"], width=5,
+        ).pack(side="left", padx=(4, 12))
+        content = tk.Text(body, wrap="word", undo=False)
         content.pack(fill="both", expand=True)
-        content.insert("1.0", markdown.read_text(encoding="utf-8"))
         content.configure(state="disabled")
-        self.status.set(f"Zapisano lokalnie: {markdown.name} i {structured.name}.")
-        def export_pdf() -> None:
+
+        def generate(*, docx: bool = False, pdf: bool = False) -> None:
+            if self.active:
+                messagebox.showwarning("Video Notes", "Inna operacja jest w toku.")
+                return
+            # Existing exports are user files; never silently overwrite them
+            # merely because the preview dialog was opened.
+            exists = (folder / "exports" / "notes-advanced.json").is_file()
+            if exists and not messagebox.askyesno(
+                "Zastąpić wcześniejsze eksporty?",
+                "Wygenerować wybrany szablon i zastąpić wcześniejsze pliki notes-advanced.*? "
+                "Ręcznie zmienione dokumenty zapisz osobno przed nadpisaniem.",
+            ):
+                return
             try:
-                targets = export_advanced_outline(Path(self.project.get()), include_pdf=True)
-                self.status.set("PDF zapisano lokalnie: " + str(targets[-1]))
+                targets = export_advanced_outline(
+                    folder, template=templates[selected_template.get()],
+                    detail=details[selected_detail.get()],
+                    section_minutes=int(minutes.get()),
+                    include_docx=docx, include_pdf=pdf,
+                )
+                markdown = targets[0].read_text(encoding="utf-8")
+            except (VideoNotesError, OSError, ValueError, KeyError) as error:
+                messagebox.showerror("Konspekt źródłowy", str(error))
+                return
+            content.configure(state="normal")
+            content.delete("1.0", "end")
+            content.insert("1.0", markdown)
+            content.configure(state="disabled")
+            self.status.set("Konspekt źródłowy zapisano lokalnie: " + ", ".join(str(p) for p in targets))
+
+        def verify() -> None:
+            try:
+                result = verify_advanced_outline(folder)
             except VideoNotesError as error:
-                messagebox.showerror("Konspekt PDF", str(error))
-        ttk.Button(body, text="Eksportuj PDF (wymaga lokalnego LibreOffice)",
-                   command=export_pdf).pack(anchor="e", pady=(6, 0))
+                messagebox.showerror("Konspekt — sprawdź źródła", str(error))
+                return
+            self.status.set(
+                f"Zweryfikowano {result['topic_citations']} cytatów i "
+                f"{result['template_focus_citations']} cytatów tematycznych."
+            )
+            messagebox.showinfo(
+                "Weryfikacja konspektu",
+                "Treść, etykiety, ID i czasy w JSON odpowiadają aktualnej transkrypcji. "
+                "Nie jest to podpis dokumentu ani dowód poprawności rozpoznania mowy.",
+            )
+
+        actions = ttk.Frame(body)
+        actions.pack(fill="x", pady=8)
+        ttk.Button(actions, text="Opracuj / odśwież", command=generate).pack(side="left", padx=3)
+        ttk.Button(actions, text="Eksport DOCX", command=lambda: generate(docx=True)).pack(side="left", padx=3)
+        ttk.Button(actions, text="Eksport PDF", command=lambda: generate(pdf=True)).pack(side="left", padx=3)
+        ttk.Button(actions, text="Sprawdź źródła", command=verify).pack(side="left", padx=3)
+
+        # First generation is explicit but can auto-open on a new project
+        # because no user-reviewed export exists yet.
+        saved = folder / "exports" / "notes-advanced.md"
+        if saved.is_file():
+            content.configure(state="normal")
+            content.insert("1.0", saved.read_text(encoding="utf-8"))
+            content.configure(state="disabled")
+            self.status.set("Otworzono zapisany konspekt. Sprawdź źródła lub opracuj ponownie.")
+        else:
+            generate()
 
     def _show_notes(self) -> None:
         """Display and edit source-cited, offline basic notes."""
