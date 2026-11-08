@@ -153,3 +153,20 @@ python -m videonotes installer-dev --bundle C:\\Test\\VideoNotes-PRIVATE --iscc 
 ```
 
 To **wyłącznie niepodpisana wersja do testów wewnętrznych**, bez prawa do publicznej dystrybucji niezweryfikowanych modeli i zależności. Testy Windows CI na syntetycznych plikach nie zastępują fizycznego sprawdzenia całkowicie offline. Instrukcja: [VN06_PRIVATE_INSTALLER.md](docs/VN06_PRIVATE_INSTALLER.md).
+
+## Mikrofon Windows: Pauza/Wznów, ochrona nagrań i kontrola sygnału (VN-04/05)
+
+Podczas lokalnego nagrywania w interfejsie Windows możesz kliknąć **Pauza** — FFmpeg domknie aktualny WAV, zachowa SHA-256 i przerwie rejestrowanie — a potem **Wznów nagrywanie** do nowej części bez nadpisywania poprzedniej. Zatrzymanie w pauzie finalizuje dotychczas nagrane audio. Kompletne części połączysz przyciskiem **„Połącz części ukończonego nagrania WAV do transkrypcji”**.
+
+Program zapisuje nowe ujęcia w oddzielnych folderach `.vn-take-*` i potwierdza ich integralność przed atomowym przeniesieniem do głównej sesji. W przypadku awarii tych folderów **nie usuwa**, a `record-status` pokazuje je do ręcznej kontroli. Dzięki temu nie polega na nieskutecznej ochronie FFmpeg `-n` dla segmentów.
+
+Dla ukończonego nagrania możesz także wybrać **„Sprawdź jakość nagrania WAV — cisza i przesterowanie”** albo:
+
+```powershell
+python -m videonotes record-status C:\\Nagrania\\wyklad-001
+python -m videonotes record-analyze C:\\Nagrania\\wyklad-001
+```
+
+Kontrola pokazuje RMS/peak w dBFS, udział bardzo cichego dźwięku i clippingu, bez udostępniania audio lub transkrypcji. Automatyczne testy używają syntetycznego PCM i rzeczywistego FFmpeg, ale **nie zastępują testów fizycznego mikrofonu, DirectShow, dwóch źródeł audio ani dwugodzinnej sesji Windows**.
+
+Instrukcja i bramki odbiorowe: [VN04_MICROPHONE_CAPTURE.md](docs/VN04_MICROPHONE_CAPTURE.md).
