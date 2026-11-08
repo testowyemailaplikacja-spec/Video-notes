@@ -12,7 +12,7 @@ from tkinter import filedialog, messagebox, ttk
 from .errors import VideoNotesError
 from .exports import edit_segment, export_project
 from .media import probe
-from .microphone import record_microphone, list_microphone_devices
+from .microphone import record_microphone, list_microphone_devices, join_finished_recording
 from .notes import generate_basic_notes, read_basic_notes, edit_note_point, export_basic_notes, export_basic_notes_docx
 from .advanced_notes import export_advanced_outline
 from .pdf_export import export_basic_notes_pdf
@@ -74,6 +74,7 @@ class VideoNotesWindow:
         ttk.Button(outer, text="Notatka podstawowa — wybrane cytaty z transkrypcji", command=self._show_notes).pack(anchor="w", pady=(0, 7))
         ttk.Button(outer, text="Konspekt źródłowy — rozdziały i cytaty (VN-03)", command=self._show_advanced).pack(anchor="w", pady=(0, 7))
         ttk.Button(outer, text="Nagraj mikrofon — nowa sesja WAV (Windows)", command=self._show_mic_recorder).pack(anchor="w", pady=(0, 7))
+        ttk.Button(outer, text="Połącz części ukończonego nagrania WAV do transkrypcji", command=self._join_finished_recording_dialog).pack(anchor="w", pady=(0, 7))
         self.status = tk.StringVar(value="Gotowe. Wybierz plik i lokalny model.")
         ttk.Label(outer, textvariable=self.status, wraplength=700).pack(anchor="w", pady=4)
         self.progress = ttk.Progressbar(outer, orient="horizontal", mode="determinate")
@@ -174,6 +175,40 @@ class VideoNotesWindow:
             except Exception:
                 self.events.put(("error", "Wewnętrzny błąd. Projekt zachowany; sprawdź log testowy przed wznowieniem."))
         threading.Thread(target=worker, name="vn-transcribe", daemon=True).start()
+
+    def _join_finished_recording_dialog(self) -> None:
+        """Opt-in lossless assembly: do not silently transcribe only first 2h."""
+        if self.active:
+            messagebox.showwarning("Video Notes", "Najpierw zakończ nagrywanie lub transkrypcję.")
+            return
+        selected = filedialog.askdirectory(title="Wybierz katalog ukończonej sesji z recording.json")
+        if not selected:
+            return
+        folder = Path(selected)
+        output = folder / "recording-full.wav"
+        if output.exists() or output.is_symlink():
+            messagebox.showwarning("Połącz WAV", "Plik recording-full.wav już istnieje. Nie nadpisuję go.")
+            return
+        if not messagebox.askyesno(
+            "Połącz nagranie",
+            "Złączyć wszystkie ukończone części WAV do nowego pliku recording-full.wav? "
+            "Operacja działa wyłącznie lokalnie i wymaga dodatkowego miejsca na dysku. "
+            "Oryginalne pliki pozostaną bez zmian."
+        ):
+            return
+        self.active = True
+        self.start_button.configure(state="disabled")
+        self.resume_button.configure(state="disabled")
+        self.status.set("Sprawdzanie i łączenie części WAV w tle...")
+        def work() -> None:
+            try:
+                joined = join_finished_recording(folder, output)
+                self.events.put(("mic_join_complete", str(joined)))
+            except VideoNotesError as error:
+                self.events.put(("mic_join_failure", str(error)))
+            except Exception:
+                self.events.put(("mic_join_failure", "Nie udało się połączyć WAV. Części oryginalne pozostały bez zmian."))
+        threading.Thread(target=work, daemon=True, name="vn-join-mic-parts").start()
 
     def _show_mic_recorder(self) -> None:
         """Manual, consent-gated microphone capture in a separate dialog."""
@@ -307,10 +342,16 @@ class VideoNotesWindow:
                         self.mic_controls["stop"].configure(state="disabled")
                     if kind == "mic_complete":
                         folder, report = data
-                        message = f"Zapisano {len(report['segments'])} części WAV w {folder}."
+                        count = len(report["segments"])
+                        message = f"Zapisano {count} części WAV w {folder}."
                         part = Path(folder) / "part-00000.wav"
-                        if part.is_file():
+                        if count == 1 and part.is_file():
                             self.source.set(str(part))
+                            self.stream.set("")
+                            self.streams.clear()
+                            self.stream_box.configure(values=[])
+                        elif count > 1:
+                            message += " Aby transkrybować CAŁE nagranie, użyj przycisku 'Połącz części ukończonego nagrania WAV'."
                         self.status.set(message)
                     else:
                         message = str(data)
@@ -318,6 +359,19 @@ class VideoNotesWindow:
                         messagebox.showwarning("Nagrywanie mikrofonu", message)
                     if self.mic_controls and self.mic_controls["window"].winfo_exists():
                         self.mic_controls["status"].set(message)
+                elif kind in {"mic_join_complete", "mic_join_failure"}:
+                    self.active = False
+                    self.start_button.configure(state="normal")
+                    self.resume_button.configure(state="normal")
+                    if kind == "mic_join_complete":
+                        self.source.set(str(data))
+                        self.stream.set("")
+                        self.streams.clear()
+                        self.stream_box.configure(values=[])
+                        self.status.set("Połączono całe nagranie. Wykryj ścieżki WAV i rozpocznij transkrypcję: " + str(data))
+                    else:
+                        self.status.set(str(data))
+                        messagebox.showwarning("Połącz WAV", str(data))
                 elif kind == "progress":
                     done, total = data
                     self.progress["maximum"] = max(total, 1)
