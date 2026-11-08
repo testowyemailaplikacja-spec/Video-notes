@@ -4,6 +4,7 @@ import contextlib
 import io
 import json
 import hashlib
+import os
 import subprocess
 import shutil
 import tempfile
@@ -217,10 +218,10 @@ class MicrophoneTest(unittest.TestCase):
             hashes.append(hashlib.sha256(sample.read_bytes()).hexdigest())
         self.assertNotEqual(hashes[0], hashes[1])
         protected = self.folder / "part-00004.wav"
-        (self.folder / "take-first" / "part-00004.wav").link_to(protected)
+        os.link(self.folder / "take-first" / "part-00004.wav", protected)
         first = protected.read_bytes()
         with self.assertRaises(FileExistsError):
-            (self.folder / "take-second" / "part-00004.wav").link_to(protected)
+            os.link(self.folder / "take-second" / "part-00004.wav", protected)
         self.assertEqual(protected.read_bytes(), first)
 
     def test_shell_free_command_and_two_hour_segmentation(self):
