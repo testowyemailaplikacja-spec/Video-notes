@@ -130,3 +130,14 @@ python -m videonotes inspect KATALOG_SESJI/recording-full.wav
 ```
 
 Program sprawdza ciągłość WAV i dziennik `finished`, nie nadpisuje gotowych plików, zachowuje oryginalne części, zapisuje nowy wynik atomowo i wymaga dodatkowego wolnego miejsca. Standardowy WAV ma limit około 4 GB. Testy automatyczne PR #63 i #64 są zielone, lecz **nie wykonano fizycznego testu mikrofonu Windows ani 2-godzinnej sesji**. Szczegóły: [VN04_MICROPHONE_CAPTURE.md](docs/VN04_MICROPHONE_CAPTURE.md).
+
+## Prywatny instalator Windows offline (VN-06 — testy wewnętrzne)
+
+Po przygotowaniu legalnych lokalnych plików `VideoNotes-DEV.exe`, `ffmpeg.exe`, `ffprobe.exe`, `whisper-cli.exe` i modelu GGML możesz stworzyć zweryfikowaną prywatną paczkę `bundle-dev`, a następnie **rzeczywisty instalator Inno Setup EXE**, który zawiera te pliki bez automatycznego pobierania podczas instalacji:
+
+```powershell
+python -m videonotes bundle-verify C:\\Test\\VideoNotes-PRIVATE
+python -m videonotes installer-dev --bundle C:\\Test\\VideoNotes-PRIVATE --iscc "C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe" --output C:\\Test\\VideoNotes-PRIVATE-Setup.exe --internal-only
+```
+
+To **wyłącznie niepodpisana wersja do testów wewnętrznych**, bez prawa do publicznej dystrybucji niezweryfikowanych modeli i zależności. Testy Windows CI na syntetycznych plikach nie zastępują fizycznego sprawdzenia całkowicie offline. Instrukcja: [VN06_PRIVATE_INSTALLER.md](docs/VN06_PRIVATE_INSTALLER.md).
