@@ -77,7 +77,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install --disable-pip-version-check --quiet 'faster-whisper==1.2.1' 'psutil>=6,<8'
+          python -m pip install --disable-pip-version-check --quiet 'faster-whisper==1.2.1' 'av==18.1.0' 'psutil>=6,<8'
       - name: Obtain verified multilingual faster-whisper tiny CTranslate2 model
         shell: bash
         run: |
@@ -105,7 +105,9 @@ jobs:
           try:
               import faster_whisper
               from faster_whisper import WhisperModel
-              print("faster-whisper module import: OK")
+              import av
+              assert av.__version__.split(".")[0] == "18"
+              print("faster-whisper module import: OK, pinned PyAV 18")
               model = WhisperModel(str(Path(os.environ["RUNNER_TEMP"]) / "faster-tiny"),
                                    device="cpu", compute_type="int8", cpu_threads=4,
                                    num_workers=1, local_files_only=True)
