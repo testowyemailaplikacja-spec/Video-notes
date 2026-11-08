@@ -48,7 +48,8 @@ def capture_command(ffmpeg: str, device: str, output: Path, *, max_seconds: int 
         raise VideoNotesError("Limit nagrywania musi być liczbą sekund od 1 do 86400.")
     if type(start_number) is not int or not 0 <= start_number < 100_000:
         raise VideoNotesError("Numer części nagrania przekracza limit WAV.")
-    args = [ffmpeg, "-hide_banner", "-loglevel", "error", "-nostats", "-y",
+    args = [ffmpeg, "-hide_banner", "-loglevel", "error", "-nostats",
+            "-n" if start_number else "-y",
             "-thread_queue_size", "512", "-f", "dshow", "-i", "audio=" + device]
     if system_device is not None:
         args.extend(["-thread_queue_size", "512", "-f", "dshow", "-i", "audio=" + system_device,
