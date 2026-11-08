@@ -170,3 +170,16 @@ python -m videonotes record-analyze C:\\Nagrania\\wyklad-001
 Kontrola pokazuje RMS/peak w dBFS, udział bardzo cichego dźwięku i clippingu, bez udostępniania audio lub transkrypcji. Automatyczne testy używają syntetycznego PCM i rzeczywistego FFmpeg, ale **nie zastępują testów fizycznego mikrofonu, DirectShow, dwóch źródeł audio ani dwugodzinnej sesji Windows**.
 
 Instrukcja i bramki odbiorowe: [VN04_MICROPHONE_CAPTURE.md](docs/VN04_MICROPHONE_CAPTURE.md).
+
+## Konspekty ze źródłowymi kategoriami — wykład, instruktaż, spotkanie, nauka (VN-03)
+
+W konspekcie zaawansowanym możesz wybrać **cztery rzeczywiście odmienne szablony**. Program wyodrębnia dokładne cytaty z transkrypcji jako możliwe definicje i przykłady (wykład), wypowiedziane kroki/ostrzeżenia i sposób sprawdzenia (instruktaż), wzmianki o decyzjach i zadaniach (spotkanie) albo pytania do powtórki (nauka). Wszystkie informacje mają czas nagrania i ID źródła; dopasowanie do kategorii ma charakter heurystyczny, bez generowania faktów.
+
+W GUI wybierasz szablon, poziom szczegółowości i długość części. Możesz wyświetlić źródłowy konspekt, wyeksportować DOCX/PDF i sprawdzić zgodność zapisanego JSON z aktualną transkrypcją. Istniejące eksporty nie są automatycznie nadpisywane po otwarciu okna.
+
+```powershell
+python -m videonotes advanced-notes C:\\Notatki\\wyklad --template tutorial --detail full --docx
+python -m videonotes advanced-verify C:\\Notatki\\wyklad
+```
+
+Opis kategorii i ograniczeń: [VN03_FUNCTIONAL_TEMPLATES.md](docs/VN03_FUNCTIONAL_TEMPLATES.md). To **narzędzie porządkowania cytatów**, nie semantyczne streszczenie ani pełny odbiór VN-03.
