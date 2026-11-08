@@ -125,6 +125,57 @@ class MicrophoneTest(unittest.TestCase):
         self.assertEqual(first.read_bytes(), original)
         self.assertTrue(broken.exists())
 
+    def test_truncated_pcm_with_valid_riff_header_is_not_complete(self):
+        """A valid WAV header can advertise more PCM than survived a crash."""
+        self._record()
+        part = self.folder / "part-00000.wav"
+        original = part.read_bytes()
+        self.assertGreater(len(original), 100)
+        damaged = original[:-80]  # Header is intact; data chunk is incomplete.
+        part.write_bytes(damaged)
+        journal_path = self.folder / "recording.json"
+        journal = json.loads(journal_path.read_text("utf-8"))
+
+        with self.assertRaisesRegex(VideoNotesError, "uszkodzony"):
+            recording_status(self.folder)
+        with self.assertRaisesRegex(VideoNotesError, "uszkodzony"):
+            inspect_wav_segments(self.folder)
+
+        journal["status"] = "needs_review"
+        journal_path.write_text(json.dumps(journal), encoding="utf-8")
+        result = recording_status(self.folder)
+        self.assertEqual(result["segments"], [])
+        self.assertEqual(result["unreadable_parts"], [part.name])
+        self.assertTrue(result["requires_manual_review"])
+        self.assertEqual(part.read_bytes(), damaged)
+
+    def test_finished_recording_requires_complete_contiguous_parts_and_journal(self):
+        self._record()
+        journal_path = self.folder / "recording.json"
+        journal = json.loads(journal_path.read_text("utf-8"))
+        original = (self.folder / "part-00000.wav").read_bytes()
+
+        for field, bad_value in (("segments", 2), ("duration_ms", 101),
+                                 ("segments", True), ("duration_ms", -1)):
+            with self.subTest(field=field, value=bad_value):
+                candidate = dict(journal)
+                candidate[field] = bad_value
+                journal_path.write_text(json.dumps(candidate), encoding="utf-8")
+                with self.assertRaisesRegex(VideoNotesError, "Dziennik"):
+                    recording_status(self.folder)
+        journal_path.write_text(json.dumps(journal), encoding="utf-8")
+
+        first = self.folder / "part-00000.wav"
+        first.rename(self.folder / "part-00001.wav")
+        with self.assertRaisesRegex(VideoNotesError, "Brakuje części WAV"):
+            recording_status(self.folder)
+        (self.folder / "part-00001.wav").rename(first)
+        first.unlink()
+        with self.assertRaisesRegex(VideoNotesError, "Dziennik"):
+            recording_status(self.folder)
+        self.assertEqual(journal_path.read_text("utf-8"), json.dumps(journal))
+        self.assertGreater(len(original), 100)
+
     def test_crash_status_does_not_follow_symlink_part(self):
         self._record()
         outside = self.folder.parent / "private.txt"
