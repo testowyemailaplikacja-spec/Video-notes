@@ -77,3 +77,13 @@ Dla **nowych** sesji program zapisuje w lokalnym `recording.json` pole `hash_pol
 Sesja z nową polityką, lecz brakującym lub niezgodnym wykazem SHA-256, **nie przechodzi kontroli**, a pliki pozostają nienaruszone. Dzienniki sprzed tej aktualizacji (bez `hash_policy`) pozostają czytelne dla zgodności i otrzymują `sha256_verified=false`; nie należy uznawać ich za sprawdzone kryptograficznie. Przerwane sesje nadal zachowują status `needs_review` i nie są automatycznie domykane.
 
 To mechanizm wykrywania przypadkowego uszkodzenia po zapisie, nie podpis cyfrowy, ochrona przed celową zmianą pliku i dziennika jednocześnie, kopia zapasowa ani odbiór fizycznego dysku Windows. Pełne testy sprzętowe pozostają wymagane.
+
+## Pauza i wznowienie bez utraty wcześniejszych części (08.11.2026)
+
+Interfejs sesji mikrofonowej otrzymał osobne przyciski **Pauza**, **Wznów nagrywanie** i **Zatrzymaj**. Wybór i zgoda na urządzenie nadal wymagają działania użytkownika. „Pauza” *nie zawiesza* procesu FFmpeg wraz z niezapisanym buforem; zamiast tego wysyła mu polecenie `q`, czeka na zamknięcie pliku WAV, sprawdza wszystkie zapisane części i zapisuje w lokalnym `recording.json` status `paused`, liczbę części oraz ich sumy SHA-256. Można wtedy bezpiecznie wybrać „Wznów”, uruchamiając nowy proces FFmpeg na **tym samym urządzeniu**, z następnym numerem `part-XXXXX.wav`. Dotychczasowe pliki nie są ponownie otwierane do zapisu ani nadpisywane.
+
+**Stop podczas pauzy** zamyka sesję bez tworzenia pustego fragmentu. Łączny czas audio nie obejmuje przerw, dlatego po sklejeniu uzyskujemy ciągłe nagranie tylko z chwil aktywnego rejestrowania. W zapisie pozostaje `pause_count`, ale ze względów prywatności nazwa urządzenia nie jest utrwalana. Zatrzymanie lub wznowienie nie oznacza automatycznego uruchomienia transkrypcji.
+
+Awaria podczas pauzy lub po restarcie pozostawia dziennik `paused` lub `needs_review`; polecenie `record-status` pokazuje czytelne części, ale **nie** oznacza sesji automatycznie jako ukończonej. Uruchomienie po awarii do tego samego katalogu jest celowo zabronione, aby nie nadpisać danych. Ponowne wznowienie istniejącej zakończonej sesji po zamknięciu aplikacji nie jest jeszcze dostępne.
+
+Testy automatyczne symulują proces FFmpeg, jego prawidłowe zamykanie, dwie oddzielne części o różnych próbkach PCM, pauzę, wznowienie, stop w pauzie, wyścigi i błąd drugiego ujęcia. Sprawdzają SHA, dziennik, numery części, treść po bezstratnym sklejeniu oraz rzeczywiste przyciski Tk na Linux/Windows CI. **Nie potwierdzają testu fizycznego mikrofonu ani zachowania urządzenia DirectShow po 2 godzinach**. Wymagany pozostaje test na prawdziwym komputerze, urządzeniu USB, przy odłączeniu i uśpieniu systemu.
