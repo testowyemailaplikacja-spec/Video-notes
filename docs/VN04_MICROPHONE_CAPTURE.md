@@ -69,3 +69,11 @@ W GUI dodano osobny przycisk **„Połącz części ukończonego nagrania WAV do
 Łączenie nie wymaga FFmpeg ani sieci. Kopiuje mono PCM 16 kHz/16 bit bez zmiany próbek, w blokach do 65 536 ramek. Przed zapisem sprawdza integralność źródłowych części, ciągłość numeracji i zgodność dziennika, weryfikuje dostępne miejsce, limit standardowego WAV 4 GB oraz nie nadpisuje istniejącego celu nawet w razie jednoczesnego utworzenia go przez inny proces. Wynik powstaje w pliku tymczasowym i jest udostępniany atomowo dopiero po walidacji. Części źródłowe i `recording.json` pozostają bez zmian. Sesja w stanie `needs_review` nie może być automatycznie łączona, dopóki nie zostanie odrębnie sprawdzona.
 
 **Ograniczenia:** złączenie wymaga dodatkowego miejsca w przybliżeniu równego wielkości audio, trwa proporcjonalnie do jego długości i nie usuwa oryginalnych części. Powyżej 4 GB standardowego WAV potrzebna będzie osobna ścieżka przetwarzania. Testy automatyczne korzystają z prawdziwych syntetycznych plików PCM zapisanych przez bibliotekę `wave`, nie z fizycznego mikrofonu Windows. Nie oznaczają zakończenia VN-04.
+
+## Sumy SHA-256 ukończonych nagrań (08.11.2026)
+
+Dla **nowych** sesji program zapisuje w lokalnym `recording.json` pole `hash_policy: sha256-v1` oraz osobną sumę SHA-256 każdego pliku `part-XXXXX.wav`, obliczaną po poprawnym zamknięciu FFmpeg. `record-status` sprawdza te sumy podczas odbioru sesji `finished`. Pozwala to wykryć również niezamierzoną zmianę próbek PCM, która nie uszkodziła nagłówka WAV, liczby ramek ani długości. Status zawiera pole `sha256_verified`, bez udostępniania samego dźwięku, transkrypcji ani sum przez sieć.
+
+Sesja z nową polityką, lecz brakującym lub niezgodnym wykazem SHA-256, **nie przechodzi kontroli**, a pliki pozostają nienaruszone. Dzienniki sprzed tej aktualizacji (bez `hash_policy`) pozostają czytelne dla zgodności i otrzymują `sha256_verified=false`; nie należy uznawać ich za sprawdzone kryptograficznie. Przerwane sesje nadal zachowują status `needs_review` i nie są automatycznie domykane.
+
+To mechanizm wykrywania przypadkowego uszkodzenia po zapisie, nie podpis cyfrowy, ochrona przed celową zmianą pliku i dziennika jednocześnie, kopia zapasowa ani odbiór fizycznego dysku Windows. Pełne testy sprzętowe pozostają wymagane.
