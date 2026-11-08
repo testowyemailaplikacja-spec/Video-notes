@@ -34,3 +34,13 @@ Pliki wynikowe: `exports/notes-advanced.md`, `notes-advanced.json`, opcjonalnie 
 Ograniczenia: nie dokonuje semantycznego streszczenia ani weryfikacji faktów, nie wyciąga niezawodnie nazwisk, terminów i obowiązków, nie ocenia WER ASR. Zapisany JSON jest odtwarzany deterministycznie, ale to nie podpis cyfrowy i nie niezależna walidacja plików Word/PDF. Dla prawdziwego odbioru VN-03 wymagane są trzy próbki z naturalną mową (wykład, instruktaż techniczny, spotkanie lub nauka), ocena człowieka i kontrola układu dokumentów na fizycznym Windows.
 
 Testy obejmują klasyfikacje PL/EN, bezpieczeństwo nieufnego HTML/Markdown, integralność źródła i poprawek, przeciwdziałanie dopisaniu fałszywego cytatu, rzeczywiste elementy Tk i Word z poprawnymi identyfikatorami. Dodatkowo job prawdziwego Whisper CPU PL/EN na syntetycznej mowie weryfikuje nowy schemat i powiązania źródłowe. Dany test jest PASS wyłącznie po zielonym przebiegu CI.
+
+## Bezpośrednie przejście z cytatu do transkrypcji Windows (08.11.2026)
+
+W konspekcie i przewodniku do nauki pojawił się pod podglądem **osobny spis źródeł** z czasem początku i dosłownym fragmentem wypowiedzi. Po zaznaczeniu możesz wybrać **„Przejdź do zaznaczonego źródła”** albo kliknąć dwukrotnie. Program wskazuje odpowiedni `segment_id` w głównej tabeli transkrypcji i wypełnia istniejący edytor, gdzie można poprawić rozpoznane słowa. Przejście jest oparte na **stabilnym ID i zweryfikowanym JSON**, nie na zgadywaniu numeru wiersza czy dopasowaniu tekstu. Jeżeli notatki nie są aktualne względem źródła, lista nie zostanie utworzona do czasu ponownego opracowania.
+
+W **notatce podstawowej** analogiczny przycisk **„Przejdź do źródła transkrypcji”** przechodzi z wybranego punktu do jego oryginalnej wypowiedzi, korzystając z dotychczasowego edytora i dziennika poprawek.
+
+**Ochrona niezapisanych szkiców:** zmiana zaznaczonego segmentu lub ponowne wczytanie projektu nie może cicho skasować niezatwierdzonej poprawki. Program pyta, czy użytkownik chce odrzucić szkic; wybranie „Nie” pozostawia tekst i dotychczasowy segment. Nie pozwala również opuścić edytora notatki podstawowej z niezapisanym szkicem bez ostrzeżenia.
+
+Źródła pozostają lokalne. Przycisk wskazuje tekst i czas w transkrypcji, ale **nie odtwarza automatycznie audio**; rzeczywisty odtwarzacz zsynchronizowany z timecode wymaga osobnego wdrożenia i odbioru. Lista w popupie jest ograniczona do pierwszych 2000 unikatowych pozycji, aby nie zablokować GUI bardzo długim materiałem.
