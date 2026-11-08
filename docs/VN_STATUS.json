@@ -1,6 +1,6 @@
 {
   "schema": "videonotes-progress-v1",
-  "updated_date": "2026-11-08",
+  "updated_date": "2026-11-09",
   "owner_repo": "testowyemailaplikacja-spec/Video-notes",
   "integration_policy": "Develop KWN/Video-notes only. Constant_app and Netlify get only later, independently accepted larger batches.",
   "main_unchanged": "4da53b3bff580e07a16218e5f7017cecf8ff7aed",
@@ -72,11 +72,13 @@
         "PR #68: genuine whisper.cpp CPU inference on original PL/EN synthetic TTS, manual transcript correction preserves raw ASR, stale basic notes rejected, versioned regeneration and DOCX checked, GitHub Actions real ASR 42468924700 + source/browser 42468924655 (6/6 PASS); not natural lecture quality.",
         "PR #69: basic notes use up to 3 repeated literal source words as optional topical hints while preserving timestamps and citation IDs; same heading algorithm on versioned regeneration, malicious markup not promoted; 8/8 CI PASS source/browser 42469190022, Windows DEV 42469190156, LibreOffice 42469190102, Linux Tk 42469190015; no semantic AI summary.",
         "PR #72: implemented separate offline source-only study guide with source-attributed overview quote, TOC, repeated term index, heuristic definition/example/uncertainty quotes, CLI and real Tk GUI, MD/JSON/DOCX/PDF; genuine whisper.cpp PL/EN synthetic TTS + Tk Linux/Windows + LibreOffice CI 10/10 PASS (42475117373, 42475117324, 42475117362, 42475117406, 42475117343). Not a semantic summary or human natural lecture review.",
-        "PR #83: desktop basic-note point now has explicit jump to original ASR segment editor by stable source ID, with protection for unsaved note and transcription drafts and project reload; real Tk hosted Windows and Linux Xvfb PASS, full regressions 8/8 checks: 42490034930, 42490034938, 42490035033. Not automatic audio playback or human semantic review."
+        "PR #83: desktop basic-note point now has explicit jump to original ASR segment editor by stable source ID, with protection for unsaved note and transcription drafts and project reload; real Tk hosted Windows and Linux Xvfb PASS, full regressions 8/8 checks: 42490034930, 42490034938, 42490035033. Not automatic audio playback or human semantic review.",
+        "PR #90: optional local llama.cpp GGUF semantic draft engine with JSON-schema-constrained source IDs, quote/time provenance, no-clobber and human-review flags; Linux/Windows source/browser, Windows DEV EXE, Inno synthetic CI 7/7 jobs PASS (42536188092, 42536188114, 42536188119). Tests use stub responses; no real LLM quality or human factual acceptance.",
+        "PR #92: optional desktop Tk window for generating local semantic draft, verifying citations, exporting Markdown and honoring unsaved ASR drafts; real hosted Windows Tk/Linux Xvfb + 5 source/browser jobs + Windows DEV EXE 8/8 PASS (42537008193, 42537008197, 42537008206). No physical Windows/human evaluation."
       ],
       "blockers": [
         "Human assessment on real lectures",
-        "Semantic multi-sentence summarization grounded in transcript remains open; deterministic source-cited study guide, TOC and heuristic definition/uncertainty index now implemented but are not AI synthesis",
+        "Local llama.cpp optional semantic draft implemented (#90/#92), but real compatible GGUF model inference, grounded multi-sentence factual correctness, named entities/numbers and human assessment are NOT_RUN; source ID alone cannot verify a claim.",
         "Manual acceptance on real source changes of existing versioned regenerate/undo and restored manual edits (source-only regression already implemented)",
         "Physical Windows Word/LibreOffice GUI acceptance; optional PDF conversion via preinstalled LibreOffice implemented and tested on Linux, not bundled or a signed offline release"
       ]
@@ -96,11 +98,14 @@
         "PR #74: actual 121min 440Hz synthetic OGG/Opus compressed FFmpeg input -> 61 checkpointed stub-ASR chunks, cancel at 12 and resume, then 61/61 source-linked study-guide citations and DOCX; 6/6 CI PASS, real-media 42476108843 and source/browser 42476109194. Not human speech or 121min true Whisper inference.",
         "PR #75: independent read-only study-verify CLI and real Tk GUI fail closed for invented/stale/modified source guide JSON, checking all citations/time labels against current corrected transcript, while preserving user files. Genuine whisper.cpp CPU PL/EN TTS, Windows/Linux real GUI, synthetic 121min FFmpeg and real Inno installer regression all 11/11 PASS (42476485059, 42476485075, 42476485031, 42476485064, 42476485035, 42476485044). No semantic fact correctness or cryptographic signature claim.",
         "PR #82: four formerly title-only advanced templates now classify exact source citations separately for lecture/tutorial/meeting/study, configurable time/detail in real Tk, DOCX/PDF focus groups, independent advanced-verify JSON provenance; genuine local whisper.cpp CPU PL/EN on synthetic TTS, 121min FFmpeg/stub ASR regression, LibreOffice Word/PDF, hosted Windows Tk and Linux, 12/12 checks PASS: 42489421967, 42489421987, 42489422032, 42489421956, 42489422062, 42489421888, 42489421878. Still heuristic, not semantic AI or fact validation.",
-        "PR #83: source index of verified advanced/study-guide citations with stable segment IDs, timestamps and clickable/double-click navigation to main desktop transcription/editor; prevents discarding unsaved ASR draft. Real Windows Tk/Linux Xvfb and source/browser 8/8 checks PASS: 42490034930, 42490034938, 42490035033. No synchronized audio playback or physical user acceptance."
+        "PR #83: source index of verified advanced/study-guide citations with stable segment IDs, timestamps and clickable/double-click navigation to main desktop transcription/editor; prevents discarding unsaved ASR draft. Real Windows Tk/Linux Xvfb and source/browser 8/8 checks PASS: 42490034930, 42490034938, 42490035033. No synchronized audio playback or physical user acceptance.",
+        "PR #89: new opt-in `slide-ocr` and `slide-verify` local FFmpeg/FFprobe/Tesseract source fingerprinting and temporary frame processing, real original synthetic title-slide OCR PASS (42535755811), 5 source/browser jobs (42535755792), synthetic private Inno (42535755821), Windows DEV EXE (42535755828), 8/8 total PASS. Not real CCNA slide accuracy or physical Windows.",
+        "PR #90: local llama.cpp cited, *unverified* semantic draft generation with source-bound JSON and Markdown verification (42536188092,42536188114,42536188119, 7/7). No end-user proof of factual synthesis.",
+        "PR #92: integrated opt-in OCR/semantic draft desktop UI, real Tk Windows and Linux tests and full source/browser checks (42537008193,42537008197,42537008206, 8/8). Still needs real video/slides, actual model and human correctness review."
       ],
       "blockers": [
         "Real lectures/tutorials/CCNA human acceptance",
-        "Human-reviewed semantic synthesis, true definitions/fact assessment and slide OCR still pending; 121min deterministic source guide and citation verification are automated but do not reason semantically",
+        "Optional offline llama.cpp drafted summary (#90) and local FFmpeg/Tesseract slide OCR (#89) implemented; true source-grounded factual correctness, real CCNA slides/screen captures, synchronization quality and human validation remain NOT_RUN.",
         "Physical Microsoft Word/LibreOffice GUI and human layout acceptance remains; headless LibreOffice Linux source render/PDF export PASS; slide/OCR and semantic grounding remain pending"
       ]
     },
@@ -118,12 +123,14 @@
         "PR #77: real GUI Pause/Resume/Stop buttons; FFmpeg closes WAV on pause, validates PCM/SHA and resumes at next numbered part without overwriting. Critical discovery: FFmpeg segment muxer ignores global -n, so each take uses isolated .vn-take staging and atomic no-clobber os.link before deleting temp names. Failed takes remain visible for manual review. Synthetic subprocess + real FFmpeg numbering, Linux/Windows source/browser, Tk Windows VM and Linux Xvfb, Windows DEV EXE 8/8 checks PASS (42479432972/42479432973/42479432971). No physical microphone.",
         "PR #78: independent fully local record-analyze CLI and real Tk GUI WAV signal-level diagnostics: streaming RMS/peak dBFS, silence, clipping, per-part stats and warnings, no transcript/audio upload, refusal for paused/damaged sessions. Original synthetic PCM, Windows/Linux unit, genuine Tk, real Inno synthetic installer regression 9/9 checks PASS (42479769485/42479769582/42479769460/42479769480). Cannot infer natural speech quality or physical mic acceptance.",
         "PR #79: actual subprocess FFmpeg sine lavfi capture (not mocked process), interactive q pause, two separate 440/880 Hz takes, WAV SHA/continuity/no-clobber, joins sample-exact, numerical quality analysis. Linux dedicated real-FFmpeg 42480072624 PASS and 5 standard source/browser Linux/Windows checks 42480072912 PASS (6/6). Synthetic source; no DirectShow USB mic or >2h hardware.",
-        "PR #81: real non-destructive recovery from interrupted FFmpeg WAV segments, including .vn-take-UUID after crash. Read-only record-recovery-status, explicit record-salvage --confirm-stopped; strict SHA, PCM, continuity, conflict/symlink/disk/race validation; original journal stays needs_review; new WAV is labeled INCOMPLETE. Actual Tk Linux/hosted Windows, source/browser, synthetic installer Windows 9/9 checks PASS: 42488798070, 42488798071, 42488798109, 42488798065. Physical USB/2h crash still NOT_RUN."
+        "PR #81: real non-destructive recovery from interrupted FFmpeg WAV segments, including .vn-take-UUID after crash. Read-only record-recovery-status, explicit record-salvage --confirm-stopped; strict SHA, PCM, continuity, conflict/symlink/disk/race validation; original journal stays needs_review; new WAV is labeled INCOMPLETE. Actual Tk Linux/hosted Windows, source/browser, synthetic installer Windows 9/9 checks PASS: 42488798070, 42488798071, 42488798109, 42488798065. Physical USB/2h crash still NOT_RUN.",
+        "PR #91: new consent+SHA-confirmed `record-transcribe` joins *all* completed session WAV parts and uses the standard project/checkpoint/Whisper export pipeline, with cancellation support; actual FFmpeg synthetic WAV and fake-ASR tests, 5 source/browser + 1 private Inno + 1 DEV EXE CI PASS (42536726970,42536727171,42536726935), 7/7. Not physical microphone.",
+        "PR #93: opt-in desktop Tk dialog chooses finished session, new empty project, optional joined WAV and user approval, then shared ASR with cancel/progress, preserves source and allows resume on failure; hosted Win/Linux Tk (42537324810), five source/browser jobs (42537324676) and Windows DEV EXE (42537324689) PASS 8/8. No 2h physical Windows recording."
       ],
       "blockers": [
         "Physical Windows microphone permission and recording",
         "Actual physical Windows 2h session including pause/resume, device unplug, disk-full and crash/restart recovery; opt-in intact-prefix salvage now implemented (PR #81) and 2-take FFmpeg lavfi CI PASS, but no physical recovery acceptance",
-        "Physical Windows user acceptance of device picker, Start/Pause/Resume/Stop GUI and post-capture signal diagnostics; genuine Tk Windows VM + Linux Xvfb CI PASS",
+        "Physical Windows end-user acceptance of device picker, Start/Pause/Resume/Stop, whole-session record-to-ASR GUI (#93) and PCM signal diagnostics; hosted Windows/Linux Tk CI PASS, hardware NOT_RUN.",
         "Real physical offline Windows acceptance with owner-supplied licensed FFmpeg/Whisper/model within private Inno installer; CI synthetic setup PASS only"
       ]
     },
@@ -1057,6 +1064,107 @@
       "windows_dev_executable": "PASS",
       "physical_windows_microphone": false,
       "human_natural_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42535755811",
+      "scope": "PR #89: VN-03B real FFmpeg/Tesseract synthetic title slide",
+      "result": "PASS",
+      "real_ocr_on_original_synthetic_video": true,
+      "real_user_slides": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42535755792",
+      "scope": "PR #89: VN-03B Linux/Windows source + real browser CI (5 jobs)",
+      "result": "PASS",
+      "source_linux_windows": "PASS",
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42535755821",
+      "scope": "PR #89: VN-03B Inno synthetic Windows install/uninstall",
+      "result": "PASS",
+      "physical_windows": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42535755828",
+      "scope": "PR #89: VN-03B Windows DEV EXE",
+      "result": "PASS",
+      "physical_windows": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42536188092",
+      "scope": "PR #90: VN-02/VN-03 optional GGUF/llama.cpp draft with stubbed LLM: Linux/Windows+browser source CI (5 jobs)",
+      "result": "PASS",
+      "real_llm_inference": false,
+      "human_factual_review": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42536188114",
+      "scope": "PR #90: VN-02/VN-03 Windows DEV EXE",
+      "result": "PASS",
+      "real_llm_inference": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42536188119",
+      "scope": "PR #90: VN-02/VN-03 synthetic private Inno installer",
+      "result": "PASS",
+      "physical_windows": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42536726970",
+      "scope": "PR #91: VN-04 finished WAV to common ASR with real FFmpeg and fake ASR; 5 source/browser jobs",
+      "result": "PASS",
+      "real_microphone": false,
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42536726935",
+      "scope": "PR #91: VN-04 Windows DEV EXE",
+      "result": "PASS",
+      "real_microphone": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42536727171",
+      "scope": "PR #91: VN-04 synthetic private Inno installer",
+      "result": "PASS",
+      "physical_windows": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42537008193",
+      "scope": "PR #92: VN-02/03 opt-in GUI; real Tk Linux Xvfb and hosted Windows 2 jobs",
+      "result": "PASS",
+      "physical_windows": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42537008197",
+      "scope": "PR #92: VN-02/03 GUI five source+browser CI jobs",
+      "result": "PASS",
+      "real_llm_inference": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42537008206",
+      "scope": "PR #92: VN-02/03 Windows DEV EXE",
+      "result": "PASS",
+      "physical_windows": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42537324810",
+      "scope": "PR #93: VN-04 finished mic session to ASR GUI; real Tk Linux/hosted Windows 2 jobs",
+      "result": "PASS",
+      "physical_microphone": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42537324676",
+      "scope": "PR #93: VN-04 unified recording ASR pipeline; five source/browser CI jobs",
+      "result": "PASS",
+      "real_microphone": false,
+      "real_asr": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42537324689",
+      "scope": "PR #93: VN-04 Windows DEV EXE",
+      "result": "PASS",
+      "physical_windows": false
     }
   ],
   "notes": [
@@ -1079,7 +1187,8 @@
     "PR #43–45 merged on 2026-11-07 after applicable Linux/Windows source/browser and Windows DEV EXE checks. MP4/MKV real FFmpeg + fake subprocess CLI does not verify true PL/EN ASR; DOCX OOXML tests do not verify Word GUI; recording crash report test is synthetic, not physical device recovery.",
     "2026-11-07 PR #47–49 accepted on verified CI only: 50k extractive selection equivalence; GUI history restoration with backup API compatibility; crucial real LibreOffice DOCX import bug was reproduced and fixed via canonical default OPC namespaces. None of these verifies real ASR, full physical Windows UI, licensed offline installer, or human semantic-note quality.",
     "2026-11-08: PR #51–54 and #56–57 CI-verified and merged: durable note transaction intent, true whisper.cpp TTS PL/EN, Xvfb Tk GUI, optional LibreOffice PDF, actual 121min compressed FFmpeg with stub ASR, PID-only stale note lock recovery. No human-lecture ASR, 2h real Whisper or physical Windows installer; 0/9 stages DONE unchanged.",
-    "2026-11-08: PR #85/#86/#87 fully CI-verified and squash-merged into develop: browser→desktop safe correction patch; internal SPDX 2.3 inventory with unverified licenses; read-only offline dependency/model/media/disk preflight. GitHub Actions 42496562215/62164/62085; 42496858013/58049/58068; 42497172591/72589/72532: 7/7 jobs per PR PASS. No natural lectures, physical Windows microphone/loopback/offline, signed/licensed installer or Wiedora staging integration. VN-00..VN-07 still W TRAKCIE, VN-08 PLANOWANE, 0 DONE."
+    "2026-11-08: PR #85/#86/#87 fully CI-verified and squash-merged into develop: browser→desktop safe correction patch; internal SPDX 2.3 inventory with unverified licenses; read-only offline dependency/model/media/disk preflight. GitHub Actions 42496562215/62164/62085; 42496858013/58049/58068; 42497172591/72589/72532: 7/7 jobs per PR PASS. No natural lectures, physical Windows microphone/loopback/offline, signed/licensed installer or Wiedora staging integration. VN-00..VN-07 still W TRAKCIE, VN-08 PLANOWANE, 0 DONE.",
+    "2026-11-09 (local Europe/Warsaw, CI GitHub timestamps 2026-11-08 UTC): PR #89–93 verified at their FINAL heads, merged to develop: optional video frame OCR with real FFmpeg/Tesseract original synthetic slide; optional offline source-cited llama.cpp DRAFT with stubbed LLM in CI; complete finished WAV→same ASR CLI and GUI with cancellation; optional Tk GUI for OCR/LLM. 38/38 CI jobs PASS after reruns fixing discovered failures. No real human lecture semantics, genuine GGUF model acceptance, 2h physical microphone, licensed offline release or Wiedora host integration. 0 DONE, VN-00..VN-07 W_TRAKCIE, VN-08 PLANOWANE."
   ],
   "last_verified_develop_before_pr8": "344e227571ba09802da8a8bea7c50498473dc2e6"
 }
