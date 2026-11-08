@@ -89,8 +89,8 @@ def run_real_benchmark(source: Path, reference: Path, *, cpp_executable: str,
     faster_model_dir = Path(faster_model_dir).expanduser().resolve()
     if not cpp_model.is_file() or not cpp_model.stat().st_size:
         raise VideoNotesError("Brakuje lokalnego modelu whisper.cpp.")
-    if not faster_model_dir.is_dir() or any(not (faster_model_dir / part).is_file() for part in ("config.json", "model.bin")):
-        raise VideoNotesError("Model faster-whisper wymaga lokalnego katalogu z config.json i model.bin.")
+    if not faster_model_dir.is_dir() or any(not (faster_model_dir / part).is_file() for part in ("config.json", "model.bin", "vocabulary.txt")):
+        raise VideoNotesError("Model faster-whisper wymaga lokalnego katalogu z config.json, model.bin i vocabulary.txt.")
     cpp_executable = executable(cpp_executable)
     source = Path(source).expanduser().resolve()
     reference = Path(reference).expanduser().resolve()
