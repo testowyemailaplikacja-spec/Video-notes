@@ -30,3 +30,16 @@ Wykonanie bez płatnego API, konta, serwera i bez automatycznej wysyłki danych.
 ## Granice odbioru
 
 Nowy przewodnik to istotny krok ku VN-02/VN-03, ale **nie jest semantycznym streszczeniem AI, rozpoznaniem znaczenia definicji, weryfikacją źródeł ani transkrypcją 1:1 bez błędów**. Udany test z syntetyczną mową TTS nie oznacza oceny przez człowieka prawdziwego wykładu. Testy fizycznego Windows, długich sesji i instalatora pozostają niezależnymi bramkami odbioru.
+
+## Niezależna kontrola cytatów (08.11.2026)
+
+Po zapisaniu `exports/notes-study.json` można sprawdzić zgodność **całego JSON, wszystkich cytatów, czasów, pojęć, etykiet i numerów sekcji z aktualną lokalną transkrypcją**:
+
+```powershell
+python -m videonotes study-verify C:\\Notatki\\wyklad-001
+python -m videonotes study-verify C:\\Notatki\\wyklad-001 --file C:\\Kopie\\notes-study.json
+```
+
+W oknie przewodnika jest też przycisk **„Sprawdź źródła”**. Weryfikacja na nowo, deterministycznie buduje oczekiwaną reprezentację z poprawionej transkrypcji i porównuje ją z zachowanym plikiem. Przy odmiennej treści, zmyślonym fragmencie, zmienionym czasie, innej klasyfikacji, brakującym cytacie, uszkodzeniu struktury lub nieaktualnej transkrypcji odmówi potwierdzenia. Nie usuwa, nie naprawia i nie nadpisuje dokumentu. Odrzuca także dowiązania symboliczne zamiast podążać za cudzym plikiem.
+
+Wynik pozytywny zawiera jedynie `verified`, liczbę części/cytatów, `source_sha256` i `document_sha256` — **nie zawiera słów z nagrania**. Służy do lokalnej kontroli, bez udziału sieci. Potwierdza dokładne pochodzenie JSON z aktualnej transkrypcji, **nie to, że ASR usłyszał prawdziwe słowa albo że są one faktograficznie poprawne**. Weryfikator nie podpisuje kryptograficznie dokumentu i nie sprawdza niezależnie plików MD/DOCX/PDF: ich bezpieczeństwo zależy od wcześniejszego generowania z zaufanego JSON oraz kontroli eksportu.
