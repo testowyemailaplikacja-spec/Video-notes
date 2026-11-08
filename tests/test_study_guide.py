@@ -15,7 +15,7 @@ from videonotes.cli import main
 from videonotes.errors import VideoNotesError
 from videonotes.study_guide import (
     SCHEMA, build_study_guide, render_study_guide_markdown,
-    export_study_guide,
+    export_study_guide, verify_study_guide,
 )
 from videonotes.storage import read_project, save_json
 
@@ -167,6 +167,71 @@ class SourceStudyGuideTest(unittest.TestCase):
                 export_study_guide(self.root, include_docx=True, include_pdf=True)
         for name, value in payloads.items():
             self.assertEqual((directory / name).read_bytes(), value)
+
+    def test_study_provenance_verification_and_redacted_cli_report(self):
+        _, file = export_study_guide(self.root, section_minutes=1, detail="full")
+        before = file.read_bytes()
+        checked = verify_study_guide(self.root)
+        self.assertTrue(checked["verified"])
+        self.assertEqual(checked["sections"], 2)
+        self.assertEqual(checked["source_citations"], 4)
+        self.assertEqual(len(checked["document_sha256"]), 64)
+        self.assertFalse(checked["cryptographic_signature_verified"])
+        self.assertNotIn("Wykład", json.dumps(checked, ensure_ascii=False))
+        self.assertEqual(file.read_bytes(), before)
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            self.assertEqual(main(["study-verify", str(self.root), "--file", str(file)]), 0)
+        self.assertEqual(json.loads(stdout.getvalue())["source_sha256"], checked["source_sha256"])
+
+    def test_verify_refuses_invented_claim_and_changed_timestamps_without_rewrite(self):
+        _, file = export_study_guide(self.root, detail="full", section_minutes=1)
+        original = json.loads(file.read_text(encoding="utf-8"))
+        for mutation in ("text", "start_ms", "unexpected", "classification"):
+            with self.subTest(mutation=mutation):
+                fake = json.loads(json.dumps(original))
+                point = fake["sections"][0]["key_quotes"][0]
+                if mutation == "text":
+                    point["text"] = "Wymyślone stwierdzenie bez źródła."
+                elif mutation == "start_ms":
+                    point["start_ms"] += 500
+                elif mutation == "unexpected":
+                    fake["untrusted_meta"] = {"force": True}
+                else:
+                    fake["sections"][0]["questions_or_uncertainties"].append(
+                        dict(point)
+                    )
+                save_json(file, fake)
+                original_tampered = file.read_bytes()
+                with self.assertRaisesRegex(VideoNotesError, "zmienione"):
+                    verify_study_guide(self.root)
+                self.assertEqual(file.read_bytes(), original_tampered)
+        save_json(file, original)
+        self.assertTrue(verify_study_guide(self.root)["verified"])
+
+    def test_verify_refuses_stale_source_and_symlink_without_modifying_content(self):
+        _, file = export_study_guide(self.root)
+        prior = file.read_bytes()
+        save_json(self.root / "edits.json", {
+            "schema": "videonotes-edits-v1",
+            "edits": {"c0000000-s00000": "Ręczna korekta tego fragmentu."}
+        })
+        with self.assertRaisesRegex(VideoNotesError, "nieaktualny"):
+            verify_study_guide(self.root)
+        self.assertEqual(file.read_bytes(), prior)
+        export_study_guide(self.root)
+        self.assertTrue(verify_study_guide(self.root)["verified"])
+
+        outside = self.root / "old-study.json"
+        outside.write_bytes(file.read_bytes())
+        link = self.root / "study-link.json"
+        try:
+            link.symlink_to(outside)
+        except (OSError, NotImplementedError):
+            self.skipTest("Symlink unavailable")
+        with self.assertRaisesRegex(VideoNotesError, "zwykłego"):
+            verify_study_guide(self.root, document=link)
+        self.assertEqual(outside.read_bytes(), file.read_bytes())
 
     def test_empty_optional_category_never_invents_missing_examples(self):
         self._source([
