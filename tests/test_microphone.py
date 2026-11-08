@@ -217,7 +217,7 @@ class MicrophoneTest(unittest.TestCase):
         original_first, original_second = first.read_bytes(), second.read_bytes()
         output = self.folder / "recording-full.wav"
         self.assertEqual(join_finished_recording(self.folder, output), output)
-        self.assertEqual([p.name for p in inspect_wav_segments(self.folder)], [first.name, second.name])
+        self.assertEqual([p["name"] for p in inspect_wav_segments(self.folder)], [first.name, second.name])
         with wave.open(str(output), "rb") as merged:
             self.assertEqual(merged.getnchannels(), 1)
             self.assertEqual(merged.getframerate(), 16000)
