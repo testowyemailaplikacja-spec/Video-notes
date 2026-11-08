@@ -9,6 +9,7 @@ from pathlib import Path
 from . import __version__
 from .errors import VideoNotesError
 from .exports import edit_segment, export_project
+from .web_corrections import import_web_corrections
 from .media import probe
 from .microphone import record_microphone, recording_status, list_microphone_devices, join_finished_recording
 from .audio_diagnostics import analyze_finished_recording
@@ -55,6 +56,10 @@ def parser() -> argparse.ArgumentParser:
     lock_recover.add_argument("--confirm", action="store_true", help="Jawnie potwierdź bezpieczne odzyskiwanie")
     exports = sub.add_parser("export", help="Zapisz TXT/SRT/VTT/JSON bez zmiany surowego tekstu")
     exports.add_argument("project", type=Path)
+    web_edits = sub.add_parser("import-web-edits", help="Sprawdź lub zastosuj poprawki z lokalnej strony WWW (VN-07)")
+    web_edits.add_argument("project", type=Path)
+    web_edits.add_argument("--file", required=True, type=Path, help="Lokalny web-corrections.json z przeglądarki")
+    web_edits.add_argument("--apply", action="store_true", help="Zapisz do edits.json po pełnej walidacji; domyślnie tylko podgląd")
     edit = sub.add_parser("edit", help="Zapisz poprawkę segmentu, zachowując surową transkrypcję")
     edit.add_argument("project", type=Path)
     edit.add_argument("--segment", required=True)
@@ -225,6 +230,8 @@ def main(argv: list[str] | None = None) -> int:
         elif args.action == "export":
             for target in export_project(args.project):
                 print(target)
+        elif args.action == "import-web-edits":
+            print(json.dumps(import_web_corrections(args.project, args.file, apply=args.apply), ensure_ascii=False, indent=2))
         elif args.action == "status":
             project, transcript, edits = read_project(args.project)
             total = (project["source"]["duration_ms"] + project["processing"]["chunk_ms"] - 1) // project["processing"]["chunk_ms"]

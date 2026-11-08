@@ -77,6 +77,17 @@ async function browserScenario() {
   const text = await captures[0].text();
   if (!text.includes("Poprawiony tekst użytkownika")) throw new Error("Eksport nie zawiera poprawki");
 
+  // The real browser must also produce a minimal reversible desktop patch.
+  const correctionButton = document.querySelector('button[data-export="web-corrections.json"]');
+  if (!correctionButton) throw new Error("Brak przycisku wymiany poprawek desktop");
+  correctionButton.click();
+  if (captures.length !== 2) throw new Error("Brak paczki poprawek w realnej przeglądarce");
+  const patch = JSON.parse(await captures[1].text());
+  if (patch.schema !== "videonotes-web-corrections-v1" || patch.project_id !== "chromium-demo" ||
+      patch.changes.length !== 1 || patch.changes[0].before !== "Pierwsza wypowiedź." ||
+      patch.changes[0].after !== "Poprawiony tekst użytkownika") {
+    throw new Error("Niezgodny format poprawek między WWW i desktopem");
+  }
   // A rejected replacement may not silently lose the saved correction.
   window.confirm = () => false;
   const newer = new File([JSON.stringify({...fixture, project_id: "another", segments: []})],

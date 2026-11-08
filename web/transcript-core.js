@@ -127,6 +127,29 @@
     });
     return files;
   }
+  // A reversible patch for a matching desktop project, not a replacement ASR transcript.
+  function renderCorrections(model, edits) {
+    var doc = validateExport(model);
+    var map = edits || Object.create(null);
+    if (!plainObject(map)) reject("Nieprawidłowa lista poprawek.");
+    var byId = new Map(doc.segments.map(function (item) { return [item.id, item]; }));
+    for (var key of Object.keys(map)) {
+      if (!byId.has(key) || !validText(map[key], MAX_TEXT)) {
+        reject("Poprawka odnosi się do nieznanego segmentu albo jest za długa.");
+      }
+    }
+    var changes = [];
+    doc.segments.forEach(function (item) {
+      if (Object.prototype.hasOwnProperty.call(map, item.id) && map[item.id] !== item.text) {
+        changes.push({
+          id: item.id, start_ms: item.start_ms, end_ms: item.end_ms,
+          before: item.text, after: map[item.id]
+        });
+      }
+    });
+    return JSON.stringify({schema: "videonotes-web-corrections-v1",
+      project_id: doc.project_id, changes: changes}, null, 2) + "\\n";
+  }
   function search(model, edits, term) {
     var doc = validateExport(model);
     var query = String(term || "").trim().toLocaleLowerCase();
@@ -145,7 +168,7 @@
     SCHEMA: SCHEMA, MAX_BYTES: MAX_BYTES, MAX_TEXT: MAX_TEXT,
     parseExport: parseExport, validateExport: validateExport,
     clock: clock, corrected: corrected, renderExport: renderExport,
-    renderExports: renderExports,
+    renderExports: renderExports, renderCorrections: renderCorrections,
     search: search
   };
   if (typeof module !== "undefined" && module.exports) module.exports = core;

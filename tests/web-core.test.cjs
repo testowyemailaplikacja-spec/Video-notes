@@ -118,3 +118,21 @@ test("subtitle exports flatten injected cue separators and escape WebVTT markup"
   assert.equal(JSON.parse(core.renderExport(doc, edits, "transcript.json")).segments[0].text, original);
   assert.ok(core.renderExport(doc, edits, "transcript.txt").includes(original));
 });
+
+test("offline browser correction patch round-trips without exporting unchanged text", () => {
+  const doc = fixture();
+  const edits = Object.create(null);
+  edits["c0000000-s00001"] = "Poprawione DHCP i IPv6";
+  edits["c0000000-s00000"] = "";
+  const patch = JSON.parse(core.renderCorrections(doc, edits));
+  assert.equal(patch.schema, "videonotes-web-corrections-v1");
+  assert.equal(patch.project_id, doc.project_id);
+  assert.deepEqual(patch.changes.map(item => item.id), ["c0000000-s00000", "c0000000-s00001"]);
+  assert.equal(patch.changes[0].before, doc.segments[0].text);
+  assert.equal(patch.changes[0].after, "");
+  assert.equal(patch.changes[1].after, "Poprawione DHCP i IPv6");
+  assert.equal(doc.segments[1].text, "Protokół DHCP nadaje adres IP.");
+  assert.equal(JSON.parse(core.renderCorrections(doc, {})).changes.length, 0);
+  assert.throws(() => core.renderCorrections(doc, {"unknown-segment": "a"}), /Poprawka/);
+  assert.throws(() => core.renderCorrections(doc, {"c0000000-s00001": "\u0000"}), /Poprawka/);
+});

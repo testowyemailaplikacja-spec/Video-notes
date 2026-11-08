@@ -35,7 +35,7 @@ class Element {
 function boot() {
   const elements = Object.create(null);
   const state = {allow: false, prompts: [], downloads: []};
-  const exportButtons = ["transcript.txt", "transcript.srt", "transcript.vtt", "transcript.json"].map(name => {
+  const exportButtons = ["transcript.txt", "transcript.srt", "transcript.vtt", "transcript.json", "web-corrections.json"].map(name => {
     const button = new Element();
     button.getAttribute = key => key === "data-export" ? name : null;
     return button;
@@ -226,4 +226,25 @@ test("segment selection exposes ARIA state and keeps focus after row redraw", as
   const selected = ux.elements["segment-rows"].children[1].children[1].children[0];
   assert.equal(selected["aria-pressed"], "true");
   assert.equal(ux.doc.activeElement, selected);
+});
+
+test("browser patch button exports only saved corrections and protects drafts", async () => {
+  const ux = boot();
+  await ux.importFile(source("desktop", 2));
+  ux.exportButtons[4].events.click();
+  assert.equal(ux.state.downloads.length, 0);
+  assert.match(ux.elements["status"].textContent, /Brak zapisanych poprawek/);
+  ux.select(1);
+  ux.elements["edit-text"].value = "Nowa poprawka do desktopu";
+  ux.exportButtons[4].events.click();
+  assert.equal(ux.state.downloads.length, 0);
+  ux.elements["save-edit"].events.click();
+  ux.exportButtons[4].events.click();
+  assert.equal(ux.state.downloads.length, 1);
+  assert.equal(ux.state.downloads[0].filename, "web-corrections.json");
+  const patch = JSON.parse(ux.state.downloads[0].payload);
+  assert.equal(patch.project_id, "desktop");
+  assert.equal(patch.changes.length, 1);
+  assert.equal(patch.changes[0].before, "desktop text 1");
+  assert.equal(patch.changes[0].after, "Nowa poprawka do desktopu");
 });
