@@ -77,3 +77,11 @@ Na Windows, gdy `soffice.exe` nie jest dostępny w PATH, wskaż jego plik przez 
 Program najpierw weryfikuje zgodność notatek z transkrypcją, tworzy DOCX w pamięci, uruchamia lokalny LibreOffice bez powłoki z odseparowanym profilem w katalogu tymczasowym, sprawdza wynik PDF i dopiero potem atomowo zapisuje `exports/notes-basic.pdf`. Dokument wejściowy i profil tymczasowy są usuwane; nie ma automatycznego pobierania dodatkowego oprogramowania. Narzędzie nie gwarantuje braku własnych mechanizmów sieciowych zewnętrznej instalacji LibreOffice.
 
 Regresje obejmują odmowę uszkodzonego PDF, zachowanie poprzednich eksportów i faktyczny odczyt polskich cytatów z wyjściowego PDF w LibreOffice/Poppler na Ubuntu. To lokalny opcjonalny eksport, nie uniwersalny niezależny od środowiska generator PDF ani fizyczny odbiór Windows. VN-02 pozostaje W_TRAKCIE.
+
+## Nagłówki z powtarzających się słów źródłowych (08.11.2026)
+
+Notatka podstawowa zachowuje podział czasowy (np. `Fragment 0–1 min`), a gdy w **co najmniej dwóch wybranych cytatach** powtarzają się te same słowa, dopisuje maksymalnie trzy takie słowa do nagłówka (np. `Fragment 0–1 min · DHCP adres`). Nazwy są wyłącznie słowami widocznymi w wypowiedziach, z usuniętą interpunkcją i znacznikami; żaden model językowy nie tworzy nowych twierdzeń. Jeśli brak powtarzających się terminów, nagłówek pozostaje czasowy.
+
+Podczas regeneracji po ręcznej korekcie transkrypcji nagłówki są obliczane ponownie według tej samej reguły, w oparciu o aktualne cytaty. Poprzednia wersja notatki i ręczne poprawki zachowują dotychczasową ochronę. Weryfikację zapewniają testy zgodności wersji, źródłowych czasów, słów powtarzanych oraz tekstu potencjalnie niebezpiecznego dla Markdown.
+
+**To heurystyczne słowa kluczowe, a nie semantyczny tytuł czy podsumowanie**; nie stanowią dowodu poprawności rozpoznania mowy ani ręcznej oceny jakości wykładu. VN-02 pozostaje W_TRAKCIE.
