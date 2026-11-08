@@ -25,6 +25,7 @@ from .backup import create_backup, restore_backup, relink_backup
 from .bundle import create_internal_bundle, verify_internal_bundle
 from .sbom import create_internal_sbom
 from .diagnostics import diagnose_local_install
+from .slide_ocr import extract_slide_ocr, verify_slide_ocr
 from .installer import build_internal_installer
 from .pipeline import create_project, transcribe_project, transcription_lock_status, recover_stale_transcription_lock
 from .storage import read_project
@@ -195,6 +196,18 @@ def parser() -> argparse.ArgumentParser:
     doctor.add_argument("--model", type=Path)
     doctor.add_argument("--source", type=Path, help="Opcjonalny lokalny plik OBS/audio do odczytu ścieżek")
     doctor.add_argument("--workspace", type=Path, help="Opcjonalny katalog na projekty do pomiaru wolnego miejsca")
+    slide = sub.add_parser("slide-ocr", help="OCR klatek z lokalnego OBS (opcjonalne VN-03B)")
+    slide.add_argument("project", type=Path)
+    slide.add_argument("--output", required=True, type=Path)
+    slide.add_argument("--ffmpeg", default="ffmpeg")
+    slide.add_argument("--ffprobe", default="ffprobe")
+    slide.add_argument("--tesseract", default="tesseract")
+    slide.add_argument("--language", default="pol+eng")
+    slide.add_argument("--interval-seconds", type=int, default=60)
+    slide.add_argument("--max-frames", type=int, default=120)
+    slide_check = sub.add_parser("slide-verify", help="Sprawdź pochodzenie i strukturę lokalnego raportu OCR")
+    slide_check.add_argument("project", type=Path)
+    slide_check.add_argument("--file", required=True, type=Path)
     sub.add_parser("gui", help="Uruchom prosty interfejs Windows/Tkinter")
     return cmd
 
@@ -366,6 +379,13 @@ def main(argv: list[str] | None = None) -> int:
                                             whisper_cli=args.whisper_cli, model=args.model,
                                             source=args.source, workspace=args.workspace)
             print(json.dumps(report, ensure_ascii=False, indent=2))
+        elif args.action == "slide-ocr":
+            print(json.dumps(extract_slide_ocr(args.project, args.output, ffmpeg=args.ffmpeg,
+                        ffprobe=args.ffprobe, tesseract=args.tesseract, language=args.language,
+                        interval_seconds=args.interval_seconds, max_frames=args.max_frames),
+                        ensure_ascii=False, indent=2))
+        elif args.action == "slide-verify":
+            print(json.dumps(verify_slide_ocr(args.project, args.file), ensure_ascii=False, indent=2))
         elif args.action == "gui":
             from .gui import launch
             launch()

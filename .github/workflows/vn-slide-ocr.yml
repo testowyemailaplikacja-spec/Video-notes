@@ -1,0 +1,33 @@
+name: Video Notes — real FFmpeg/Tesseract original slide OCR smoke
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'videonotes/slide_ocr.py'
+      - 'scripts/real_slide_ocr_smoke.py'
+      - '.github/workflows/vn-slide-ocr.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  original-generated-slide:
+    name: Local FFmpeg and real Tesseract on synthetic video (Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Check real offline-tool prerequisites
+        shell: bash
+        run: |
+          timeout 180s sudo apt-get update -qq
+          timeout 240s sudo apt-get install -y --no-install-recommends ffmpeg tesseract-ocr tesseract-ocr-eng fonts-dejavu-core
+          ffmpeg -version | head -n 1
+          tesseract --version | head -n 1
+          tesseract --list-langs 2>&1 | grep -x eng
+      - name: Run genuine FFmpeg and local OCR on generated slide
+        run: |
+          python -m compileall -q videonotes scripts/real_slide_ocr_smoke.py
+          python -m scripts.real_slide_ocr_smoke
