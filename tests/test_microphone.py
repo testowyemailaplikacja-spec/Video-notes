@@ -14,7 +14,8 @@ from unittest import mock
 from videonotes.cli import main
 from videonotes.errors import VideoNotesError
 from videonotes.microphone import (SEGMENT_SECONDS, capture_command,
-                                   inspect_wav_segments, record_microphone, recording_status, list_microphone_devices)
+                                   inspect_wav_segments, record_microphone, recording_status, list_microphone_devices,
+                                   join_finished_recording)
 
 
 class FakeFFmpeg:
@@ -194,6 +195,79 @@ class MicrophoneTest(unittest.TestCase):
         self.assertEqual([row["name"] for row in report["segments"]], ["part-00000.wav"])
         self.assertEqual(outside.read_text("utf-8"), "do not read this")
         self.assertTrue(link.is_symlink())
+
+    def _make_finished_two_part_recording(self):
+        self._record()
+        journal_path = self.folder / "recording.json"
+        journal = json.loads(journal_path.read_text("utf-8"))
+        second = self.folder / "part-00001.wav"
+        with wave.open(str(second), "wb") as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(16000)
+            wav.writeframes(b"\\x01\\x00" * 1600)
+        journal["segments"] = 2
+        journal["duration_ms"] = 200
+        journal_path.write_text(json.dumps(journal), encoding="utf-8")
+        return journal_path
+
+    def test_join_completed_wav_parts_is_lossless_and_cli_exports_same_source(self):
+        self._make_finished_two_part_recording()
+        first, second = self.folder / "part-00000.wav", self.folder / "part-00001.wav"
+        original_first, original_second = first.read_bytes(), second.read_bytes()
+        output = self.folder / "recording-full.wav"
+        self.assertEqual(join_finished_recording(self.folder, output), output)
+        self.assertEqual([p.name for p in inspect_wav_segments(self.folder)], [first.name, second.name])
+        with wave.open(str(output), "rb") as merged:
+            self.assertEqual(merged.getnchannels(), 1)
+            self.assertEqual(merged.getframerate(), 16000)
+            self.assertEqual(merged.getnframes(), 3200)
+            self.assertEqual(merged.readframes(1600), b"\\x00\\x00" * 1600)
+            self.assertEqual(merged.readframes(1600), b"\\x01\\x00" * 1600)
+        self.assertEqual(first.read_bytes(), original_first)
+        self.assertEqual(second.read_bytes(), original_second)
+
+        another = self.folder / "full-via-cli.wav"
+        console = io.StringIO()
+        with contextlib.redirect_stdout(console):
+            self.assertEqual(main(["record-join", str(self.folder), "--output", str(another)]), 0)
+        self.assertEqual(console.getvalue().strip(), str(another))
+        self.assertEqual(output.read_bytes(), another.read_bytes())
+        with self.assertRaisesRegex(VideoNotesError, "nowy plik"):
+            join_finished_recording(self.folder, output)
+        self.assertEqual(output.read_bytes(), another.read_bytes())
+
+    def test_join_refuses_incomplete_or_missing_segments_and_bad_names(self):
+        journal = self._make_finished_two_part_recording()
+        original = json.loads(journal.read_text("utf-8"))
+        output = self.folder / "recording-full.wav"
+        altered = dict(original, status="needs_review")
+        journal.write_text(json.dumps(altered), encoding="utf-8")
+        with self.assertRaisesRegex(VideoNotesError, "Tylko ukończoną"):
+            join_finished_recording(self.folder, output)
+        journal.write_text(json.dumps(original), encoding="utf-8")
+        (self.folder / "part-00001.wav").unlink()
+        with self.assertRaisesRegex(VideoNotesError, "Dziennik"):
+            join_finished_recording(self.folder, output)
+        self.assertFalse(output.exists())
+        with self.assertRaisesRegex(VideoNotesError, "numerowana"):
+            join_finished_recording(self.folder, self.folder / "part-00002.wav")
+
+    def test_join_refuses_full_disk_and_atomic_collision_without_clobber(self):
+        self._make_finished_two_part_recording()
+        target = self.folder / "recording-full.wav"
+        first_before = (self.folder / "part-00000.wav").read_bytes()
+        with mock.patch("videonotes.microphone.shutil.disk_usage", return_value=mock.Mock(free=0)):
+            with self.assertRaisesRegex(VideoNotesError, "mało wolnego miejsca"):
+                join_finished_recording(self.folder, target)
+        self.assertFalse(target.exists())
+
+        with mock.patch("videonotes.microphone.os.link", side_effect=FileExistsError("race")):
+            with self.assertRaisesRegex(VideoNotesError, "już istnieje"):
+                join_finished_recording(self.folder, target)
+        self.assertFalse(target.exists())
+        self.assertEqual(list(self.folder.glob(".vn-join-*")), [])
+        self.assertEqual((self.folder / "part-00000.wav").read_bytes(), first_before)
 
     def test_stop_event_closes_capture_and_keeps_valid_audio(self):
         stop = threading.Event()
