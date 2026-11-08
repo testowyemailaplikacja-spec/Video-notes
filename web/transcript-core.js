@@ -148,7 +148,7 @@
       }
     });
     return JSON.stringify({schema: "videonotes-web-corrections-v1",
-      project_id: doc.project_id, changes: changes}, null, 2) + "\\n";
+      project_id: doc.project_id, changes: changes}, null, 2) + String.fromCharCode(10);
   }
   function search(model, edits, term) {
     var doc = validateExport(model);
