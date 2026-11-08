@@ -42,13 +42,14 @@
         "PR #52 real whisper.cpp PL/EN synthetic short WAV through FFmpeg to checkpoint JSON/4 exports/basic notes/DOCX, workflow 42426108460 PASS.",
         "PR #56: real FFmpeg 121-minute OGG/Opus sine input, 61 actual two-minute PCM extractions, checkpoint cancel at 12/resume to 61, idempotent and source unchanged, workflow 42427011686 PASS (7260006 ms; 59.583s generation + 15.107s checkpoint/resume/export); ASR stub, not real 2h model.",
         "PR #59: real whisper.cpp multilingual tiny end-to-end on self-generated two-track OBS-like MP4 (PL) and MKV (EN), actual FFprobe/FFmpeg, explicit non-default audio track, checkpoints, human edits that preserve raw ASR and 4 exports; GitHub Actions 42465075107 real-ASR job PASS, all source/browser Linux+Windows jobs 42465074909 PASS. No human speech, real OBS camera or physical Windows.",
-        "PR #61: actual local whisper.cpp CPU on 34-second synthetic two-track MKV, safe cancel after first 30-second chunk, genuine ASR checkpoint resume for second chunk, no duplicates, idempotent re-run, four exports; real-ASR workflow 42465450853 PASS and five source/browser Linux+Windows checks 42465450897 PASS. Does not test 2-hour natural speech or physical Windows."
+        "PR #61: actual local whisper.cpp CPU on 34-second synthetic two-track MKV, safe cancel after first 30-second chunk, genuine ASR checkpoint resume for second chunk, no duplicates, idempotent re-run, four exports; real-ASR workflow 42465450853 PASS and five source/browser Linux+Windows checks 42465450897 PASS. Does not test 2-hour natural speech or physical Windows.",
+        "PR #74: real 121min OGG/Opus FFmpeg and 61 chunk resume with 12th-chunk cancellation preserved, 61/61 source-linked study-guide citations generated and DOCX exported; GitHub real-media 42476108843 PASS; synthetic stub ASR, not 2h real model or physical Windows."
       ],
       "blockers": [
         "Real Whisper model end-to-end transcript of MP4/MKV",
         "2h+ real Whisper model, peak memory and performance on real lecture/hardware (121min real FFmpeg+stub CI PASS)",
         "Windows offline end-to-end and interruption testing",
-        "Complete installer"
+        "Public release installer acceptance (private unsigned Inno DEV setup exists, but real offline Windows hardware and legal redistribution are untested)"
       ]
     },
     {
@@ -68,11 +69,12 @@
         "PR #54: optional local installed LibreOffice PDF export in CLI/GUI for source notes, fail-closed preflight and unsaved draft guard; 147 Linux tests, 5/5 source-browser CI 42426680763, real LibreOffice/Poppler PDF verification 42426680781 (2 tests), Tk GUI 42426680779 and Win DEV EXE 42426680776 PASS. LibreOffice not bundled; no standalone Windows PDF.",
         "PR #57: .notes.lock carries PID with fsync; notes-lock-status and notes-lock-recover --confirm allow only verified dead PID, not active/malformed/unknown/symlink; multi-OS CI, real Tk/LibreOffice and Windows DEV EXE PASS 42427381623/42427381540/42427381588/42427381622; no physical power loss.",
         "PR #68: genuine whisper.cpp CPU inference on original PL/EN synthetic TTS, manual transcript correction preserves raw ASR, stale basic notes rejected, versioned regeneration and DOCX checked, GitHub Actions real ASR 42468924700 + source/browser 42468924655 (6/6 PASS); not natural lecture quality.",
-        "PR #69: basic notes use up to 3 repeated literal source words as optional topical hints while preserving timestamps and citation IDs; same heading algorithm on versioned regeneration, malicious markup not promoted; 8/8 CI PASS source/browser 42469190022, Windows DEV 42469190156, LibreOffice 42469190102, Linux Tk 42469190015; no semantic AI summary."
+        "PR #69: basic notes use up to 3 repeated literal source words as optional topical hints while preserving timestamps and citation IDs; same heading algorithm on versioned regeneration, malicious markup not promoted; 8/8 CI PASS source/browser 42469190022, Windows DEV 42469190156, LibreOffice 42469190102, Linux Tk 42469190015; no semantic AI summary.",
+        "PR #72: implemented separate offline source-only study guide with source-attributed overview quote, TOC, repeated term index, heuristic definition/example/uncertainty quotes, CLI and real Tk GUI, MD/JSON/DOCX/PDF; genuine whisper.cpp PL/EN synthetic TTS + Tk Linux/Windows + LibreOffice CI 10/10 PASS (42475117373, 42475117324, 42475117362, 42475117406, 42475117343). Not a semantic summary or human natural lecture review."
       ],
       "blockers": [
         "Human assessment on real lectures",
-        "Topic/summary generation beyond extractive snippets",
+        "Semantic multi-sentence summarization grounded in transcript remains open; deterministic source-cited study guide, TOC and heuristic definition/uncertainty index now implemented but are not AI synthesis",
         "Manual acceptance on real source changes of existing versioned regenerate/undo and restored manual edits (source-only regression already implemented)",
         "Physical Windows Word/LibreOffice GUI acceptance; optional PDF conversion via preinstalled LibreOffice implemented and tested on Linux, not bundled or a signed offline release"
       ]
@@ -87,11 +89,14 @@
         "PR #41: source-word-only topic hints replace generic heading labels, prioritize repeated terms across distinct quotes; untrusted HTML/Markdown stripped from headings but original citations preserved; Linux/Windows source+browser CI and Windows DEV EXE PASS. Not semantic AI.",
         "PR #49: real LibreOffice Writer Ubuntu headless imports advanced DOCX, renders PDF and verifies Polish text via Poppler; canonical default namespace in [Content_Types].xml and _rels/.rels fixed true previous failure; 48 concurrent DOCX export namespace regression; dedicated workflow, 5/5 source/browser and DEV EXE PASS. Not physical Microsoft Word/LibreOffice manual GUI acceptance.",
         "PR #54: optional source-grounded advanced notes PDF conversion with installed local LibreOffice, preflight before replacing Markdown/JSON/DOCX/PDF; real LibreOffice+Poppler test 42426680781 PASS, Windows mock/DEV EXE PASS, physical Windows Office untested.",
-        "PR #68: verified real whisper.cpp CPU PL/EN synthetic TTS -> corrected transcript -> source-linked advanced outline Markdown/JSON/DOCX with literal quotes, exact segment IDs and timestamps, 6/6 CI PASS (42468924700, 42468924655); no human evaluation of natural lectures or semantic synthesis."
+        "PR #68: verified real whisper.cpp CPU PL/EN synthetic TTS -> corrected transcript -> source-linked advanced outline Markdown/JSON/DOCX with literal quotes, exact segment IDs and timestamps, 6/6 CI PASS (42468924700, 42468924655); no human evaluation of natural lectures or semantic synthesis.",
+        "PR #72: offline versioned study-guide JSON and Word/PDF source-linked citations with actual real Whisper CPU synthetic PL/EN speech, edited ASR and source SHA, test 10/10 jobs PASS. Heuristic extraction only; no semantic fact synthesis.",
+        "PR #74: actual 121min 440Hz synthetic OGG/Opus compressed FFmpeg input -> 61 checkpointed stub-ASR chunks, cancel at 12 and resume, then 61/61 source-linked study-guide citations and DOCX; 6/6 CI PASS, real-media 42476108843 and source/browser 42476109194. Not human speech or 121min true Whisper inference.",
+        "PR #75: independent read-only study-verify CLI and real Tk GUI fail closed for invented/stale/modified source guide JSON, checking all citations/time labels against current corrected transcript, while preserving user files. Genuine whisper.cpp CPU PL/EN TTS, Windows/Linux real GUI, synthetic 121min FFmpeg and real Inno installer regression all 11/11 PASS (42476485059, 42476485075, 42476485031, 42476485064, 42476485035, 42476485044). No semantic fact correctness or cryptographic signature claim."
       ],
       "blockers": [
         "Real lectures/tutorials/CCNA human acceptance",
-        "Semantic headings, definitions and long-document synthesis",
+        "Human-reviewed semantic synthesis, true definitions/fact assessment and slide OCR still pending; 121min deterministic source guide and citation verification are automated but do not reason semantically",
         "Physical Microsoft Word/LibreOffice GUI and human layout acceptance remains; headless LibreOffice Linux source render/PDF export PASS; slide/OCR and semantic grounding remain pending"
       ]
     },
@@ -139,14 +144,15 @@
         "PR #17: bundle-verify preflight before GUI and manifest integrity tests; Linux/Windows CI + Windows DEV EXE PASS",
         "PR #22: atomic no-clobber portable backup output, concurrent-name race and unsupported filesystem tests; Linux/Windows CI and DEV EXE PASS",
         "PR #25: secure portable backup of note-revision history with per-snapshot validation and restore/undo regression; Linux/Windows CI and Windows DEV EXE PASS",
-        "PR #40: atomically publish pre-verified internal bundle directory without replacing racing empty destination: Windows rename, Linux renameat2(RENAME_NOREPLACE); race regression, Linux/Windows source+browser CI and Windows DEV EXE PASS; no actual installer or hardware test."
+        "PR #40: atomically publish pre-verified internal bundle directory without replacing racing empty destination: Windows rename, Linux renameat2(RENAME_NOREPLACE); race regression, Linux/Windows source+browser CI and Windows DEV EXE PASS; no actual installer or hardware test.",
+        "PR #73: genuine Inno Setup private Windows offline EXE builder from exact locally verified owner-provided app/FFmpeg/FFprobe/Whisper/model bundle, atomic no-clobber, per-user installation/uninstall; Windows hosted CI compiled a REAL Inno installer with intentionally unusable synthetic binaries, silently installed, checked hashes and uninstalled, 7/7 PASS (42475888625, 42475888581, 42475888631). Not genuine model runtime offline hardware, release license, signing, or public distribution."
       ],
       "blockers": [
-        "Installer .exe/.msi with model/runtime",
+        "Public release-quality and signed Windows installer with legally cleared model/runtime; private Inno Setup EXE with user-supplied dependencies exists and synthetic install/uninstall CI passes",
         "Windows installation offline, antivirus, licensing and SBOM",
         "Recovery and long-run performance",
         "Signed release policy",
-        "DEV EXE alone lacks dependencies; internal portable bundle can include supplied FFmpeg/Whisper/model but is unsigned and untested on a physical offline Windows machine"
+        "Private Inno installer bundles owner-supplied FFmpeg/Whisper/model after local SHA-256 verification, but no physical Windows offline test with genuine licensed model, AV, signing, SBOM or redistributable release"
       ]
     },
     {
@@ -780,6 +786,103 @@
       "scope": "PR #70 five standard Linux/Windows source/browser regression jobs PASS",
       "source_linux_windows_browser": "PASS",
       "physical_windows": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42475117373",
+      "scope": "PR #72 genuine whisper.cpp PL/EN CPU original synthetic TTS to fully source-linked study guide MD/JSON/DOCX; real engine, no lecture human evaluation",
+      "real_whisper_to_study_guide": "PASS",
+      "human_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42475117324",
+      "scope": "PR #72 standard 5/5 source and browser checks Linux/Windows including source-only study guide regressions",
+      "source_linux_windows_browser": "PASS",
+      "physical_windows": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42475117362",
+      "scope": "PR #72 genuine Tk GUI Linux Xvfb + Windows VM study guide UI and DOCX button, both PASS",
+      "real_tk_gui_linux": "PASS",
+      "real_tk_gui_hosted_windows": "PASS"
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42475117406",
+      "scope": "PR #72 real Linux LibreOffice renders source-linked Word and PDF workflow PASS",
+      "real_libreoffice_linux": "PASS",
+      "physical_windows": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42475117343",
+      "scope": "PR #72 Windows development binary compile/smoke PASS, not offline signed installer",
+      "windows_dev_executable": "PASS",
+      "signed_release": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42475888625",
+      "scope": "PR #73 real Inno Setup on hosted Windows compiles private setup EXE, silently installs 5 synthetic fixture files with verified SHA256 and uninstalls; no genuine ASR/physical offline test",
+      "real_inno_synthetic_install_uninstall": "PASS",
+      "genuine_model_offline": false,
+      "physical_windows": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42475888581",
+      "scope": "PR #73 standard 5/5 Linux/Windows source/browser CI for private installer preflight and safety",
+      "source_linux_windows_browser": "PASS",
+      "physical_windows": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42475888631",
+      "scope": "PR #73 Windows DEV EXE compile/smoke PASS (not release)",
+      "windows_dev_executable": "PASS"
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42476108843",
+      "scope": "PR #74 actual 121min compressed Opus FFmpeg + 61 cancellation/resume checkpoints with stub ASR, then 61 source-linked guide quotes and Word; real-long CI PASS",
+      "real_121min_ffmpeg_and_study_guide": "PASS",
+      "real_whisper_121min": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42476109194",
+      "scope": "PR #74 standard 5/5 Linux/Windows source/browser CI success",
+      "source_linux_windows_browser": "PASS",
+      "physical_windows": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42476485059",
+      "scope": "PR #75 genuine Whisper CPU PL/EN synthetic TTS -> study-guide saved JSON independently verified against current corrected transcript; CI PASS",
+      "real_whisper_provenance": "PASS",
+      "human_lecture": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42476485075",
+      "scope": "PR #75 real Tk GUI on both Ubuntu Xvfb and hosted Windows VM, provenance verification button PASS",
+      "real_tk_gui_linux": "PASS",
+      "real_tk_gui_hosted_windows": "PASS",
+      "physical_windows": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42476485031",
+      "scope": "PR #75 121min real synthetic compressed OGG/Opus source plus stub ASR/61 checkpoints and study guide regression PASS",
+      "real_121min_ffmpeg_and_study_guide": "PASS",
+      "real_whisper_121min": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42476485064",
+      "scope": "PR #75 genuine Inno compiler and private synthetic Windows installer install/verify/uninstall regression PASS",
+      "real_inno_synthetic_install_uninstall": "PASS",
+      "physical_offline_windows": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42476485035",
+      "scope": "PR #75 standard Linux/Windows source and browser 5/5 CI PASS, including fail-closed study verifier",
+      "source_linux_windows_browser": "PASS",
+      "physical_windows": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42476485044",
+      "scope": "PR #75 Windows DEV EXE smoke PASS, no signed public release",
+      "windows_dev_executable": "PASS",
+      "signed_release": false
     }
   ],
   "notes": [

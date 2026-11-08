@@ -1,7 +1,7 @@
 # VIDEO NOTES — PLAN ROZWOJU SAMODZIELNEGO PROGRAMU
 
 **Wersja planu:** 1.3 · **Data:** 2026-11-06 · **Repo:** `testowyemailaplikacja-spec/Video-notes`  
-**Status ogólny:** W TRAKCIE (VN-00/VN-01). Żaden etap implementacyjny nie jest oznaczony jako ukończony; benchmark prawdziwego ASR i odbiór Windows są otwarte.  
+**Status ogólny:** W TRAKCIE (VN-00–VN-07; VN-08 opcjonalny PLANOWANE), formalnie 0/9 etapów DONE na 08.11.2026. Prawdziwy whisper.cpp i faster-whisper na syntetycznym TTS oraz prywatny instalator Inno Setup mają potwierdzone testy CI, lecz naturalna mowa, odbiór fizycznego Windows i publiczna dystrybucja są otwarte. Dowody i aktualny stan: \`docs/VN_STATUS.json\`.  
 **Zakres bieżący:** osobny program Windows. Najpierw OBS → transkrypcja → notatki podstawowe → zaawansowane → mikrofon na żywo → dalsze źródła.  
 **Poza bieżącą implementacją:** przebudowa Wiedora / Constant_app, płatne API, usługi w chmurze, aplikacja mobilna.
 
@@ -101,7 +101,7 @@ Użytkownik nagrał wykład lub tutorial w OBS, np. do MP4 albo MKV. Wybiera pli
 
 ### VN-03 — Zaawansowane notatki i materiały naukowe (v0.3)
 
-**Cel:** wielopoziomowe opracowanie materiałów edukacyjnych z zachowaniem powiązań do źródła. **Status: PLANOWANE.**
+**Cel:** wielopoziomowe opracowanie materiałów edukacyjnych z zachowaniem powiązań do źródła. **Status: W TRAKCIE — istnieją konspekt ekstrakcyjny i źródłowy przewodnik do nauki, ale nie pełna synteza semantyczna ani odbiór.**
 
 - [ ] Szablony: wykład akademicki, tutorial techniczny, spotkanie, materiał do nauki; ustawienia długości i szczegółowości.
 - [ ] Spis treści, podrozdziały, definicje, przykłady, kroki procedur, pojęcia do sprawdzenia, lista niejasności i cytowane fragmenty z czasem źródła.
@@ -115,7 +115,7 @@ Użytkownik nagrał wykład lub tutorial w OBS, np. do MP4 albo MKV. Wybiera pli
 
 ### VN-04 — Mikrofon na żywo podczas wykładu (v0.4)
 
-**Cel:** możliwość rejestrowania i rozpoznawania wypowiedzi bez przygotowanego pliku OBS. **Status: PLANOWANE.**
+**Cel:** możliwość rejestrowania i rozpoznawania wypowiedzi bez przygotowanego pliku OBS. **Status: W TRAKCIE — Windows DirectShow, GUI Start/Stop, świadoma zgoda, kontrola WAV i łączenie części istnieją, ale brak pełnej kontroli fizycznego mikrofonu i 2h.**
 
 - [ ] Wybór mikrofonu, wskaźnik poziomu, zgoda użytkownika, start/pauza/wznów/stop oraz czytelny status nagrywania.
 - [ ] Zapisywanie nagrania w małych częściach na dysku, tak aby awaria nie usuwała całego wykładu.
@@ -156,7 +156,7 @@ Użytkownik nagrał wykład lub tutorial w OBS, np. do MP4 albo MKV. Wybiera pli
 
 ### VN-07 — Integracja jako moduł Wiedora
 
-**Cel:** zintegrować samodzielny Video Notes ze stroną Wiedora jako oddzielny, funkcjonalny moduł w katalogu aplikacji, zachowując niezależne wydania i działanie offline programu Windows. **Status: PLANOWANE, NIE RUSZAĆ Constant_app TERAZ.**
+**Cel:** zintegrować samodzielny Video Notes ze stroną Wiedora jako oddzielny, funkcjonalny moduł w katalogu aplikacji, zachowując niezależne wydania i działanie offline programu Windows. **Status: W TRAKCIE (samodzielny lokalny interfejs WWW testowany na Chrome/Firefox/Edge; portal Wiedora i Constant_app nietknięte).**
 
 - [ ] Ustalić interfejs wejścia/wyjścia (wersjonowany JSON + pliki) i granice odpowiedzialności.
 - [ ] Dodać w Wiedora kartę programu, opis i link do sprawdzonego instalatora.
@@ -298,3 +298,15 @@ PR #6: historia regeneracji notatek (Linux 56/56, Windows 46/46 PASS). PR #7: re
 ---
 
 **Zasada aktualizacji:** w tym planie przy każdej fazie wpisujemy datę, link do issue/PR, ostatni zweryfikowany commit, wynik testów i faktyczny status. Bez takich danych etap pozostaje PLANOWANE. Ten dokument jest planem, nie raportem wykonanych funkcji.
+
+## E. Aktualizacja dużych wdrożeń (08.11.2026)
+
+**PR #72 – VN-02/VN-03:** odrębny offline `study-guide` i GUI: spis treści, źródłowe cytaty, podpowiedzi terminów, heurystyczne definicje i przykłady oraz lista niepewności; eksport MD/JSON/DOCX/PDF. Prawdziwy whisper.cpp PL/EN na syntetycznej mowie, realne Tk Windows i Linux, LibreOffice; **10/10 automatycznych kontroli PASS**. Nie jest to semantyczne podsumowanie AI.
+
+**PR #73 – VN-06:** w pełni skompilowany wewnętrzny instalator Inno Setup Windows EXE z lokalnie dostarczonym modelem i narzędziami, wymagający jawnej zgody `--internal-only`. Testowane rzeczywiste pakowanie, cicha instalacja, SHA-256 i deinstalacja **syntetycznych nieuruchamialnych plików** na GitHub-hosted Windows; **7/7 PASS**. Nie stanowi podpisanego wydania 1.0.
+
+**PR #74 – VN-01/VN-03:** realne dekodowanie 121-minutowego OGG/Opus przez FFmpeg, zatrzymanie po 12. fragmencie, idempotentne wznowienie, eksport, 61/61 oznaczonych źródłem cytatów przewodnika i DOCX. **6/6 PASS**, ale rozpoznawanie mowy jest w tym scenariuszu jawnie atrapą.
+
+**PR #75 – VN-03:** `study-verify` + „Sprawdź źródła” w GUI pozwalają bez zmian danych odrzucić nieaktualny lub zmodyfikowany JSON przewodnika. Poświadcza pochodzenie słów i znaczniki czasu, a nie poprawność ASR lub faktów. Prawdziwy whisper.cpp na PL/EN TTS oraz wszystkie regresje **11/11 PASS**.
+
+Te zmiany **nie upoważniają do oznaczenia całego etapu jako DONE**, bo wymagania odbioru obejmują m.in. prawdziwe próbki mowy, WER/CER z oceną człowieka, testy mikrofonu/dźwięku systemowego na Windows, instalację z siecią odłączoną przy prawdziwym legalnym modelu, decyzje licencyjne, dostępność i podpisanie wydania. Jedyną wiążącą ewidencją pozostaje `docs/VN_STATUS.json`. Rozwój odbywa się wyłącznie w `Video-notes`, bez zmian hosta Wiedora/Netlify.
