@@ -131,6 +131,43 @@ class GuiNotesHeadlessTest(unittest.TestCase):
         self.assertEqual(read_basic_notes(self.folder)[1]["edits"], {})
 
 
+    def test_mic_real_tk_pause_resume_stop_controls_and_events(self):
+        """Tests real widgets on Linux Xvfb + Windows VM, not physical mic."""
+        self.gui._show_mic_recorder()
+        self.root.update()
+        controls = self.gui.mic_controls
+        self.assertTrue(controls["window"].winfo_exists())
+        self.assertEqual(str(controls["pause"]["state"]), "disabled")
+        self.assertEqual(str(controls["resume"]["state"]), "disabled")
+        self.gui.active = True
+        controls["stop"].configure(state="normal")
+        self.gui.events.put(("mic_capture_state", "recording"))
+        self.gui._drain()
+        self.assertEqual(str(controls["pause"]["state"]), "normal")
+        self._button(controls["window"], "Pauza").invoke()
+        self.assertTrue(self.gui.mic_pause.is_set())
+        self.assertEqual(str(controls["pause"]["state"]), "disabled")
+        self.gui.events.put(("mic_capture_state", "paused"))
+        self.gui._drain()
+        self.assertEqual(str(controls["resume"]["state"]), "normal")
+        self.assertIn("Wstrzymane", controls["status"].get())
+        self._button(controls["window"], "Wznów nagrywanie").invoke()
+        self.assertTrue(self.gui.mic_resume.is_set())
+        self.gui.events.put(("mic_capture_state", "recording"))
+        self.gui._drain()
+        self.assertEqual(str(controls["resume"]["state"]), "disabled")
+        self.assertEqual(str(controls["pause"]["state"]), "normal")
+        self._button(controls["window"], "Zatrzymaj").invoke()
+        self.assertTrue(self.gui.mic_stop.is_set())
+        self.gui.events.put(("mic_complete", (self.folder, {
+            "status": "finished",
+            "segments": [{"name": "part-00000.wav"}, {"name": "part-00001.wav"}],
+        })))
+        self.gui._drain()
+        self.assertFalse(self.gui.active)
+        self.assertEqual(str(controls["pause"]["state"]), "disabled")
+        self.assertEqual(str(controls["resume"]["state"]), "disabled")
+
     def test_multisegment_mic_status_never_silently_selects_first_part(self):
         """Exercise actual Tk event handling with two recorded WAV pieces."""
         old_source = "previous-existing-source.wav"
