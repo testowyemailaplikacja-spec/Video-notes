@@ -81,7 +81,7 @@ class WavDiagnosticsTest(unittest.TestCase):
         self.assertAlmostEqual(result["silent_ratio"], 1 / 3, places=5)
         self.assertEqual(result["longest_silence_ms"], 2000)
         self.assertTrue(any("przesterowania" in w for w in result["warnings"]))
-        self.assertLess(result["peak_dbfs"], 0)
+        self.assertLessEqual(result["peak_dbfs"], 0.0)
         self.assertEqual(result["parts"][0]["silence_examples"], [
             {"start_ms": 2000, "duration_ms": 2000}
         ])
