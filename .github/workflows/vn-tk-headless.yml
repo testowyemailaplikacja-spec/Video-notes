@@ -6,6 +6,7 @@ on:
       - 'videonotes/gui.py'
       - 'videonotes/notes.py'
       - 'videonotes/study_guide.py'
+      - 'videonotes/advanced_notes.py'
       - 'videonotes/audio_diagnostics.py'
       - 'videonotes/recovery_audio.py'
       - 'videonotes/note_revisions.py'
