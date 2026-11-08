@@ -20,6 +20,7 @@ from videonotes.errors import VideoNotesError
 from videonotes.exports import export_project
 from videonotes.media import probe
 from videonotes.pipeline import create_project, transcribe_project
+from videonotes.study_guide import build_study_guide, export_study_guide
 from videonotes.storage import read_project
 
 DURATION_SECONDS = 2 * 3600 + 60  # 121 minutes, 61 chunks x 120 seconds
@@ -103,6 +104,30 @@ def main() -> int:
         exports = export_project(folder)
         if len(exports) != 4:
             raise VideoNotesError("Błędny eksport 121-minutowej transkrypcji.")
+        guide_started = time.perf_counter()
+        guide = build_study_guide(folder, section_minutes=10, detail="full")
+        study_paths = export_study_guide(folder, section_minutes=10, detail="full",
+                                       include_docx=True)
+        if len(study_paths) != 3 or not all(path.is_file() for path in study_paths):
+            raise VideoNotesError("Nie wyeksportowano 121-minutowego przewodnika MD/JSON/DOCX.")
+        saved_study = json.loads(study_paths[1].read_text(encoding="utf-8"))
+        if saved_study != guide or saved_study.get("source_sha256") != guide["source_sha256"]:
+            raise VideoNotesError("Struktura przewodnika do nauki nie zgadza się ze źródłem.")
+        source_segments = {row["id"]: row for row in completed["segments"]}
+        references = []
+        for section in guide["sections"]:
+            for quote in section["key_quotes"]:
+                origin = source_segments.get(quote["segment_id"])
+                if (origin is None or quote["start_ms"] != origin["start_ms"] or
+                        quote["end_ms"] != origin["end_ms"] or
+                        quote["text"] != origin["text"]):
+                    raise VideoNotesError("W przewodniku utracono źródłowe ID/czas/tekst.")
+                references.append(quote["segment_id"])
+        if set(references) != set(source_segments) or len(references) != len(set(references)):
+            raise VideoNotesError("Przewodnik 121-minutowy pomija lub powiela fragmenty źródłowe.")
+        if not study_paths[2].stat().st_size > 1000:
+            raise VideoNotesError("Długi DOCX przewodnika jest pusty.")
+        guide_seconds = round(time.perf_counter() - guide_started, 3)
         if compressed.stat().st_size <= 0 or hashlib.sha256(compressed.read_bytes()).hexdigest() != source_digest:
             raise VideoNotesError("Przetwarzanie zmieniło źródłowe nagranie.")
         print(json.dumps({
@@ -117,6 +142,11 @@ def main() -> int:
             "generation_seconds": round(generation_seconds, 3),
             "checkpoint_resume_and_export_seconds": round(time.perf_counter() - processing_started, 3),
             "source_preserved": True,
+            "study_guide_complete": True,
+            "study_guide_sections": len(guide["sections"]),
+            "study_guide_source_citations": len(references),
+            "study_guide_md_json_docx": True,
+            "study_guide_elapsed_seconds": guide_seconds,
         }, ensure_ascii=False))
     return 0
 
