@@ -195,3 +195,7 @@ Szczegóły: [VN03_FUNCTIONAL_TEMPLATES.md](docs/VN03_FUNCTIONAL_TEMPLATES.md).
 ## Inwentarz zależności offline do prywatnego pakietu Windows (VN-06)
 
 Polecenie `python -m videonotes bundle-sbom KATALOG_PAKIETU --output raport.spdx.json` sprawdza istniejącą prywatną paczkę i zapisuje oddzielnie SPDX 2.3 z SHA-256 poszczególnych binariów/modelu. Wszystkie licencje są jawnie niezweryfikowane (`NOASSERTION`); brak podstaw do publikacji stabilnej wersji. Opis: [VN06_SBOM.md](docs/VN06_SBOM.md).
+
+## Test lokalnego środowiska (VN-00/VN-06)
+
+`python -m videonotes doctor --model C:\\Modele\\ggml-base.bin --workspace C:\\Notatki --source C:\\Nagrania\\test.mkv` pokazuje lokalnie diagnostykę binariów, ścieżek audio, wolnego dysku i SHA-256 modelu bez sieci czy logowania prywatnych ścieżek. Nie potwierdza realnej jakości ASR, fizycznego Windows ani licencji. [Instrukcja](docs/VN_OFFLINE_DIAGNOSTICS.md).
