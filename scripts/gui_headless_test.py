@@ -159,6 +159,37 @@ class GuiNotesHeadlessTest(unittest.TestCase):
         self.assertFalse(self.gui.active)
         self.assertIn("Połączono całe nagranie", self.gui.status.get())
 
+    def test_real_study_guide_gui_preview_reconfigure_and_word_export(self):
+        self._button(
+            self.root,
+            "Przewodnik do nauki — cytaty, pojęcia i pytania (VN-02/03)",
+        ).invoke()
+        self.root.update()
+        windows = [
+            window for window in children(self.root)
+            if isinstance(window, tk.Toplevel) and window.winfo_exists()
+            and "Przewodnik do nauki" in window.title()
+        ]
+        self.assertEqual(len(windows), 1)
+        dialog = windows[0]
+        preview = next(x for x in children(dialog) if isinstance(x, tk.Text))
+        self.assertIn("Spis treści", preview.get("1.0", "end-1c"))
+        self.assertIn("Źródło", preview.get("1.0", "end-1c"))
+        self.assertEqual(str(preview["state"]), "disabled")
+        self.assertTrue((self.folder / "exports" / "notes-study.json").is_file())
+        selections = [x for x in children(dialog) if isinstance(x, ttk.Combobox)]
+        self.assertEqual(len(selections), 2)
+        selections[0].set("full")
+        selections[1].set("10")
+        self._button(dialog, "Opracuj / odśwież").invoke()
+        self.root.update()
+        self.assertTrue((self.folder / "exports" / "notes-study.md").is_file())
+        self._button(dialog, "Eksport DOCX").invoke()
+        self.root.update()
+        self.assertTrue((self.folder / "exports" / "notes-study.docx").is_file())
+        self.assertIn("notes-study.docx", self.gui.status.get())
+        self.assertFalse(self.gui.active)
+
     def test_basic_pdf_button_refuses_unsaved_draft(self):
         generate_basic_notes(self.folder)
         self.gui._show_notes()
