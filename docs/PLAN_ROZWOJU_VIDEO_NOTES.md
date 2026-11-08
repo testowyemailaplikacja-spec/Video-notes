@@ -115,12 +115,12 @@ Użytkownik nagrał wykład lub tutorial w OBS, np. do MP4 albo MKV. Wybiera pli
 
 ### VN-04 — Mikrofon na żywo podczas wykładu (v0.4)
 
-**Cel:** możliwość rejestrowania i rozpoznawania wypowiedzi bez przygotowanego pliku OBS. **Status: W TRAKCIE — Windows DirectShow, GUI Start/Stop, świadoma zgoda, kontrola WAV i łączenie części istnieją, ale brak pełnej kontroli fizycznego mikrofonu i 2h.**
+**Cel:** możliwość rejestrowania i rozpoznawania wypowiedzi bez przygotowanego pliku OBS. **Status: W TRAKCIE — Windows DirectShow, GUI Start/Pauza/Wznów/Stop, zamykanie WAV, izolacja nowych ujęć, SHA-256, łączenie i lokalna kontrola RMS/ciszy/clippingu; realny FFmpeg na syntetycznej fali i Tk Windows/Linux CI PASS, fizyczny mikrofon i 2h wciąż nieodebrane.**
 
 - [ ] Wybór mikrofonu, wskaźnik poziomu, zgoda użytkownika, start/pauza/wznów/stop oraz czytelny status nagrywania.
-- [ ] Zapisywanie nagrania w małych częściach na dysku, tak aby awaria nie usuwała całego wykładu.
+- [x] Zapisywanie nagrania w częściach WAV co 2h i odrębnych katalogach ujęć po pauzie, z SHA-256; testy real FFmpeg i Windows/Linux PASS, fizyczna awaria nadal do odbioru.
 - [ ] Transkrypcja na żywo, jeśli sprzęt daje radę; w przeciwnym razie transkrypcja z kolejki po nagraniu. Komunikat o opóźnieniu.
-- [ ] Oddzielenie tymczasowych segmentów od zatwierdzonych; brak powtarzania tekstu przy przerwach i odzyskiwaniu nagrania.
+- [x] Oddzielenie tymczasowych `.vn-take-*` od zweryfikowanych WAV przez atomowe dowiązania bez nadpisania; po awarii pozostają czytelne części i katalogi do ręcznej kontroli. Automatyczne odtworzenie z uszkodzonego WAV nadal niezaimplementowane.
 - [ ] Wybór jakości źródła, kontrola ciszy, testy odłączenia mikrofonu, zmiany urządzenia, uśpienia i odmowy dostępu.
 - [ ] Po stopie nagranie trafia do **tego samego** procesu transkrypcji i notatek co plik OBS.
 
@@ -128,7 +128,7 @@ Użytkownik nagrał wykład lub tutorial w OBS, np. do MP4 albo MKV. Wybiera pli
 
 ### VN-05 — Inne źródła dźwięku (v0.5)
 
-**Cel:** rozszerzać wejścia bez kopiowania osobnego silnika transkrypcji. **Status: W TRAKCIE (import plików audio i testy syntetyczne; sprzętowe źródła dźwięku nadal niezaimplementowane).**
+**Cel:** rozszerzać wejścia bez kopiowania osobnego silnika transkrypcji. **Status: W TRAKCIE (import plików audio, dobrowolne mieszanie dwóch wejść DirectShow i diagnostyka PCM są zaimplementowane, lecz sprzętowe źródła dźwięku i jakość fizycznego miksu nie zostały odebrane).**
 
 - [x] Import plików WAV/MP3/M4A/FLAC/OGG/OPUS przez FFprobe/FFmpeg i wspólną kolejkę ASR; zgodność kodeków zależy od lokalnej instalacji FFmpeg. Syntetyczne testy audio PASS, realne ASR i fizyczny Windows niezweryfikowane.
 - [ ] Przechwytywanie dźwięku systemowego/loopback w Windows, w granicach możliwości i uprawnień systemu.
@@ -141,7 +141,7 @@ Użytkownik nagrał wykład lub tutorial w OBS, np. do MP4 albo MKV. Wybiera pli
 
 ### VN-06 — Stabilny program, dystrybucja i utrzymanie (v1.0)
 
-**Cel:** przejście od kolejnych prototypów do powtarzalnych wydań Windows. **Status: W TRAKCIE (wyłącznie podstawowy backup/restore; instalator, wydanie i sprzętowy odbiór PLANOWANE).**
+**Cel:** przejście od kolejnych prototypów do powtarzalnych wydań Windows. **Status: W TRAKCIE (prywatny instalator Inno Setup z modelem dostarczonym przez właściciela, test rzeczywistej instalacji/deinstalacji na syntetycznym pakiecie oraz backup/restore istnieją; podpisane wydanie publiczne, prawa licencyjne i fizyczny odbiór offline nadal otwarte).**
 
 - [ ] Installer `.exe` lub `.msi`, odinstalowanie, plik wersji, bezpieczne katalogi danych, odzyskiwanie projektów.
 - [ ] **Pełny instalator offline:** wszystkie biblioteki, modele i runtime dostarczone w pakiecie; jeśli Tauri, uwzględnić instalację WebView2 bez sieci na systemach, które tego wymagają.
@@ -310,3 +310,13 @@ PR #6: historia regeneracji notatek (Linux 56/56, Windows 46/46 PASS). PR #7: re
 **PR #75 – VN-03:** `study-verify` + „Sprawdź źródła” w GUI pozwalają bez zmian danych odrzucić nieaktualny lub zmodyfikowany JSON przewodnika. Poświadcza pochodzenie słów i znaczniki czasu, a nie poprawność ASR lub faktów. Prawdziwy whisper.cpp na PL/EN TTS oraz wszystkie regresje **11/11 PASS**.
 
 Te zmiany **nie upoważniają do oznaczenia całego etapu jako DONE**, bo wymagania odbioru obejmują m.in. prawdziwe próbki mowy, WER/CER z oceną człowieka, testy mikrofonu/dźwięku systemowego na Windows, instalację z siecią odłączoną przy prawdziwym legalnym modelu, decyzje licencyjne, dostępność i podpisanie wydania. Jedyną wiążącą ewidencją pozostaje `docs/VN_STATUS.json`. Rozwój odbywa się wyłącznie w `Video-notes`, bez zmian hosta Wiedora/Netlify.
+
+## G. Duży pakiet nagrywania i diagnostyki — 08.11.2026
+
+**PR #77 (VN-04)** — pełna implementacja **Pauza/Wznów**: zamknięcie FFmpeg poleceniem `q`, atomowe potwierdzanie kolejnych WAV w jednorazowych folderach `.vn-take-*`, kontrola SHA-256, dziennik `recording/paused/finished/needs_review`, bez nadpisywania wcześniejszych ujęć, rzeczywiste przyciski Tk. Odkryto i obejście potwierdzono realnym FFmpeg: muxer segmentowy potrafi ignorować globalne `-n`. **8/8 CI PASS** — [standard Linux/Windows](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42479432972), [real Tk Windows/Linux](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42479432973), [DEV EXE](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42479432971).
+
+**PR #78 (VN-04/VN-05)** — offline analiza gotowych WAV w CLI i GUI: średnie RMS, peak dBFS, udział próbek bliskich przesterowaniu, czas ciszy i ostrzeżenia. Działa bez modelu, w blokach po 2 sekundy, z kontrolą stanu i SHA-256; nie publikuje prywatnego dźwięku. **9/9 CI PASS** — [standard Linux/Windows](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42479769485), [real Tk Windows/Linux](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42479769582), [Inno setup syntetyczny](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42479769460), [DEV EXE](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42479769480).
+
+**PR #79 (VN-04)** — pełny przebieg **realnego procesu FFmpeg** z syntetyczną falą sinusoidalną (nie atrapą procesu): 2 rzeczywiste ujęcia, zamknięcie `q`, pauza/wznowienie, różne PCM, SHA, bezstratne łączenie i numeryczna analiza. **6/6 CI PASS** — [dedykowany real FFmpeg smoke](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42480072624), [standard Linux/Windows](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42480072912).
+
+**Pozostaje warunkiem pełnego odbioru VN-04/VN-05:** fizyczny Windows 10/11 z prawdziwym mikrofonem, niezależnie podanym wejściem systemowym, aktywną zgodą użytkownika, przerwą i wznowieniem po dłuższej sesji, testem USB unplug/uśpienia/dysku pełnego i dwugodzinnym testem w praktyce. Nie było rzeczywistego odsłuchu ani pomiaru jakości mowy. Formalne liczniki: **0/9 DONE, 8/9 W_TRAKCIE, 1/9 PLANOWANE**.
