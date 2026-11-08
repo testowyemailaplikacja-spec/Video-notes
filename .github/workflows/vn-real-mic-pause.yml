@@ -1,0 +1,40 @@
+name: Video Notes — real FFmpeg pause/resume WAV capture (synthetic lavfi, no microphone)
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - 'tests/test_mic_real_ffmpeg_pause.py'
+      - 'videonotes/microphone.py'
+      - 'videonotes/audio_diagnostics.py'
+      - '.github/workflows/vn-real-mic-pause.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mic-real-ffmpeg:
+    name: Real FFmpeg process q/pause/resume two takes, SHA, join and audio diagnostics
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Require actual FFmpeg (not mock)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null; then
+            timeout 240s sudo apt-get update -qq
+            timeout 300s sudo apt-get install -y --no-install-recommends ffmpeg
+          fi
+          ffmpeg -version | head -n 1
+      - name: Run genuine FFmpeg process pause/resume -> immutable WAV -> quality diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest tests.test_mic_real_ffmpeg_pause -v
+      - name: Document hardware boundary
+        shell: bash
+        run: |
+          echo 'PASS here does not mean physical DirectShow, audio loopback, or 2h microphone acceptance.'
