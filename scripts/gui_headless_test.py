@@ -1,11 +1,13 @@
 """Real Tk widget interactions under a disposable Linux Xvfb display.
 
 Tests GUI state transitions without mocking widgets; messagebox confirmation
-is mocked to avoid a human-operated modal window. No hardware or real Windows.
+is mocked to avoid a human-operated modal window. Supports Linux Xvfb and
+Windows hosted CI with Tk available, not physical Windows acceptance.
 """
 from __future__ import annotations
 
 import os
+import sys
 import tempfile
 import tkinter as tk
 import unittest
@@ -28,7 +30,10 @@ def children(widget):
     return found
 
 
-@unittest.skipUnless(os.environ.get("DISPLAY"), "Real Tk GUI smoke requires Xvfb DISPLAY")
+@unittest.skipUnless(
+    bool(os.environ.get("DISPLAY")) or sys.platform == "win32",
+    "Real Tk GUI smoke requires Xvfb or a Windows desktop session",
+)
 class GuiNotesHeadlessTest(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="vn-gui-test-")
