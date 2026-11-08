@@ -183,3 +183,11 @@ python -m videonotes advanced-verify C:\\Notatki\\wyklad
 ```
 
 Opis kategorii i ograniczeń: [VN03_FUNCTIONAL_TEMPLATES.md](docs/VN03_FUNCTIONAL_TEMPLATES.md). To **narzędzie porządkowania cytatów**, nie semantyczne streszczenie ani pełny odbiór VN-03.
+
+## Klikalne źródła w notatkach (VN-02/VN-03)
+
+Z notatki podstawowej, zaawansowanej oraz przewodnika do nauki można teraz **przejść bezpośrednio do oryginalnego fragmentu transkrypcji w edytorze Windows**. Wystarczy wybrać cytat i przycisk przejścia do źródła. Wyświetlany jest prawidłowy ID fragmentu i tekst, który możesz ręcznie poprawić.
+
+Przejście jest zabezpieczone przed przypadkową utratą niezapisanych poprawek. W przypadku istniejącego szkicu aplikacja najpierw pyta o jego zachowanie lub świadome odrzucenie; nie kasuje tekstu bez ostrzeżenia. Program nie odtwarza jeszcze automatycznie dźwięku od danego timecode — łącznik wskazuje tekstowe źródło z oznaczeniem czasu.
+
+Szczegóły: [VN03_FUNCTIONAL_TEMPLATES.md](docs/VN03_FUNCTIONAL_TEMPLATES.md).
