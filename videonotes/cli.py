@@ -27,6 +27,7 @@ from .sbom import create_internal_sbom
 from .diagnostics import diagnose_local_install
 from .slide_ocr import extract_slide_ocr, verify_slide_ocr
 from .semantic_draft import create_semantic_draft, verify_semantic_draft, export_semantic_markdown
+from .record_pipeline import transcribe_finished_session
 from .installer import build_internal_installer
 from .pipeline import create_project, transcribe_project, transcription_lock_status, recover_stale_transcription_lock
 from .storage import read_project
@@ -225,6 +226,16 @@ def parser() -> argparse.ArgumentParser:
     semantic_export.add_argument("project", type=Path)
     semantic_export.add_argument("--file", required=True, type=Path)
     semantic_export.add_argument("--output", required=True, type=Path)
+    record_to_asr = sub.add_parser("record-transcribe", help="Po zakończeniu nagrania WAV użyj wspólnego silnika Whisper i eksportu")
+    record_to_asr.add_argument("recording", type=Path, help="Katalog zakończonej sesji WAV z recording.json")
+    record_to_asr.add_argument("--project", type=Path, required=True)
+    record_to_asr.add_argument("--joined-wav", type=Path, help="Nowy WAV do połączenia wszystkich części, wymagany dla wielu części")
+    record_to_asr.add_argument("--model", type=Path, required=True)
+    record_to_asr.add_argument("--whisper-cli", default="whisper-cli")
+    record_to_asr.add_argument("--language", default="pl", choices=["pl", "en", "auto"])
+    record_to_asr.add_argument("--chunk-seconds", type=int, default=30)
+    record_to_asr.add_argument("--ffmpeg", default="ffmpeg")
+    record_to_asr.add_argument("--ffprobe", default="ffprobe")
     sub.add_parser("gui", help="Uruchom prosty interfejs Windows/Tkinter")
     return cmd
 
@@ -414,6 +425,12 @@ def main(argv: list[str] | None = None) -> int:
         elif args.action == "semantic-export":
             print(json.dumps(export_semantic_markdown(args.project, args.file, args.output),
                              ensure_ascii=False, indent=2))
+        elif args.action == "record-transcribe":
+            report = transcribe_finished_session(args.recording, args.project, model=args.model,
+                            whisper_cli=args.whisper_cli, joined_wav=args.joined_wav,
+                            language=args.language, chunk_seconds=args.chunk_seconds,
+                            ffmpeg=args.ffmpeg, ffprobe=args.ffprobe, progress=_progress)
+            print(json.dumps(report, ensure_ascii=False, indent=2))
         elif args.action == "gui":
             from .gui import launch
             launch()

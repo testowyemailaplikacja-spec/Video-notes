@@ -207,3 +207,7 @@ Polecenie `python -m videonotes bundle-sbom KATALOG_PAKIETU --output raport.spdx
 ## Szkic semantyczny offline z opcjonalnym lokalnym llama.cpp (VN-02/03)
 
 Polecenie `python -m videonotes semantic-draft KATALOG_PROJEKTU --model C:\\Modele\\model.gguf --llama-cli llama-cli --output szkic.json` przygotowuje odrębne szkice oparte na wybranych segmentach transkrypcji. `semantic-verify --file szkic.json` sprawdza powiązania z cytatami, a `semantic-export --file szkic.json --output szkic.md` tworzy czytelny plik. Nie wymaga sieci, ale wymaga zainstalowanego lokalnie binarium i modelu GGUF. **To nie jest automatyczna weryfikacja merytoryczna**, a wszystkie twierdzenia modelu muszą być sprawdzone przez człowieka. [Ograniczenia i instrukcja](docs/VN_SEMANTIC_DRAFT.md).
+
+## Transkrypcja całego zakończonego nagrania z mikrofonu (VN-04)
+
+Nowe polecenie `record-transcribe` obsługuje sesje WAV po pauzach, wymaga zgód i spójnego SHA-256, łączy wszystkie części bez nadpisania i kieruje je do identycznego lokalnego przepływu ASR/eksportu co pliki OBS. Po przerwaniu użyj istniejącego `resume`. Instrukcja: [VN04_RECORD_TO_ASR.md](docs/VN04_RECORD_TO_ASR.md). Nie zastępuje fizycznego testu mikrofonu Windows.
