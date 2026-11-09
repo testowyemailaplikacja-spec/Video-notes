@@ -235,3 +235,7 @@ Ręczne zmiany w edytorze i import `import-web-edits --apply` korzystają z jedn
 ## Diagnostyka dodatkowych narzędzi offline
 
 `doctor` sprawdza teraz opcjonalne FFplay, Tesseract wraz z językami OCR, obecność `llama-cli` oraz nagłówek i SHA-256 wskazanego lokalnego modelu GGUF. Nie uruchamia wnioskowania, nie wysyła danych, nie potwierdza licencji ani wydania gotowego na instalację. [Instrukcja](docs/VN_OFFLINE_DIAGNOSTICS.md).
+
+## Ręczne zatwierdzanie szkiców semantycznych
+
+Komendy `semantic-review-init`, `semantic-review-mark --confirm`, `semantic-review-status` i `semantic-review-export` umożliwiają ocenę każdego twierdzenia lokalnego szkicu AI bez przepisywania transkrypcji. Zapis dotyczy deklaracji użytkownika, **nie** niezależnej weryfikacji prawdziwości. [Instrukcja](docs/VN_SEMANTIC_HUMAN_REVIEW.md).
