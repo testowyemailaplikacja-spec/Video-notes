@@ -98,7 +98,28 @@ def _prompt(rows: list[dict], *, limit: int) -> tuple[str, list[dict]]:
     return prompt, selected
 
 
-def _parse_response(payload: bytes, allowed: set[str], limit: int) -> tuple[str, list[dict]]:
+
+# Heuristic rejection, not a proof of factual or semantic correctness. The
+# model may use only numeric literals and uppercase technical identifiers
+# appearing *verbatim* in its cited source excerpts.
+NUMBER_TOKEN = re.compile(r"\d+(?:[.,:/-]\d+)*", re.UNICODE)
+UPPER_ID = re.compile(r"\b[A-Z][A-Z0-9]{1,19}\b")
+SOURCE_WORD = re.compile(r"\b[^\W_]+\b", re.UNICODE)
+
+
+def _guard_literal_evidence(statement: str, citations: list[str]) -> None:
+    evidence = "\n".join(citations)
+    numbers = set(NUMBER_TOKEN.findall(evidence))
+    unexpected = set(NUMBER_TOKEN.findall(statement)) - numbers
+    if unexpected:
+        # Never print the model's private claim, numeric values or transcript.
+        raise VideoNotesError("Szkic dodaje nieudokumentowane liczby lub adresy; wymaga ręcznego sprawdzenia.")
+    cited_identifiers = {word.casefold() for word in SOURCE_WORD.findall(evidence)}
+    new_identifiers = {word.casefold() for word in UPPER_ID.findall(statement)}
+    if new_identifiers - cited_identifiers:
+        raise VideoNotesError("Szkic dodaje nieudokumentowany skrót techniczny; wymaga ręcznego sprawdzenia.")
+
+def _parse_response(payload: bytes, allowed: dict[str, str], limit: int) -> tuple[str, list[dict]]:
     if len(payload) > MAX_REPLY_BYTES:
         raise VideoNotesError("Odpowiedź lokalnego modelu jest za długa.")
     try:
@@ -119,7 +140,9 @@ def _parse_response(payload: bytes, allowed: set[str], limit: int) -> tuple[str,
                 or not SOURCE_ID.fullmatch(s) or s not in allowed for s in ids)
                 or len(set(ids)) != len(ids)):
             raise VideoNotesError("Niepoparte lub nieprawidłowo oznaczone twierdzenie modelu.")
+        _guard_literal_evidence(item["text"], [allowed[sid] for sid in ids])
         claims.append({"text": item["text"].strip(), "source_ids": ids})
+    _guard_literal_evidence(doc["heading"], list(allowed.values()))
     return doc["heading"].strip(), claims
 
 
@@ -199,7 +222,7 @@ def create_semantic_draft(folder: Path, output: Path, *, model: Path,
             if completed.returncode != 0 or response_file.stat().st_size > MAX_REPLY_BYTES:
                 raise VideoNotesError("Lokalny model zwrócił błąd lub nadmierną odpowiedź. Niczego nie zapisano.")
             heading, proposed = _parse_response(response_file.read_bytes(),
-                                                {row["id"] for row in excerpts}, claim_limit)
+                                                {row["id"]: row["text"] for row in excerpts}, claim_limit)
             claims = []
             for n, item in enumerate(proposed):
                 citations = []
@@ -281,6 +304,10 @@ def verify_semantic_draft(folder: Path, document: Path) -> dict:
                 not isinstance(section["claims"], list) or
                 not 1 <= len(section["claims"]) <= doc["claim_limit"]):
             raise VideoNotesError("Nieprawidłowe sekcje szkicu AI.")
+        _guard_literal_evidence(section["heading"], [
+            row["text"] for row in rows
+            if row["start_ms"] // (doc["section_minutes"] * 60000) == group_index
+        ])
         for i, item in enumerate(section["claims"]):
             if (not isinstance(item, dict) or
                     set(item) != {"id", "text", "citations", "requires_human_review"} or
@@ -304,6 +331,7 @@ def verify_semantic_draft(folder: Path, document: Path) -> dict:
                         type(cite["end_ms"]) is not int or cite["end_ms"] != raw_row["end_ms"] or
                         cite["text"] != row["text"]):
                     raise VideoNotesError("Cytat lub czas szkicu nie zgadza się z transkrypcją.")
+            _guard_literal_evidence(item["text"], [cite["text"] for cite in item["citations"]])
             claims_count += 1
     return {
         "verified_source_citations": True, "semantic_facts_verified": False,
