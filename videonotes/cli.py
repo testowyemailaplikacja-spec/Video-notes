@@ -26,6 +26,7 @@ from .bundle import create_internal_bundle, verify_internal_bundle
 from .sbom import create_internal_sbom
 from .diagnostics import diagnose_local_install
 from .slide_ocr import extract_slide_ocr, verify_slide_ocr
+from .slide_alignment import align_slides_to_speech, verify_slide_speech_alignment, export_slide_speech_markdown
 from .semantic_draft import create_semantic_draft, verify_semantic_draft, export_semantic_markdown
 from .record_pipeline import transcribe_finished_session
 from .source_player import play_source_segment
@@ -211,6 +212,20 @@ def parser() -> argparse.ArgumentParser:
     slide_check = sub.add_parser("slide-verify", help="Sprawdź pochodzenie i strukturę lokalnego raportu OCR")
     slide_check.add_argument("project", type=Path)
     slide_check.add_argument("--file", required=True, type=Path)
+    slide_align = sub.add_parser("slide-align", help="Połącz OCR z najbliższymi wypowiedziami według czasu (wymaga kontroli)")
+    slide_align.add_argument("project", type=Path)
+    slide_align.add_argument("--ocr", required=True, type=Path)
+    slide_align.add_argument("--output", required=True, type=Path)
+    slide_align.add_argument("--max-gap-seconds", type=int, default=45)
+    slide_index_verify = sub.add_parser("slide-align-verify", help="Sprawdź temporalny indeks slajdów i aktualną transkrypcję")
+    slide_index_verify.add_argument("project", type=Path)
+    slide_index_verify.add_argument("--ocr", required=True, type=Path)
+    slide_index_verify.add_argument("--file", required=True, type=Path)
+    slide_index_md = sub.add_parser("slide-align-md", help="Wyeksportuj niezweryfikowany indeks OCR i mowy do MD")
+    slide_index_md.add_argument("project", type=Path)
+    slide_index_md.add_argument("--ocr", required=True, type=Path)
+    slide_index_md.add_argument("--file", required=True, type=Path)
+    slide_index_md.add_argument("--output", required=True, type=Path)
     semantic = sub.add_parser("semantic-draft", help="Opcjonalny lokalny szkic semantyczny — WYMAGA KONTROLI człowieka")
     semantic.add_argument("project", type=Path)
     semantic.add_argument("--model", required=True, type=Path, help="Legalnie pozyskany lokalny model GGUF")
@@ -421,6 +436,15 @@ def main(argv: list[str] | None = None) -> int:
                         ensure_ascii=False, indent=2))
         elif args.action == "slide-verify":
             print(json.dumps(verify_slide_ocr(args.project, args.file), ensure_ascii=False, indent=2))
+        elif args.action == "slide-align":
+            print(json.dumps(align_slides_to_speech(args.project, args.ocr, args.output,
+                max_gap_seconds=args.max_gap_seconds), ensure_ascii=False, indent=2))
+        elif args.action == "slide-align-verify":
+            print(json.dumps(verify_slide_speech_alignment(args.project, args.ocr, args.file),
+                             ensure_ascii=False, indent=2))
+        elif args.action == "slide-align-md":
+            print(json.dumps(export_slide_speech_markdown(args.project, args.ocr,
+                             args.file, args.output), ensure_ascii=False, indent=2))
         elif args.action == "semantic-draft":
             report = create_semantic_draft(args.project, args.output, model=args.model,
                         llama_cli=args.llama_cli, section_minutes=args.section_minutes,

@@ -221,3 +221,7 @@ Aplikacja Tk oferuje również przycisk „Zakończone nagranie mikrofonowe → 
 ## Ręczny odsłuch cytatu z oryginalnego źródła (VN-02)
 
 `python -m videonotes play-source KATALOG_PROJEKTU --segment ID --seconds 15` (lub przycisk „Odtwórz zaznaczony fragment z nagrania” w GUI) weryfikuje SHA-256 oryginalnego nagrania, wybiera faktyczną ścieżkę audio projektu, wycina krótkie WAV i uruchamia lokalny FFplay. Wymaga osobno zainstalowanego FFplay; nie ingeruje w edycje ani nie przesyła materiałów. [Instrukcja i ograniczenia](docs/VN02_SOURCE_AUDIO_PLAYBACK.md).
+
+## Łączenie odczytanych slajdów i transkrypcji według czasu (VN-03B)
+
+`slide-align --ocr raport-ocr.json --output NOWY-indeks.json` przypisuje rozpoznane fragmenty obrazu do **najbliższych w czasie** segmentów mowy, bez twierdzenia, że temat jest zgodny. `slide-align-verify` odtwarza wyniki z aktualnego źródła, a `slide-align-md` eksportuje dosłowne OCR i cytaty. W GUI działa przycisk „Powiąż OCR z wypowiedziami według czasu”. [Instrukcja](docs/VN03_SLIDE_TRANSCRIPT_TIME_ALIGNMENT.md). Wszystkie powiązania wymagają sprawdzenia przez człowieka.
