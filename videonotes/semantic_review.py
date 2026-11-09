@@ -218,7 +218,8 @@ def export_reviewed_semantic_markdown(folder: Path, draft: Path, review: Path,
             continue
         lines.extend(["## Fragment " + str(section["window_index"]), ""])
         for claim in accepted:
-            lines.extend(["### Twierdzenie zatwierdzone przez użytkownika", ""])
+            lines.extend(["### Twierdzenie zatwierdzone przez użytkownika", "",
+                          "Identyfikator twierdzenia: " + claim["id"], ""])
             for part in claim["text"].splitlines():
                 lines.append("    " + part)
             lines.append("")
