@@ -119,6 +119,37 @@ class SemanticDraftTest(unittest.TestCase):
                                   llama_cli=sys.executable, runner=invented_heading)
         self.assertFalse(self.result.exists())
 
+    def test_altered_saved_acronym_is_not_accepted_at_export(self):
+        import sys
+        create_semantic_draft(self.project, self.result, model=self.model,
+                              llama_cli=sys.executable, runner=self.fake_runner)
+        saved = load_json(self.result)
+        saved["sections"][0]["claims"][0]["text"] = "Rzekomo opisano BGP."
+        save_json(self.result, saved)
+        with self.assertRaisesRegex(VideoNotesError, "skrót"):
+            verify_semantic_draft(self.project, self.result)
+        with self.assertRaises(VideoNotesError):
+            export_semantic_markdown(self.project, self.result, self.md)
+        self.assertFalse(self.md.exists())
+
+    def test_numbers_exactly_present_in_corrected_source_are_permitted(self):
+        import sys
+        edits = load_json(self.project / "edits.json")
+        edits["edits"]["c0000000-s00000"] = (
+            "Wykład dotyczy TCP IP i DHCP; prowadzący mówi 192.168.1.1.")
+        save_json(self.project / "edits.json", edits)
+        def quoted_number(argv, **options):
+            options["stdout"].write(json.dumps({
+                "heading": "Wykład o TCP i DHCP",
+                "claims": [{"text": "Wspomniano TCP i DHCP oraz adres 192.168.1.1.",
+                            "source_ids": ["c0000000-s00000"]}],
+            }).encode("utf-8"))
+            return CompletedProcess(argv, 0)
+        result = create_semantic_draft(self.project, self.result, model=self.model,
+                                       llama_cli=sys.executable, runner=quoted_number)
+        self.assertFalse(result["semantic_facts_verified"])
+        self.assertTrue(verify_semantic_draft(self.project, self.result)["verified_source_citations"])
+
     def test_unknown_model_claim_rejects_without_output(self):
         def unsupported(argv, **options):
             options["stdout"].write(json.dumps({
