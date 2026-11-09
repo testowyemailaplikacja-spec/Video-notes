@@ -21,6 +21,7 @@ from .notes import generate_basic_notes, read_basic_notes, edit_note_point, expo
 from .advanced_notes import export_advanced_outline, verify_advanced_outline
 from .study_guide import export_study_guide, verify_study_guide
 from .semantic_draft import create_semantic_draft, verify_semantic_draft, export_semantic_markdown, SCHEMA as SEMANTIC_SCHEMA
+from .semantic_review_gui import SemanticReviewWindow
 from .slide_ocr import extract_slide_ocr, verify_slide_ocr, SCHEMA as SLIDE_SCHEMA
 from .slide_alignment import align_slides_to_speech, verify_slide_speech_alignment, export_slide_speech_markdown, SCHEMA as ALIGN_SCHEMA
 from .pdf_export import export_basic_notes_pdf
@@ -1006,6 +1007,9 @@ class VideoNotesWindow:
                 self._run_optional_analysis("Eksport szkicu", lambda: export_semantic_markdown(
                     folder, Path(source), Path(destination)))
         ttk.Button(actions_ai, text="Eksportuj sprawdzalne cytaty do MD", command=export_draft).pack(side="left", padx=4)
+        ttk.Button(actions_ai, text="Oceń szkic AI", command=lambda: SemanticReviewWindow(
+            self.root, folder, guard=lambda: self.active or self._has_transcript_draft()
+        )).pack(side="left", padx=4)
 
         slide = ttk.LabelFrame(body, text="OCR slajdów — lokalne FFmpeg i Tesseract", padding=10)
         slide.pack(fill="x", pady=5)
