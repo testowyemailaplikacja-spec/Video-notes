@@ -28,6 +28,9 @@ from .diagnostics import diagnose_local_install
 from .slide_ocr import extract_slide_ocr, verify_slide_ocr
 from .slide_alignment import align_slides_to_speech, verify_slide_speech_alignment, export_slide_speech_markdown
 from .semantic_draft import create_semantic_draft, verify_semantic_draft, export_semantic_markdown
+from .semantic_review import (
+    init_semantic_review, mark_semantic_claim, semantic_review_status, export_reviewed_semantic_markdown,
+)
 from .record_pipeline import transcribe_finished_session
 from .edit_lock import transcript_edit_lock_status, recover_stale_transcript_edit_lock
 from .source_player import play_source_segment
@@ -253,6 +256,28 @@ def parser() -> argparse.ArgumentParser:
     semantic_export.add_argument("project", type=Path)
     semantic_export.add_argument("--file", required=True, type=Path)
     semantic_export.add_argument("--output", required=True, type=Path)
+    review_init = sub.add_parser("semantic-review-init", help="Rozpocznij lokalną ocenę twierdzeń AI; bez automatycznej akceptacji")
+    review_init.add_argument("project", type=Path)
+    review_init.add_argument("--file", required=True, type=Path)
+    review_init.add_argument("--review", required=True, type=Path)
+    review_mark = sub.add_parser("semantic-review-mark", help="Zapisz jednorazową decyzję recenzenta o twierdzeniu")
+    review_mark.add_argument("project", type=Path)
+    review_mark.add_argument("--file", required=True, type=Path)
+    review_mark.add_argument("--review", required=True, type=Path)
+    review_mark.add_argument("--claim", required=True)
+    review_mark.add_argument("--decision", choices=["approve", "reject"], required=True)
+    review_mark.add_argument("--reviewer", required=True)
+    review_mark.add_argument("--note", default="")
+    review_mark.add_argument("--confirm", action="store_true")
+    review_status = sub.add_parser("semantic-review-status", help="Sprawdź decyzje i zgodność źródłowych cytatów")
+    review_status.add_argument("project", type=Path)
+    review_status.add_argument("--file", required=True, type=Path)
+    review_status.add_argument("--review", required=True, type=Path)
+    review_export = sub.add_parser("semantic-review-export", help="Eksportuj tylko zatwierdzone przez użytkownika twierdzenia")
+    review_export.add_argument("project", type=Path)
+    review_export.add_argument("--file", required=True, type=Path)
+    review_export.add_argument("--review", required=True, type=Path)
+    review_export.add_argument("--output", required=True, type=Path)
     record_to_asr = sub.add_parser("record-transcribe", help="Po zakończeniu nagrania WAV użyj wspólnego silnika Whisper i eksportu")
     record_to_asr.add_argument("recording", type=Path, help="Katalog zakończonej sesji WAV z recording.json")
     record_to_asr.add_argument("--project", type=Path, required=True)
@@ -475,6 +500,21 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(verify_semantic_draft(args.project, args.file), ensure_ascii=False, indent=2))
         elif args.action == "semantic-export":
             print(json.dumps(export_semantic_markdown(args.project, args.file, args.output),
+                             ensure_ascii=False, indent=2))
+        elif args.action == "semantic-review-init":
+            print(json.dumps(init_semantic_review(args.project, args.file, args.review),
+                             ensure_ascii=False, indent=2))
+        elif args.action == "semantic-review-mark":
+            print(json.dumps(mark_semantic_claim(args.project, args.file, args.review,
+                             claim_id=args.claim, decision=args.decision,
+                             reviewer=args.reviewer, note=args.note, confirm=args.confirm),
+                             ensure_ascii=False, indent=2))
+        elif args.action == "semantic-review-status":
+            print(json.dumps(semantic_review_status(args.project, args.file, args.review),
+                             ensure_ascii=False, indent=2))
+        elif args.action == "semantic-review-export":
+            print(json.dumps(export_reviewed_semantic_markdown(
+                             args.project, args.file, args.review, args.output),
                              ensure_ascii=False, indent=2))
         elif args.action == "record-transcribe":
             report = transcribe_finished_session(args.recording, args.project, model=args.model,
