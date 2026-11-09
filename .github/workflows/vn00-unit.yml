@@ -36,6 +36,9 @@ jobs:
           python -m unittest discover -s tests -v
       - name: Confirm CLI responds without remote services
         run: python -m videonotes --version
+      - name: Exercise optional offline capability preflight without models or remote services
+        run: |
+          python -m videonotes doctor --ffplay missing-local-ffplay --tesseract missing-local-tesseract --ocr-language pol+eng --llama-cli missing-local-llama --gguf-model nonexistent-local.gguf
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
