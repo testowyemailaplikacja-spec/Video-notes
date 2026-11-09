@@ -162,6 +162,40 @@ class GuiNotesHeadlessTest(unittest.TestCase):
             backend.assert_not_called()
             self.assertFalse(self.gui.active)
 
+    def test_source_preview_button_is_explicit_async_and_does_not_discard_draft(self):
+        import time
+        self.gui._load()
+        self.root.update()
+        selected = self.gui.segments.get_children()[0]
+        self.gui.segments.selection_set(selected)
+        self.gui._selected()
+        self.gui.edit_text.insert("end", " DRAFT NOT SAVED")
+        original = self.gui.edit_text.get("1.0", "end-1c")
+        with patch("videonotes.gui.play_source_segment", return_value={
+                "schema": "videonotes-source-preview-v1", "segment_id": selected,
+                "source_preserved": True,
+            }) as play, patch("videonotes.gui.messagebox.showwarning") as warning:
+            self._button(self.root, "Odtwórz zaznaczony fragment z nagrania").invoke()
+            self.assertTrue(self.gui.active)
+            for _ in range(150):
+                self.root.update()
+                if not self.gui.active:
+                    break
+                time.sleep(0.02)
+            self.assertFalse(self.gui.active)
+            play.assert_called_once_with(self.folder, selected)
+            self.assertIn("Odsłuchano lokalnie", self.gui.status.get())
+            self.assertEqual(original, self.gui.edit_text.get("1.0", "end-1c"))
+            warning.assert_not_called()
+
+    def test_source_preview_without_selection_does_not_run_player(self):
+        with patch("videonotes.gui.play_source_segment") as player, \
+             patch("videonotes.gui.messagebox.showinfo") as notice:
+            self._button(self.root, "Odtwórz zaznaczony fragment z nagrania").invoke()
+            notice.assert_called_once()
+            player.assert_not_called()
+            self.assertFalse(self.gui.active)
+
     def test_version_history_button_opens_and_restores_selected_source_safe_snapshot(self):
         note = generate_basic_notes(self.folder, window_minutes=1)
         point = note["sections"][0]["points"][0]["id"]

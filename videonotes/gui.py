@@ -14,6 +14,7 @@ from .exports import edit_segment, export_project
 from .media import probe
 from .microphone import record_microphone, list_microphone_devices, join_finished_recording, recording_status
 from .record_pipeline import transcribe_finished_session
+from .source_player import play_source_segment
 from .audio_diagnostics import analyze_finished_recording
 from .recovery_audio import salvage_recording
 from .notes import generate_basic_notes, read_basic_notes, edit_note_point, export_basic_notes, export_basic_notes_docx
@@ -111,6 +112,7 @@ class VideoNotesWindow:
         self.edit_text = tk.Text(right, wrap="word", height=9, undo=True)
         self.edit_text.pack(fill="both", expand=True)
         ttk.Button(right, text="Zapisz poprawkę i eksport", command=self._save_edit).pack(anchor="e", pady=6)
+        ttk.Button(right, text="Odtwórz zaznaczony fragment z nagrania", command=self._preview_selected_source).pack(anchor="e", pady=5)
         ttk.Label(right, text="Oryginalny wynik ASR pozostaje nietknięty.", wraplength=245).pack(anchor="w")
 
     def _on_app_close(self) -> None:
@@ -118,7 +120,7 @@ class VideoNotesWindow:
         if self.active:
             if self.optional_analysis_active:
                 messagebox.showwarning("Video Notes",
-                    "Trwa lokalne opracowanie lub OCR. Poczekaj na zapis wyniku przed zamknięciem programu.")
+                    "Trwa lokalne opracowanie, OCR lub odsłuch. Poczekaj na zakończenie przed zamknięciem programu.")
                 return
             if self.mic_controls and self.mic_controls["window"].winfo_exists():
                 self.mic_stop.set()
@@ -695,6 +697,16 @@ class VideoNotesWindow:
                         )
                         messagebox.showwarning("Transkrypcja nagrania", reason +
                             " W przypadku utworzenia projektu wznowienie następuje przez Wznów projekt: " + project_path)
+                elif kind in {"source_preview_complete", "source_preview_failure"}:
+                    self.active = False
+                    self.optional_analysis_active = False
+                    self.start_button.configure(state="normal")
+                    self.resume_button.configure(state="normal")
+                    if kind == "source_preview_complete":
+                        self.status.set(f"Odsłuchano lokalnie fragment {data['segment_id']}; źródło i poprawki zachowane.")
+                    else:
+                        self.status.set("Odsłuch lokalny nie został ukończony. Źródłowe dane pozostają bez zmian.")
+                        messagebox.showwarning("Odsłuch źródła", str(data))
                 elif kind == "progress":
                     done, total = data
                     self.progress["maximum"] = max(total, 1)
@@ -862,6 +874,36 @@ class VideoNotesWindow:
             )
             if len(seen) >= 2000:
                 break
+
+    def _preview_selected_source(self) -> None:
+        """Explicit background playback of selected original OBS audio track."""
+        if self.active:
+            messagebox.showwarning("Odsłuch źródła", "Zakończ inne przetwarzanie przed odsłuchem.")
+            return
+        selection = self.segments.selection()
+        if not selection or selection[0] not in self._rows:
+            messagebox.showinfo("Odsłuch źródła", "Najpierw zaznacz segment transkrypcji.")
+            return
+        if not self.project.get().strip():
+            messagebox.showwarning("Odsłuch źródła", "Wybierz katalog projektu.")
+            return
+        folder = Path(self.project.get())
+        segment_id = selection[0]
+        self.active = True
+        self.optional_analysis_active = True
+        self.start_button.configure(state="disabled")
+        self.resume_button.configure(state="disabled")
+        self.status.set("Trwa przygotowanie i odsłuch lokalnego oryginału (FFmpeg/FFplay)…")
+
+        def worker() -> None:
+            try:
+                response = play_source_segment(folder, segment_id)
+                self.events.put(("source_preview_complete", response))
+            except VideoNotesError as error:
+                self.events.put(("source_preview_failure", str(error)))
+            except Exception:
+                self.events.put(("source_preview_failure", "Lokalny odtwarzacz nie ukończył pracy. Źródłowe pliki zachowano."))
+        threading.Thread(target=worker, name="vn-local-source-preview", daemon=True).start()
 
     def _save_edit(self) -> None:
         if self.active:
