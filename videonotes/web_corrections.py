@@ -12,6 +12,7 @@ from pathlib import Path
 from .contracts import MAX_TEXT_LENGTH
 from .errors import VideoNotesError
 from .storage import read_project, save_json
+from .edit_lock import transcript_edit_lock
 
 PATCH_SCHEMA = "videonotes-web-corrections-v1"
 MAX_PATCH_BYTES = 20 * 1024 * 1024
@@ -24,11 +25,17 @@ def _valid_text(value: object) -> bool:
 
 
 def import_web_corrections(folder: Path, patch_file: Path, *, apply: bool = False) -> dict:
-    """Preview by default; --apply is required for an atomic edits.json update.
+    """Read-only preview or coordinated all-or-none edits in desktop project."""
+    if apply:
+        # Lock before FIRST read: a recheck immediately before save without a
+        # cooperative lock still allows two writers to both pass and overwrite.
+        with transcript_edit_lock(folder):
+            return _import_web_corrections_unlocked(folder, patch_file, apply=True)
+    return _import_web_corrections_unlocked(folder, patch_file, apply=False)
 
-    Existing, unrelated edits are preserved. Every changed segment must still
-    match its source identity, timestamps and exact pre-edit browser text.
-    """
+
+def _import_web_corrections_unlocked(folder: Path, patch_file: Path, *, apply: bool) -> dict:
+    """Validate exact pre-edit source and reject entire batch on conflicts."""
     folder, patch_file = Path(folder), Path(patch_file)
     project, transcript, edits = read_project(folder)
     try:

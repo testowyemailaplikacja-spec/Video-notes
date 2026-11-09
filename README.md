@@ -227,3 +227,7 @@ Aplikacja Tk oferuje również przycisk „Zakończone nagranie mikrofonowe → 
 `slide-align --ocr raport-ocr.json --output NOWY-indeks.json` przypisuje rozpoznane fragmenty obrazu do **najbliższych w czasie** segmentów mowy, bez twierdzenia, że temat jest zgodny. `slide-align-verify` odtwarza wyniki z aktualnego źródła, a `slide-align-md` eksportuje dosłowne OCR i cytaty. W GUI działa przycisk „Powiąż OCR z wypowiedziami według czasu”. [Instrukcja](docs/VN03_SLIDE_TRANSCRIPT_TIME_ALIGNMENT.md). Wszystkie powiązania wymagają sprawdzenia przez człowieka.
 
 Lokalne szkice semantyczne zawierają dodatkowo konserwatywną kontrolę liczb, adresów i skrótów technicznych względem cytowanych fragmentów. Niepoparte identyfikatory powodują odmowę zapisu lub weryfikacji. To ograniczenie halucynacji, nie potwierdzenie poprawności merytorycznej. [Szczegóły](docs/VN_SEMANTIC_DRAFT.md).
+
+## Ochrona przed utratą równoległych poprawek (VN-02/VN-07)
+
+Ręczne zmiany w edytorze i import `import-web-edits --apply` korzystają z jednej **kooperacyjnej blokady pliku**. Jednoczesny zapis drugiego procesu jest odrzucany, bez nadpisania starszych poprawek. `edit-lock-status KATALOG` pokazuje aktywny/osierocony proces; `edit-lock-recover KATALOG --confirm` pozwala świadomie usunąć wyłącznie potwierdzoną blokadę po martwym procesie. Nie dotyczy edytorów zewnętrznych piszących bezpośrednio do `edits.json`. [Instrukcja](docs/KWN_EDIT_LOCK.md).
