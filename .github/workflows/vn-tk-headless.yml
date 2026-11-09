@@ -4,6 +4,8 @@ on:
     branches: [develop]
     paths:
       - 'videonotes/gui.py'
+      - 'videonotes/semantic_review_gui.py'
+      - 'scripts/gui_semantic_review_smoke.py'
       - 'videonotes/notes.py'
       - 'videonotes/study_guide.py'
       - 'videonotes/advanced_notes.py'
@@ -35,6 +37,7 @@ jobs:
         run: |
           set -euo pipefail
           timeout 120s xvfb-run -a /usr/bin/python3 -m scripts.gui_headless_test
+          timeout 90s xvfb-run -a /usr/bin/python3 -m scripts.gui_semantic_review_smoke
 
   gui-tk-windows:
     name: Real Tk GUI on hosted Windows VM (not physical offline acceptance)
@@ -54,4 +57,6 @@ jobs:
           python -c "import sys, tkinter; assert sys.platform == 'win32'; root = tkinter.Tk(); root.withdraw(); print('Windows Tk loaded'); root.destroy()"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m scripts.gui_headless_test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m scripts.gui_semantic_review_smoke
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

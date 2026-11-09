@@ -239,3 +239,7 @@ Ręczne zmiany w edytorze i import `import-web-edits --apply` korzystają z jedn
 ## Ręczne zatwierdzanie szkiców semantycznych
 
 Komendy `semantic-review-init`, `semantic-review-mark --confirm`, `semantic-review-status` i `semantic-review-export` umożliwiają ocenę każdego twierdzenia lokalnego szkicu AI bez przepisywania transkrypcji. Zapis dotyczy deklaracji użytkownika, **nie** niezależnej weryfikacji prawdziwości. [Instrukcja](docs/VN_SEMANTIC_HUMAN_REVIEW.md).
+
+### Okno ręcznej recenzji szkicu AI
+
+W aplikacji desktop otwórz **Analiza opcjonalna → Oceń szkic AI**, wskaż lokalny szkic JSON, utwórz osobny katalog recenzji, porównaj cytaty i jawnie zatwierdź lub odrzuć każde twierdzenie. Eksport możliwy po kompletnej kontroli; decyzje deklaruje użytkownik, nie weryfikuje ich oprogramowanie.
