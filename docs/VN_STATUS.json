@@ -78,7 +78,9 @@
         "PR #92: optional desktop Tk window for generating local semantic draft, verifying citations, exporting Markdown and honoring unsaved ASR drafts; real hosted Windows Tk/Linux Xvfb + 5 source/browser jobs + Windows DEV EXE 8/8 PASS (42537008193, 42537008197, 42537008206). No physical Windows/human evaluation.",
         "PR #96: source-linked FFplay audio preview from transcript editor / navigated note citations, original OBS selected stream via real FFmpeg, before/after size+SHA-256, ephemeral WAV, redacted errors and no transcript/draft mutation. All nine final CI jobs PASS: 42595929705 (Tk Win+Linux, 2/2), 42595929720 (source+browser 5/5), 42595929769 (private synthetic Inno 1/1), 42595929879 (Windows DEV EXE 1/1). Actual FFplay speakers/device Windows and real user lecture NOT_RUN. FFplay optional not bundled.",
         "PR #98: new fail-closed evidence-literal guard rejects unsourced numeric tokens, IP addresses and uppercase technical acronyms in local LLM semantic drafts, at generation and in `semantic-verify`; tests positive grounded TCP/DHCP/IPv4 and negative port 65535/BGP/tampered saved claim. Final source/browser 5/5 PASS run 42597232583, Windows DEV EXE 1/1 PASS run 42597232588. Still not semantic truth validation or actual GGUF human quality acceptance.",
-        "PR #100: cross-process `.transcript-edits.lock` shared by CLI/Tk manual edit_segment and opt-in web corrections apply; read/validate/write under one cooperative lock; stale-PID inspect/recover with explicit --confirm, real Python subprocess race and no-loss tests on Linux/hosted Windows, 7/7 CI PASS (42601392194, 42601392182, 42601392249). Raw ASR unaffected. Does not protect external programs directly writing edits.json."
+        "PR #100: cross-process `.transcript-edits.lock` shared by CLI/Tk manual edit_segment and opt-in web corrections apply; read/validate/write under one cooperative lock; stale-PID inspect/recover with explicit --confirm, real Python subprocess race and no-loss tests on Linux/hosted Windows, 7/7 CI PASS (42601392194, 42601392182, 42601392249). Raw ASR unaffected. Does not protect external programs directly writing edits.json.",
+        "PR #103: separated source-bound semantic claim review journal with explicit per-claim approve/reject --confirm, append-only decisions protected by hash of source/draft/claim, no overwrite, all-claims-before-export and approved-only Markdown; 7/7 FINAL CI jobs PASS (42694635216, 42694635639, 42694635341). Automated tests declare no real human QA.",
+        "PR #104: separate Tk interactive review window in desktop KWN with source quotes/timestamps, reviewer label, deliberate confirmation, selection, approved-only Markdown and unsaved transcript guard; real hosted Windows Tk + Linux Xvfb 2/2, source/browser 5/5, Windows DEV EXE 1/1 CI PASS (42695709291, 42695708549, 42695708700). No physical device/human evaluation."
       ],
       "blockers": [
         "Human assessment on real lectures",
@@ -107,7 +109,8 @@
         "PR #90: local llama.cpp cited, *unverified* semantic draft generation with source-bound JSON and Markdown verification (42536188092,42536188114,42536188119, 7/7). No end-user proof of factual synthesis.",
         "PR #92: integrated opt-in OCR/semantic draft desktop UI, real Tk Windows and Linux tests and full source/browser checks (42537008193,42537008197,42537008206, 8/8). Still needs real video/slides, actual model and human correctness review.",
         "PR #97: opt-in `slide-align`, `slide-align-verify`, `slide-align-md`, optional Tk GUI mapping local FFmpeg/Tesseract OCR frame requested timestamps to nearest transcript segments only. Exact rebuild rejects changed OCR/corrections, no-clobber exports, `nearby_spoken_segment=null` on no nearby speech. 9/9 final CI PASS: 42596515028 (Tk Win+Linux), 42596514806 (5 source/browser), 42596514808 (private synthetic Inno), 42596514770 (Win DEV EXE). Temporal association not proof of slide/speech semantic agreement or true PTS; human review NOT_RUN.",
-        "PR #98: evidence-literal numeric/IP/acronym filter added for local semantic draft creation/verification; 6/6 final CI jobs PASS (42597232583, 42597232588). Factual/semantic correctness and real CCNA human tests remain NOT_RUN."
+        "PR #98: evidence-literal numeric/IP/acronym filter added for local semantic draft creation/verification; 6/6 final CI jobs PASS (42597232583, 42597232588). Factual/semantic correctness and real CCNA human tests remain NOT_RUN.",
+        "PR #103: explicit manual claim review provenance workflow, synthetic CI tests for source hash, user-declared labels, reject/approve, tamper, duplicate, concurrent decisions, no-clobber and CLI. FINAL GitHub CI 7/7 PASS, no factual guarantee. PR #104: interactive Tk review and original-citation presentation with Windows/Linux hosted CI; 8/8 PASS. Real CCNA lecture and slide semantic correctness NOT_RUN."
       ],
       "blockers": [
         "Real lectures/tutorials/CCNA human acceptance",
@@ -1301,6 +1304,54 @@
       "physical_windows_acceptance": false,
       "real_user_lectures": false,
       "model_or_license_acceptance": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42694635216",
+      "scope": "PR #103 FINAL: Python source and browser regressions Linux/Windows 5/5",
+      "result": "PASS",
+      "physical_windows_acceptance": false,
+      "real_user_lectures": false,
+      "model_or_license_acceptance": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42694635639",
+      "scope": "PR #103 FINAL: Windows DEV EXE 1/1",
+      "result": "PASS",
+      "physical_windows_acceptance": false,
+      "real_user_lectures": false,
+      "model_or_license_acceptance": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42694635341",
+      "scope": "PR #103 FINAL: private unsigned Inno synthetic installer 1/1",
+      "result": "PASS",
+      "physical_windows_acceptance": false,
+      "real_user_lectures": false,
+      "model_or_license_acceptance": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42695708549",
+      "scope": "PR #104 FINAL: Python source and browser regressions Linux/Windows 5/5",
+      "result": "PASS",
+      "physical_windows_acceptance": false,
+      "real_user_lectures": false,
+      "model_or_license_acceptance": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42695708700",
+      "scope": "PR #104 FINAL: Windows DEV EXE 1/1",
+      "result": "PASS",
+      "physical_windows_acceptance": false,
+      "real_user_lectures": false,
+      "model_or_license_acceptance": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42695709291",
+      "scope": "PR #104 FINAL: Tk GUI real widgets on hosted Windows and Linux Xvfb 2/2",
+      "result": "PASS",
+      "physical_windows_acceptance": false,
+      "real_user_lectures": false,
+      "model_or_license_acceptance": false
     }
   ],
   "notes": [
@@ -1326,7 +1377,8 @@
     "2026-11-08: PR #85/#86/#87 fully CI-verified and squash-merged into develop: browser→desktop safe correction patch; internal SPDX 2.3 inventory with unverified licenses; read-only offline dependency/model/media/disk preflight. GitHub Actions 42496562215/62164/62085; 42496858013/58049/58068; 42497172591/72589/72532: 7/7 jobs per PR PASS. No natural lectures, physical Windows microphone/loopback/offline, signed/licensed installer or Wiedora staging integration. VN-00..VN-07 still W TRAKCIE, VN-08 PLANOWANE, 0 DONE.",
     "2026-11-09 (local Europe/Warsaw, CI GitHub timestamps 2026-11-08 UTC): PR #89–93 verified at their FINAL heads, merged to develop: optional video frame OCR with real FFmpeg/Tesseract original synthetic slide; optional offline source-cited llama.cpp DRAFT with stubbed LLM in CI; complete finished WAV→same ASR CLI and GUI with cancellation; optional Tk GUI for OCR/LLM. 38/38 CI jobs PASS after reruns fixing discovered failures. No real human lecture semantics, genuine GGUF model acceptance, 2h physical microphone, licensed offline release or Wiedora host integration. 0 DONE, VN-00..VN-07 W_TRAKCIE, VN-08 PLANOWANE.",
     "2026-11-09: PR #96/#97/#98 verified and squash-merged to `develop` (source preview original selected OBS stream through local FFmpeg/FFplay, OCR frame-to-nearby-speech time-only index, source-literal numeric/IP/acronym anti-hallucination guard for semantic drafts). 24/24 final GitHub CI jobs PASS (source Linux/Windows, browsers, hosted Tk, dev Windows EXE, private synthetic Inno). No physical Windows microphone/offline speaker test, genuine human lectures, real LLAMA GGUF semantic quality, fully licensed public installer or authorized Wiedora integration; 0/9 DONE.",
-    "2026-11-09: PR #100/#101 merged to develop. Cross-process manual GUI/CLI and web patch writes now share fail-closed `.transcript-edits.lock` and explicit stale recovery. `doctor` now reports optional FFplay/Tesseract languages/llama-cli/GGUF header+hash without running LLM. 14/14 final CI jobs PASS (standard source Windows/Linux 10, DEV EXE 2, private synthetic Inno 2); real user recording, hardware, licensed release, actual LLM/OCR semantic quality and Wiedora deployment NOT_RUN. Formal 0 DONE, 8 W_TRAKCIE, 1 PLANOWANE."
+    "2026-11-09: PR #100/#101 merged to develop. Cross-process manual GUI/CLI and web patch writes now share fail-closed `.transcript-edits.lock` and explicit stale recovery. `doctor` now reports optional FFplay/Tesseract languages/llama-cli/GGUF header+hash without running LLM. 14/14 final CI jobs PASS (standard source Windows/Linux 10, DEV EXE 2, private synthetic Inno 2); real user recording, hardware, licensed release, actual LLM/OCR semantic quality and Wiedora deployment NOT_RUN. Formal 0 DONE, 8 W_TRAKCIE, 1 PLANOWANE.",
+    "2026-11-09: PR #103–104 squash-merged to `develop`. Append-only local human-decision journal for semantic draft claims, CLI status/approve/reject/export and corresponding real Tk GUI with opt-in confirmation and source citations. 15/15 FINAL CI jobs PASS, including real hosted Windows/Linux Tk, Python source, browsers and Windows DEV EXE/private synthetic installer. This software records USER-DECLARED review, not independent human identity or factual confirmation; real natural lectures, licensed local GGUF inference, CCNA/slides human assessment, physical Windows AV/installer/mic and Wiedora beta host deployment NOT_RUN. Formal 0/9 stages DONE, 8 W_TRAKCIE, 1 PLANOWANE."
   ],
   "last_verified_develop_before_pr8": "344e227571ba09802da8a8bea7c50498473dc2e6"
 }
