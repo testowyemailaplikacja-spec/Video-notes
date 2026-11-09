@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .errors import VideoNotesError
 from .storage import atomic_write, read_project, save_json
+from .edit_lock import transcript_edit_lock
 
 
 def _clock(ms: int, *, vtt: bool = False) -> str:
@@ -28,13 +29,15 @@ def _cue_text(text: str, *, vtt: bool = False) -> str:
 
 
 def edit_segment(folder: Path, segment_id: str, updated: str) -> None:
-    project, transcript, edits = read_project(folder)
-    if segment_id not in {segment["id"] for segment in transcript["segments"]}:
-        raise VideoNotesError("Nie znaleziono segmentu do poprawienia.")
     if not isinstance(updated, str) or len(updated) > 10000 or "\x00" in updated:
         raise VideoNotesError("Nieprawidłowa poprawka transkrypcji.")
-    edits["edits"][segment_id] = updated
-    save_json(Path(folder) / "edits.json", edits)
+    # Both GUI/manual changes and browser patch imports serialize reads+writes.
+    with transcript_edit_lock(folder):
+        project, transcript, edits = read_project(folder)
+        if segment_id not in {segment["id"] for segment in transcript["segments"]}:
+            raise VideoNotesError("Nie znaleziono segmentu do poprawienia.")
+        edits["edits"][segment_id] = updated
+        save_json(Path(folder) / "edits.json", edits)
 
 
 def render_exports(folder: Path) -> dict[str, bytes]:

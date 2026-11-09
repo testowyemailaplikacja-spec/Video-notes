@@ -29,6 +29,7 @@ from .slide_ocr import extract_slide_ocr, verify_slide_ocr
 from .slide_alignment import align_slides_to_speech, verify_slide_speech_alignment, export_slide_speech_markdown
 from .semantic_draft import create_semantic_draft, verify_semantic_draft, export_semantic_markdown
 from .record_pipeline import transcribe_finished_session
+from .edit_lock import transcript_edit_lock_status, recover_stale_transcript_edit_lock
 from .source_player import play_source_segment
 from .installer import build_internal_installer
 from .pipeline import create_project, transcribe_project, transcription_lock_status, recover_stale_transcription_lock
@@ -63,6 +64,11 @@ def parser() -> argparse.ArgumentParser:
     lock_recover.add_argument("--confirm", action="store_true", help="Jawnie potwierdź bezpieczne odzyskiwanie")
     exports = sub.add_parser("export", help="Zapisz TXT/SRT/VTT/JSON bez zmiany surowego tekstu")
     exports.add_argument("project", type=Path)
+    edit_lock_status = sub.add_parser("edit-lock-status", help="Sprawdź blokadę edycji transkrypcji (GUI/WWW)")
+    edit_lock_status.add_argument("project", type=Path)
+    edit_lock_recover = sub.add_parser("edit-lock-recover", help="Usuń tylko potwierdzoną osieroconą blokadę poprawek")
+    edit_lock_recover.add_argument("project", type=Path)
+    edit_lock_recover.add_argument("--confirm", action="store_true", help="Jawna zgoda na odzyskanie po martwym procesie")
     web_edits = sub.add_parser("import-web-edits", help="Sprawdź lub zastosuj poprawki z lokalnej strony WWW (VN-07)")
     web_edits.add_argument("project", type=Path)
     web_edits.add_argument("--file", required=True, type=Path, help="Lokalny web-corrections.json z przeglądarki")
@@ -298,6 +304,12 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(transcription_lock_status(args.project), ensure_ascii=False))
         elif args.action == "lock-recover":
             print(json.dumps(recover_stale_transcription_lock(args.project, confirm=args.confirm), ensure_ascii=False))
+        elif args.action == "edit-lock-status":
+            read_project(args.project)
+            print(json.dumps(transcript_edit_lock_status(args.project), ensure_ascii=False))
+        elif args.action == "edit-lock-recover":
+            print(json.dumps(recover_stale_transcript_edit_lock(
+                args.project, confirm=args.confirm), ensure_ascii=False))
         elif args.action == "edit":
             edit_segment(args.project, args.segment, args.text)
             export_project(args.project)
