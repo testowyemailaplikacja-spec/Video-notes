@@ -22,6 +22,7 @@ from .advanced_notes import export_advanced_outline, verify_advanced_outline
 from .study_guide import export_study_guide, verify_study_guide
 from .semantic_draft import create_semantic_draft, verify_semantic_draft, export_semantic_markdown, SCHEMA as SEMANTIC_SCHEMA
 from .slide_ocr import extract_slide_ocr, verify_slide_ocr, SCHEMA as SLIDE_SCHEMA
+from .slide_alignment import align_slides_to_speech, verify_slide_speech_alignment, export_slide_speech_markdown, SCHEMA as ALIGN_SCHEMA
 from .pdf_export import export_basic_notes_pdf
 from .note_revisions import regenerate_basic_notes, list_note_versions, restore_note_version, recover_interrupted_note_update
 from .pipeline import create_project, transcribe_project
@@ -963,7 +964,7 @@ class VideoNotesWindow:
             return
         window = tk.Toplevel(self.root)
         window.title("Lokalna analiza opcjonalna — OCR slajdów i szkic AI")
-        window.geometry("800x420")
+        window.geometry("800x520")
         body = ttk.Frame(window, padding=16)
         body.pack(fill="both", expand=True)
         ttk.Label(body, text="Wszystkie wyniki są NIEZWERYFIKOWANE. Cytat nie potwierdza prawdziwości parafrazy, a OCR może się mylić.",
@@ -1030,6 +1031,43 @@ class VideoNotesWindow:
                     interval_seconds=chosen_interval))
         ttk.Button(controls, text="Wykonaj OCR slajdów", command=make_ocr).pack(side="left", padx=12)
 
+        alignment = ttk.Frame(slide)
+        alignment.pack(fill="x", pady=5)
+        def make_alignment() -> None:
+            existing = filedialog.askopenfilename(
+                title="Wybierz istniejący raport OCR slajdów",
+                filetypes=[("JSON", "*.json")],
+            )
+            if not existing:
+                return
+            destination = filedialog.asksaveasfilename(
+                title="Zapisz NOWY indeks OCR do wypowiedzi (niezweryfikowany)",
+                defaultextension=".json", filetypes=[("JSON", "*.json")],
+            )
+            if destination:
+                self._run_optional_analysis("Indeks czasu slajdów",
+                    lambda: align_slides_to_speech(folder, Path(existing), Path(destination)))
+        ttk.Button(alignment, text="Powiąż OCR z wypowiedziami według czasu", command=make_alignment).pack(side="left", padx=4)
+
+        def export_alignment() -> None:
+            ocr_report = filedialog.askopenfilename(
+                title="Wybierz źródłowy raport OCR", filetypes=[("JSON", "*.json")])
+            if not ocr_report:
+                return
+            source_index = filedialog.askopenfilename(
+                title="Wybierz istniejący indeks slajdów i wypowiedzi",
+                filetypes=[("JSON", "*.json")])
+            if not source_index:
+                return
+            output_md = filedialog.asksaveasfilename(
+                title="Zapisz NOWY indeks Markdown",
+                defaultextension=".md", filetypes=[("Markdown", "*.md")])
+            if output_md:
+                self._run_optional_analysis("Eksport indeksu czasu",
+                    lambda: export_slide_speech_markdown(
+                        folder, Path(ocr_report), Path(source_index), Path(output_md)))
+        ttk.Button(alignment, text="Eksport indeksu slajdów do MD", command=export_alignment).pack(side="left", padx=4)
+
         def check_existing() -> None:
             source = filedialog.askopenfilename(title="Wybierz istniejący raport OCR lub szkic AI",
                                                 filetypes=[("JSON", "*.json")])
@@ -1044,6 +1082,8 @@ class VideoNotesWindow:
                     return verify_semantic_draft(folder, Path(source))
                 if data.get("schema") == SLIDE_SCHEMA:
                     return verify_slide_ocr(folder, Path(source))
+                if data.get("schema") == ALIGN_SCHEMA:
+                    raise VideoNotesError("Do weryfikacji indeksu użyj slide-align-verify z oryginalnym raportem OCR.")
                 raise VideoNotesError("To nie jest raport lokalnej analizy Video Notes.")
             self._run_optional_analysis("Sprawdzanie źródeł", task)
         ttk.Button(body, text="Sprawdź cytaty / integralność istniejącego raportu", command=check_existing).pack(anchor="w", pady=8)

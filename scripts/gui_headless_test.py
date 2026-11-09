@@ -196,6 +196,35 @@ class GuiNotesHeadlessTest(unittest.TestCase):
             player.assert_not_called()
             self.assertFalse(self.gui.active)
 
+    def test_slide_speech_alignment_requires_existing_ocr_and_explicit_output(self):
+        import time
+        self.gui._show_optional_analysis()
+        self.root.update()
+        windows = [x for x in children(self.root)
+                   if isinstance(x, tk.Toplevel) and x.winfo_exists()
+                   and "Lokalna analiza opcjonalna" in x.title()]
+        self.assertEqual(len(windows), 1)
+        dialog = windows[0]
+        destination = str(self.folder / "new-slide-index.json")
+        existing = str(self.folder / "existing-slide-ocr.json")
+        with patch("videonotes.gui.filedialog.askopenfilename", return_value=existing), \
+             patch("videonotes.gui.filedialog.asksaveasfilename", return_value=destination), \
+             patch("videonotes.gui.align_slides_to_speech", return_value={
+                 "output": destination, "frames": 2,
+                 "semantic_slide_speech_match_verified": False,
+             }) as engine, \
+             patch("videonotes.gui.messagebox.showinfo") as info, \
+             patch("videonotes.gui.messagebox.showwarning") as warning:
+            self._button(dialog, "Powiąż OCR z wypowiedziami według czasu").invoke()
+            for _ in range(150):
+                self.root.update()
+                if not self.gui.active:
+                    break
+                time.sleep(0.02)
+            self.assertFalse(self.gui.active)
+            engine.assert_called_once_with(self.folder, Path(existing), Path(destination))
+            info.assert_called_once()
+            warning.assert_not_called()
     def test_version_history_button_opens_and_restores_selected_source_safe_snapshot(self):
         note = generate_basic_notes(self.folder, window_minutes=1)
         point = note["sections"][0]["points"][0]["id"]
