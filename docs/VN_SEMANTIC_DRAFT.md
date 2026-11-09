@@ -21,3 +21,9 @@ Podanie poprawnego ID **nie oznacza**, że parafraza lub definicja modelu jest p
 Flagi CLI \`-m\`, \`-f\`, \`-n\`, \`--temp\`, \`--no-display-prompt\`, \`--json-schema-file\` bazują na współczesnym interfejsie llama.cpp. Trzeba użyć aktualnej, lokalnej instalacji. W praktyce potrzebne są testy modelu, rozdziałów, wielogodzinnej transkrypcji i ręcznej oceny jakości. VN-02 i VN-03 pozostają **W TRAKCIE**, nie DONE.
 
 Testy jednostkowe obejmują format JSON, cytaty z ID/czasem, prywatny plik promptu, odmowę dla nieznanego ID, brak nadpisania i przerwany lokalny proces. Model jest atrapą, więc **nie jest to test realnej jakości LLM**.
+
+## Ograniczanie niepopartych liczb, adresów i skrótów (09.11.2026)
+
+Model nie może swobodnie dopisywać nowych **dosłownych liczb**, adresów IP, portów i wielkimi literami zapisanych skrótów technicznych, których nie ma w przypisanych fragmentach transkrypcji. Lokalny filtr odrzuca cały szkic bez zapisu, jeżeli któraś z tych cech nie ma śladu w cytowanych źródłach. Kontrola obejmuje też nagłówki i ponowną weryfikację wcześniej utworzonych plików. Dzięki temu dokument nie przejdzie weryfikatora tylko dlatego, że model podał poprawny, lecz nieistotny identyfikator źródłowy.
+
+**Nie jest to weryfikacja faktów.** Dwa różne zdania mogą używać identycznych liczb i skrótów, a mimo to znaczyć coś innego. Program może też konserwatywnie odrzucić poprawne parafrazy z przekształconymi jednostkami, numeracją lub niepopartymi formalnie akronimami. Częściowo edytowane stare szkice mogą teraz wymagać ponownego wygenerowania. Liczby zapisane słownie oraz logiczne wnioskowanie nie są przez ten filtr potwierdzane. Wszystkie rezultaty pozostają oznaczone jako niezweryfikowane, wymagające kontroli człowieka.

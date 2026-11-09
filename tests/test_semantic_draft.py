@@ -67,6 +67,58 @@ class SemanticDraftTest(unittest.TestCase):
         self.assertIn("NIEZWERYFIKOWANY", markdown)
         self.assertIn("c0000000-s00000", markdown)
 
+    def test_unsourced_number_or_acronym_is_not_published(self):
+        import sys
+        for statement, expected in (
+            ("Router używa portu 65535.", "liczby"),
+            ("Opisano protokół BGP.", "skrót"),
+            ("Adres 192.168.1.1 jest bramą.", "liczby"),
+        ):
+            def fake_llm(argv, **options):
+                options["stdout"].write(json.dumps({
+                    "heading": "Wykład o sieciach",
+                    "claims": [{"text": statement, "source_ids": ["c0000000-s00000"]}],
+                }).encode("utf-8"))
+                return CompletedProcess(argv, 0)
+            with self.subTest(statement=statement), self.assertRaisesRegex(VideoNotesError, expected):
+                create_semantic_draft(self.project, self.result, model=self.model,
+                                      llama_cli=sys.executable, runner=fake_llm)
+            self.assertFalse(self.result.exists())
+
+    def test_technical_identifiers_quoted_from_source_are_allowed_but_not_verified(self):
+        import sys
+        def grounded(argv, **options):
+            options["stdout"].write(json.dumps({
+                "heading": "Wykład o TCP i DHCP",
+                "claims": [{"text": "TCP oraz DHCP występują w wypowiedzi.",
+                            "source_ids": ["c0000000-s00000"]}],
+            }).encode("utf-8"))
+            return CompletedProcess(argv, 0)
+        result = create_semantic_draft(self.project, self.result, model=self.model,
+                                       llama_cli=sys.executable, runner=grounded)
+        self.assertFalse(result["semantic_facts_verified"])
+        self.assertTrue(verify_semantic_draft(self.project, self.result)["verified_source_citations"])
+        saved = load_json(self.result)
+        saved["sections"][0]["claims"][0]["text"] = "Wykład poleca BGP oraz port 9999."
+        save_json(self.result, saved)
+        with self.assertRaisesRegex(VideoNotesError, "liczby"):
+            verify_semantic_draft(self.project, self.result)
+        self.assertFalse(self.md.exists())
+
+    def test_unsourced_uppercase_or_numeric_heading_is_rejected(self):
+        import sys
+        def invented_heading(argv, **options):
+            options["stdout"].write(json.dumps({
+                "heading": "Analiza BGP 999",
+                "claims": [{"text": "Wykład dotyczy sieci.",
+                            "source_ids": ["c0000000-s00000"]}],
+            }).encode("utf-8"))
+            return CompletedProcess(argv, 0)
+        with self.assertRaises(VideoNotesError):
+            create_semantic_draft(self.project, self.result, model=self.model,
+                                  llama_cli=sys.executable, runner=invented_heading)
+        self.assertFalse(self.result.exists())
+
     def test_unknown_model_claim_rejects_without_output(self):
         def unsupported(argv, **options):
             options["stdout"].write(json.dumps({

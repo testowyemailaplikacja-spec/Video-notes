@@ -225,3 +225,5 @@ Aplikacja Tk oferuje również przycisk „Zakończone nagranie mikrofonowe → 
 ## Łączenie odczytanych slajdów i transkrypcji według czasu (VN-03B)
 
 `slide-align --ocr raport-ocr.json --output NOWY-indeks.json` przypisuje rozpoznane fragmenty obrazu do **najbliższych w czasie** segmentów mowy, bez twierdzenia, że temat jest zgodny. `slide-align-verify` odtwarza wyniki z aktualnego źródła, a `slide-align-md` eksportuje dosłowne OCR i cytaty. W GUI działa przycisk „Powiąż OCR z wypowiedziami według czasu”. [Instrukcja](docs/VN03_SLIDE_TRANSCRIPT_TIME_ALIGNMENT.md). Wszystkie powiązania wymagają sprawdzenia przez człowieka.
+
+Lokalne szkice semantyczne zawierają dodatkowo konserwatywną kontrolę liczb, adresów i skrótów technicznych względem cytowanych fragmentów. Niepoparte identyfikatory powodują odmowę zapisu lub weryfikacji. To ograniczenie halucynacji, nie potwierdzenie poprawności merytorycznej. [Szczegóły](docs/VN_SEMANTIC_DRAFT.md).
