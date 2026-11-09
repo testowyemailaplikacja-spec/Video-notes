@@ -28,6 +28,7 @@ from .diagnostics import diagnose_local_install
 from .slide_ocr import extract_slide_ocr, verify_slide_ocr
 from .semantic_draft import create_semantic_draft, verify_semantic_draft, export_semantic_markdown
 from .record_pipeline import transcribe_finished_session
+from .source_player import play_source_segment
 from .installer import build_internal_installer
 from .pipeline import create_project, transcribe_project, transcription_lock_status, recover_stale_transcription_lock
 from .storage import read_project
@@ -236,6 +237,12 @@ def parser() -> argparse.ArgumentParser:
     record_to_asr.add_argument("--chunk-seconds", type=int, default=30)
     record_to_asr.add_argument("--ffmpeg", default="ffmpeg")
     record_to_asr.add_argument("--ffprobe", default="ffprobe")
+    source_player = sub.add_parser("play-source", help="Odsłuchaj krótki fragment z oryginalnej wybranej ścieżki OBS (FFplay)")
+    source_player.add_argument("project", type=Path)
+    source_player.add_argument("--segment", required=True)
+    source_player.add_argument("--seconds", type=int, default=15)
+    source_player.add_argument("--ffmpeg", default="ffmpeg")
+    source_player.add_argument("--ffplay", default="ffplay")
     sub.add_parser("gui", help="Uruchom prosty interfejs Windows/Tkinter")
     return cmd
 
@@ -431,6 +438,10 @@ def main(argv: list[str] | None = None) -> int:
                             language=args.language, chunk_seconds=args.chunk_seconds,
                             ffmpeg=args.ffmpeg, ffprobe=args.ffprobe, progress=_progress)
             print(json.dumps(report, ensure_ascii=False, indent=2))
+        elif args.action == "play-source":
+            print(json.dumps(play_source_segment(args.project, args.segment,
+                seconds=args.seconds, ffmpeg=args.ffmpeg, ffplay=args.ffplay),
+                ensure_ascii=False, indent=2))
         elif args.action == "gui":
             from .gui import launch
             launch()

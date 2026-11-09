@@ -217,3 +217,7 @@ Nowe polecenie `record-transcribe` obsługuje sesje WAV po pauzach, wymaga zgód
 W aplikacji desktopowej dodano przycisk **„OCR slajdów i lokalne szkice AI (wymagają kontroli)”**. Otwiera osobne narzędzia do tworzenia szkicu semantycznego, OCR slajdów, eksportu Markdown i weryfikacji źródeł. Dłuższe operacje uruchamiane są w osobnym wątku bez blokowania okna; nie ma automatycznej synchronizacji ani wysyłki danych. Wyniki pozostają oznaczone jako niezweryfikowane. Testy prawdziwych widżetów Tk w CI nie zastępują odbioru na fizycznym Windows.
 
 Aplikacja Tk oferuje również przycisk „Zakończone nagranie mikrofonowe → transkrypcja całej sesji”: jawny wybór zakończonej sesji, pustego folderu, ewentualnego WAV i modelu, potem wspólny proces ASR z postępem i bezpiecznym przerwaniem. Źródłowe nagrania są zachowywane.
+
+## Ręczny odsłuch cytatu z oryginalnego źródła (VN-02)
+
+`python -m videonotes play-source KATALOG_PROJEKTU --segment ID --seconds 15` (lub przycisk „Odtwórz zaznaczony fragment z nagrania” w GUI) weryfikuje SHA-256 oryginalnego nagrania, wybiera faktyczną ścieżkę audio projektu, wycina krótkie WAV i uruchamia lokalny FFplay. Wymaga osobno zainstalowanego FFplay; nie ingeruje w edycje ani nie przesyła materiałów. [Instrukcja i ograniczenia](docs/VN02_SOURCE_AUDIO_PLAYBACK.md).
