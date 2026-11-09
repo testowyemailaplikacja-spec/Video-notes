@@ -21,7 +21,8 @@
         "PR #7: code for actual local whisper.cpp vs faster-whisper CPU comparison on same audio (CI mocks only)",
         "PR #52: real local whisper.cpp CPU multilingual tiny PL/EN TTS 13.004s/11.315s, 3/2 nonempty recognized segments and source-grounded exports; pinned model verified, ephemeral CI 42426108460 PASS. Synthetic voices, NO natural speech WER/CER/Windows.",
         "PR #55: real whisper.cpp vs faster-whisper PL/EN multilingual tiny CPU on same local synthetic TTS WAV; verified model SHA, WER/CER, elapsed time and peak RSS for both engines in GitHub Actions 42428095863 PASS; no natural lecture or physical Windows acceptance.",
-        "PR #87: read-only offline `doctor` CLI: actual FFmpeg/FFprobe version preflight, local model SHA-256/size, optional media metadata and disk space, privacy-redacted JSON. All 7 source/browser Linux+Windows, private synthetic installer and Windows DEV EXE CI jobs PASS (42497172591, 42497172589, 42497172532). NOT real ASR inference, human speech WER/CER or physical Windows acceptance."
+        "PR #87: read-only offline `doctor` CLI: actual FFmpeg/FFprobe version preflight, local model SHA-256/size, optional media metadata and disk space, privacy-redacted JSON. All 7 source/browser Linux+Windows, private synthetic installer and Windows DEV EXE CI jobs PASS (42497172591, 42497172589, 42497172532). NOT real ASR inference, human speech WER/CER or physical Windows acceptance.",
+        "PR #101: new `doctor` optional local FFplay/Tesseract OCR language, llama-cli presence and GGUF header+SHA diagnostics. Linux/Windows Python/browser CI 5/5 PASS (42602054884), Windows DEV EXE 1/1 PASS (42602055432), private synthetic Inno 1/1 PASS (42602055238). No real model load, ASR WER/CER, system-airgap measurement or physical Windows acceptance."
       ],
       "blockers": [
         "Real local PL/EN ASR benchmarks on legal OBS clips",
@@ -76,7 +77,8 @@
         "PR #90: optional local llama.cpp GGUF semantic draft engine with JSON-schema-constrained source IDs, quote/time provenance, no-clobber and human-review flags; Linux/Windows source/browser, Windows DEV EXE, Inno synthetic CI 7/7 jobs PASS (42536188092, 42536188114, 42536188119). Tests use stub responses; no real LLM quality or human factual acceptance.",
         "PR #92: optional desktop Tk window for generating local semantic draft, verifying citations, exporting Markdown and honoring unsaved ASR drafts; real hosted Windows Tk/Linux Xvfb + 5 source/browser jobs + Windows DEV EXE 8/8 PASS (42537008193, 42537008197, 42537008206). No physical Windows/human evaluation.",
         "PR #96: source-linked FFplay audio preview from transcript editor / navigated note citations, original OBS selected stream via real FFmpeg, before/after size+SHA-256, ephemeral WAV, redacted errors and no transcript/draft mutation. All nine final CI jobs PASS: 42595929705 (Tk Win+Linux, 2/2), 42595929720 (source+browser 5/5), 42595929769 (private synthetic Inno 1/1), 42595929879 (Windows DEV EXE 1/1). Actual FFplay speakers/device Windows and real user lecture NOT_RUN. FFplay optional not bundled.",
-        "PR #98: new fail-closed evidence-literal guard rejects unsourced numeric tokens, IP addresses and uppercase technical acronyms in local LLM semantic drafts, at generation and in `semantic-verify`; tests positive grounded TCP/DHCP/IPv4 and negative port 65535/BGP/tampered saved claim. Final source/browser 5/5 PASS run 42597232583, Windows DEV EXE 1/1 PASS run 42597232588. Still not semantic truth validation or actual GGUF human quality acceptance."
+        "PR #98: new fail-closed evidence-literal guard rejects unsourced numeric tokens, IP addresses and uppercase technical acronyms in local LLM semantic drafts, at generation and in `semantic-verify`; tests positive grounded TCP/DHCP/IPv4 and negative port 65535/BGP/tampered saved claim. Final source/browser 5/5 PASS run 42597232583, Windows DEV EXE 1/1 PASS run 42597232588. Still not semantic truth validation or actual GGUF human quality acceptance.",
+        "PR #100: cross-process `.transcript-edits.lock` shared by CLI/Tk manual edit_segment and opt-in web corrections apply; read/validate/write under one cooperative lock; stale-PID inspect/recover with explicit --confirm, real Python subprocess race and no-loss tests on Linux/hosted Windows, 7/7 CI PASS (42601392194, 42601392182, 42601392249). Raw ASR unaffected. Does not protect external programs directly writing edits.json."
       ],
       "blockers": [
         "Human assessment on real lectures",
@@ -168,7 +170,8 @@
         "PR #40: atomically publish pre-verified internal bundle directory without replacing racing empty destination: Windows rename, Linux renameat2(RENAME_NOREPLACE); race regression, Linux/Windows source+browser CI and Windows DEV EXE PASS; no actual installer or hardware test.",
         "PR #73: genuine Inno Setup private Windows offline EXE builder from exact locally verified owner-provided app/FFmpeg/FFprobe/Whisper/model bundle, atomic no-clobber, per-user installation/uninstall; Windows hosted CI compiled a REAL Inno installer with intentionally unusable synthetic binaries, silently installed, checked hashes and uninstalled, 7/7 PASS (42475888625, 42475888581, 42475888631). Not genuine model runtime offline hardware, release license, signing, or public distribution.",
         "PR #86: internal-only SPDX 2.3 file inventory with five exact bundle-manifest SHA-256 files, license=NOASSERTION, verification before/after and no-clobber export outside bundle; Linux+Windows, browser, Inno synthetic install and Windows DEV EXE CI 7/7 PASS (42496858013, 42496858049, 42496858068). No legal clearance, AV/signing or public release.",
-        "PR #87: read-only local `doctor` dependency/disk/model/media checks; 7/7 CI jobs PASS (42497172591, 42497172589, 42497172532). Exposes all unsatisfied hardware/license/asr acceptance flags as false."
+        "PR #87: read-only local `doctor` dependency/disk/model/media checks; 7/7 CI jobs PASS (42497172591, 42497172589, 42497172532). Exposes all unsatisfied hardware/license/asr acceptance flags as false.",
+        "PR #101: offline `doctor` extended with optional FFplay version, Tesseract response and installed `pol+eng` language codes, llama-cli presence, local GGUF header/SHA; candidate capability flags intentionally do not assert model compatibility, inference, license, physical Windows, AV/SmartScreen or signed installer. Final 7/7 CI PASS (42602054884,42602055238,42602055432)."
       ],
       "blockers": [
         "Public release-quality and signed Windows installer with legally cleared model/runtime; private Inno Setup EXE with user-supplied dependencies exists and synthetic install/uninstall CI passes",
@@ -192,7 +195,8 @@
         "PR #33: 50,000 synthetic segments imported/searched/paginated in real Chromium Linux, Chrome and Edge Windows CI, keyboard focus/ARIA and no HTTP(S) resource requests PASS; 207ms Linux, 160ms Chrome Windows, 109ms Edge Windows CI; not physical screen-reader or full WEB-02 acceptance.",
         "PR #35: real headless Firefox file:// WebDriver on Ubuntu runner, local import/edit/export and synthetic 50k/focus scenario PASS alongside 4 existing CI jobs, workflow 42416372511; not physical Windows Firefox or screen-reader acceptance.",
         "PR #70: genuine Tkinter widget interactions run on GitHub-hosted Windows 3.13 VM as well as Ubuntu Xvfb, without skipping, with note history/crash/draft guards and full-WAV selection, source/browser and GUI CI 7/7 PASS (42469389311 and 42469389310). Does not constitute physical Windows, screen reader or full offline installation acceptance.",
-        "PR #85: local browser web-corrections-v1 patch (only changed segments, ID/time/before/after) + desktop CLI `import-web-edits` preview and opt-in --apply with conflict rejection and raw-ASR preservation; real Chrome/Edge Windows, Firefox/Chromium Linux, source Windows/Linux, private Inno synthetic install, Windows DEV EXE 7/7 CI PASS (42496562215, 42496562164, 42496562085); merged to develop `deaef2a4`. Not a Wiedora portal deployment or full web ASR."
+        "PR #85: local browser web-corrections-v1 patch (only changed segments, ID/time/before/after) + desktop CLI `import-web-edits` preview and opt-in --apply with conflict rejection and raw-ASR preservation; real Chrome/Edge Windows, Firefox/Chromium Linux, source Windows/Linux, private Inno synthetic install, Windows DEV EXE 7/7 CI PASS (42496562215, 42496562164, 42496562085); merged to develop `deaef2a4`. Not a Wiedora portal deployment or full web ASR.",
+        "PR #100: web→desktop imported patch and concurrent manual edits serialized under one per-project process lock; preview stays read-only, stale recovery opt-in, tests actual separate process, 7/7 CI PASS (42601392194,42601392182,42601392249). Does not deploy or enable browser ASR / Wiedora portal."
       ],
       "blockers": [
         "Physical Windows Firefox/Chrome/Edge browser tests, keyboard and screen-reader accessibility acceptance; headless Firefox Linux and Chrome/Edge Windows CI are not human acceptance",
@@ -1249,6 +1253,54 @@
       "real_asr": false,
       "physical_windows_acceptance": false,
       "human_lecture_review": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42601392194",
+      "scope": "PR #100: Source Python Linux/Windows + browser Chromium/Chrome+Edge/Firefox 5/5",
+      "result": "PASS",
+      "physical_windows_acceptance": false,
+      "real_user_lectures": false,
+      "model_or_license_acceptance": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42601392182",
+      "scope": "PR #100: Windows DEV EXE 1/1",
+      "result": "PASS",
+      "physical_windows_acceptance": false,
+      "real_user_lectures": false,
+      "model_or_license_acceptance": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42601392249",
+      "scope": "PR #100: private Windows Inno synthetic installer 1/1",
+      "result": "PASS",
+      "physical_windows_acceptance": false,
+      "real_user_lectures": false,
+      "model_or_license_acceptance": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42602054884",
+      "scope": "PR #101: Source Python Linux/Windows + browser Chromium/Chrome+Edge/Firefox 5/5",
+      "result": "PASS",
+      "physical_windows_acceptance": false,
+      "real_user_lectures": false,
+      "model_or_license_acceptance": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42602055238",
+      "scope": "PR #101: Windows DEV EXE 1/1",
+      "result": "PASS",
+      "physical_windows_acceptance": false,
+      "real_user_lectures": false,
+      "model_or_license_acceptance": false
+    },
+    {
+      "workflow": "https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/42602055432",
+      "scope": "PR #101: private Windows Inno synthetic installer 1/1",
+      "result": "PASS",
+      "physical_windows_acceptance": false,
+      "real_user_lectures": false,
+      "model_or_license_acceptance": false
     }
   ],
   "notes": [
@@ -1273,7 +1325,8 @@
     "2026-11-08: PR #51–54 and #56–57 CI-verified and merged: durable note transaction intent, true whisper.cpp TTS PL/EN, Xvfb Tk GUI, optional LibreOffice PDF, actual 121min compressed FFmpeg with stub ASR, PID-only stale note lock recovery. No human-lecture ASR, 2h real Whisper or physical Windows installer; 0/9 stages DONE unchanged.",
     "2026-11-08: PR #85/#86/#87 fully CI-verified and squash-merged into develop: browser→desktop safe correction patch; internal SPDX 2.3 inventory with unverified licenses; read-only offline dependency/model/media/disk preflight. GitHub Actions 42496562215/62164/62085; 42496858013/58049/58068; 42497172591/72589/72532: 7/7 jobs per PR PASS. No natural lectures, physical Windows microphone/loopback/offline, signed/licensed installer or Wiedora staging integration. VN-00..VN-07 still W TRAKCIE, VN-08 PLANOWANE, 0 DONE.",
     "2026-11-09 (local Europe/Warsaw, CI GitHub timestamps 2026-11-08 UTC): PR #89–93 verified at their FINAL heads, merged to develop: optional video frame OCR with real FFmpeg/Tesseract original synthetic slide; optional offline source-cited llama.cpp DRAFT with stubbed LLM in CI; complete finished WAV→same ASR CLI and GUI with cancellation; optional Tk GUI for OCR/LLM. 38/38 CI jobs PASS after reruns fixing discovered failures. No real human lecture semantics, genuine GGUF model acceptance, 2h physical microphone, licensed offline release or Wiedora host integration. 0 DONE, VN-00..VN-07 W_TRAKCIE, VN-08 PLANOWANE.",
-    "2026-11-09: PR #96/#97/#98 verified and squash-merged to `develop` (source preview original selected OBS stream through local FFmpeg/FFplay, OCR frame-to-nearby-speech time-only index, source-literal numeric/IP/acronym anti-hallucination guard for semantic drafts). 24/24 final GitHub CI jobs PASS (source Linux/Windows, browsers, hosted Tk, dev Windows EXE, private synthetic Inno). No physical Windows microphone/offline speaker test, genuine human lectures, real LLAMA GGUF semantic quality, fully licensed public installer or authorized Wiedora integration; 0/9 DONE."
+    "2026-11-09: PR #96/#97/#98 verified and squash-merged to `develop` (source preview original selected OBS stream through local FFmpeg/FFplay, OCR frame-to-nearby-speech time-only index, source-literal numeric/IP/acronym anti-hallucination guard for semantic drafts). 24/24 final GitHub CI jobs PASS (source Linux/Windows, browsers, hosted Tk, dev Windows EXE, private synthetic Inno). No physical Windows microphone/offline speaker test, genuine human lectures, real LLAMA GGUF semantic quality, fully licensed public installer or authorized Wiedora integration; 0/9 DONE.",
+    "2026-11-09: PR #100/#101 merged to develop. Cross-process manual GUI/CLI and web patch writes now share fail-closed `.transcript-edits.lock` and explicit stale recovery. `doctor` now reports optional FFplay/Tesseract languages/llama-cli/GGUF header+hash without running LLM. 14/14 final CI jobs PASS (standard source Windows/Linux 10, DEV EXE 2, private synthetic Inno 2); real user recording, hardware, licensed release, actual LLM/OCR semantic quality and Wiedora deployment NOT_RUN. Formal 0 DONE, 8 W_TRAKCIE, 1 PLANOWANE."
   ],
   "last_verified_develop_before_pr8": "344e227571ba09802da8a8bea7c50498473dc2e6"
 }
