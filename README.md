@@ -231,3 +231,7 @@ Lokalne szkice semantyczne zawierają dodatkowo konserwatywną kontrolę liczb, 
 ## Ochrona przed utratą równoległych poprawek (VN-02/VN-07)
 
 Ręczne zmiany w edytorze i import `import-web-edits --apply` korzystają z jednej **kooperacyjnej blokady pliku**. Jednoczesny zapis drugiego procesu jest odrzucany, bez nadpisania starszych poprawek. `edit-lock-status KATALOG` pokazuje aktywny/osierocony proces; `edit-lock-recover KATALOG --confirm` pozwala świadomie usunąć wyłącznie potwierdzoną blokadę po martwym procesie. Nie dotyczy edytorów zewnętrznych piszących bezpośrednio do `edits.json`. [Instrukcja](docs/KWN_EDIT_LOCK.md).
+
+## Diagnostyka dodatkowych narzędzi offline
+
+`doctor` sprawdza teraz opcjonalne FFplay, Tesseract wraz z językami OCR, obecność `llama-cli` oraz nagłówek i SHA-256 wskazanego lokalnego modelu GGUF. Nie uruchamia wnioskowania, nie wysyła danych, nie potwierdza licencji ani wydania gotowego na instalację. [Instrukcja](docs/VN_OFFLINE_DIAGNOSTICS.md).

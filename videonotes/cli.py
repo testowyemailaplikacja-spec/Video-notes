@@ -206,6 +206,11 @@ def parser() -> argparse.ArgumentParser:
     doctor.add_argument("--model", type=Path)
     doctor.add_argument("--source", type=Path, help="Opcjonalny lokalny plik OBS/audio do odczytu ścieżek")
     doctor.add_argument("--workspace", type=Path, help="Opcjonalny katalog na projekty do pomiaru wolnego miejsca")
+    doctor.add_argument("--ffplay", help="Opcjonalne lokalne FFplay do odsłuchu źródła")
+    doctor.add_argument("--tesseract", help="Opcjonalny lokalny Tesseract OCR")
+    doctor.add_argument("--ocr-language", default="pol+eng", help="Zestaw wcześniej zainstalowanych języków Tesseract")
+    doctor.add_argument("--llama-cli", help="Opcjonalne lokalne llama-cli; tylko obecność, bez uruchamiania modelu")
+    doctor.add_argument("--gguf-model", type=Path, help="Opcjonalny lokalny GGUF do sprawdzenia nagłówka/SHA")
     slide = sub.add_parser("slide-ocr", help="OCR klatek z lokalnego OBS (opcjonalne VN-03B)")
     slide.add_argument("project", type=Path)
     slide.add_argument("--output", required=True, type=Path)
@@ -439,7 +444,10 @@ def main(argv: list[str] | None = None) -> int:
         elif args.action == "doctor":
             report = diagnose_local_install(ffmpeg=args.ffmpeg, ffprobe=args.ffprobe,
                                             whisper_cli=args.whisper_cli, model=args.model,
-                                            source=args.source, workspace=args.workspace)
+                                            source=args.source, workspace=args.workspace,
+                                            ffplay=args.ffplay, tesseract=args.tesseract,
+                                            ocr_language=args.ocr_language, llama_cli=args.llama_cli,
+                                            gguf_model=args.gguf_model)
             print(json.dumps(report, ensure_ascii=False, indent=2))
         elif args.action == "slide-ocr":
             print(json.dumps(extract_slide_ocr(args.project, args.output, ffmpeg=args.ffmpeg,
