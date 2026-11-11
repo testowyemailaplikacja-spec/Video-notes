@@ -73,6 +73,12 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .note { margin-top: 12px; font-size: .84rem; }
 .edit-history { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .edit-history button { flex: 1 1 auto; }
+.local-media { border-top: 1px solid #dbe1e9; margin-top: 22px; padding-top: 18px; }
+.local-media h3 { font-size: 1rem; margin: 0 0 8px; }
+.local-media input[type="file"] { display: block; width: 100%; max-width: 100%; margin: 8px 0; }
+.local-media video { display: block; width: 100%; max-height: 250px; margin: 10px 0; border-radius: 8px; background: #17253a; }
+.local-media video[hidden] { display: none; }
+.local-media button { margin: 8px 0; }
 .download-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .download-actions button { min-width: 85px; }
 footer { padding: 30px 0 12px; color: #66778c; text-align: center; font-size: .83rem; }

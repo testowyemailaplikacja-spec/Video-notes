@@ -17,6 +17,8 @@
   var undoStack = [];
   var redoStack = [];
   var MAX_HISTORY = 100;
+  var mediaUrl = null;
+  var pendingSeekSeconds = null;
   var get = function (id) { return document.getElementById(id); };
   var elements = {
     source: get("source-file"), corrections: get("corrections-file"), status: get("status"), search: get("search"),
@@ -24,7 +26,9 @@
     previous: get("previous"), next: get("next"), page: get("page-number"),
     selected: get("selected-label"), text: get("edit-text"),
     save: get("save-edit"), reset: get("reset-edit"),
-    undo: get("undo-edit"), redo: get("redo-edit")
+    undo: get("undo-edit"), redo: get("redo-edit"),
+    media: get("source-media"), player: get("source-player"),
+    seek: get("seek-segment")
   };
   function message(text, error) {
     elements.status.textContent = text;
@@ -85,6 +89,78 @@
       message("Historia nie pasuje do obecnej transkrypcji. Niczego nie zmieniono.", true);
     }
   }
+
+  // Media is never copied to the transcript, stored, or uploaded. File-backed
+  // object URLs let browsers seek without loading an entire OBS video into JS RAM.
+  function updateMediaControls() {
+    elements.seek.disabled = !mediaUrl || selected === null;
+  }
+  function clearMedia() {
+    var previous = mediaUrl;
+    mediaUrl = null;
+    pendingSeekSeconds = null;
+    if (typeof elements.player.pause === "function") elements.player.pause();
+    elements.player.removeAttribute("src");
+    elements.player.hidden = true;
+    if (typeof elements.player.load === "function") elements.player.load();
+    if (previous) URL.revokeObjectURL(previous);
+    elements.media.value = "";
+    updateMediaControls();
+  }
+  function tryMediaSeek() {
+    if (!mediaUrl || pendingSeekSeconds === null || elements.player.readyState < 1) return;
+    var seconds = pendingSeekSeconds;
+    pendingSeekSeconds = null;
+    if (Number.isFinite(elements.player.duration) && seconds > elements.player.duration + 0.1) {
+      message("Czas segmentu wykracza poza wybrane nagranie. Sprawdź, czy wskazano właściwy plik.", true);
+      return;
+    }
+    try {
+      elements.player.currentTime = seconds;
+      message("Przesunięto lokalny odtwarzacz do " + core.clock(Math.round(seconds * 1000), true) +
+        ". Odtwarzanie uruchamiasz samodzielnie.", false);
+    } catch (_error) {
+      message("Nie można przejść do czasu segmentu w tym pliku.", true);
+    }
+  }
+  elements.media.addEventListener("change", function (event) {
+    var file = event.target.files && event.target.files[0];
+    if (!file) return;
+    if (!doc || !Number.isSafeInteger(file.size) || file.size <= 0) {
+      message("Najpierw wybierz transkrypcję, a potem niepusty plik audio/wideo.", true);
+      elements.media.value = "";
+      return;
+    }
+    clearMedia();
+    try {
+      mediaUrl = URL.createObjectURL(file);
+      elements.player.src = mediaUrl;
+      elements.player.hidden = false;
+      if (typeof elements.player.load === "function") elements.player.load();
+      updateMediaControls();
+      message("Wybrano nagranie lokalne. Nie jest weryfikowane automatycznie względem transkrypcji. " +
+        "Odsłuch nie rozpocznie się bez Twojego działania.", false);
+    } catch (_error) {
+      clearMedia();
+      message("Nie udało się otworzyć lokalnego pliku audio/wideo.", true);
+    }
+  });
+  elements.player.addEventListener("loadedmetadata", tryMediaSeek);
+  elements.player.addEventListener("error", function () {
+    if (!mediaUrl) return;
+    clearMedia();
+    message("Przeglądarka nie obsługuje tego nagrania lub jego kodeka. " +
+      "Wybierz obsługiwany WAV/MP3/MP4/WebM albo odtwarzaj je w aplikacji Windows.", true);
+  });
+  elements.seek.addEventListener("click", function () {
+    if (!mediaUrl || !doc || selected === null) return;
+    pendingSeekSeconds = doc.segments[selected].start_ms / 1000;
+    tryMediaSeek();
+    if (pendingSeekSeconds !== null) {
+      message("Wczytywanie nagrania. Przejście nastąpi po odczycie metadanych.", false);
+    }
+  });
+  window.addEventListener("pagehide", clearMedia);
   function setSelected(index) {
     if (index !== selected && hasPendingEdit() &&
         !window.confirm("W edytorze jest niezachowana poprawka. Odrzucić ją i przejść do innej wypowiedzi?")) return;
@@ -98,6 +174,7 @@
     elements.text.disabled = false;
     elements.save.disabled = false;
     elements.reset.disabled = false;
+    updateMediaControls();
     renderList(true);
   }
   function renderList(focusSelected) {
@@ -224,6 +301,7 @@
         message("Import anulowany: zachowano poprawki w bieżącej transkrypcji.", false);
         return;
       }
+      clearMedia(); // Do not silently align old audio against a different transcript.
       doc = loaded;
       edits = Object.create(null);
       clearHistory();
@@ -233,6 +311,7 @@
       elements.search.value = "";
       elements.search.disabled = false;
       elements.corrections.disabled = false;
+      elements.media.disabled = false;
       elements.text.disabled = true;
       elements.text.value = "";
       elements.save.disabled = true;
