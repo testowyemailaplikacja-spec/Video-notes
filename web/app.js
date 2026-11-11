@@ -28,7 +28,7 @@
     save: get("save-edit"), reset: get("reset-edit"),
     undo: get("undo-edit"), redo: get("redo-edit"),
     media: get("source-media"), player: get("source-player"),
-    seek: get("seek-segment")
+    seek: get("seek-segment"), jump: get("jump-playhead")
   };
   function message(text, error) {
     elements.status.textContent = text;
@@ -94,6 +94,7 @@
   // object URLs let browsers seek without loading an entire OBS video into JS RAM.
   function updateMediaControls() {
     elements.seek.disabled = !mediaUrl || selected === null;
+    elements.jump.disabled = !mediaUrl || !doc || elements.player.readyState < 1;
   }
   function clearMedia() {
     var previous = mediaUrl;
@@ -145,7 +146,10 @@
       message("Nie udało się otworzyć lokalnego pliku audio/wideo.", true);
     }
   });
-  elements.player.addEventListener("loadedmetadata", tryMediaSeek);
+  elements.player.addEventListener("loadedmetadata", function () {
+    updateMediaControls();
+    tryMediaSeek();
+  });
   elements.player.addEventListener("error", function () {
     if (!mediaUrl) return;
     clearMedia();
@@ -160,13 +164,36 @@
       message("Wczytywanie nagrania. Przejście nastąpi po odczycie metadanych.", false);
     }
   });
+  elements.jump.addEventListener("click", function () {
+    if (!mediaUrl || !doc || elements.player.readyState < 1) return;
+    var seconds = elements.player.currentTime;
+    if (!Number.isFinite(seconds) || seconds < 0 || seconds > 86400) {
+      message("Odtwarzacz nie udostępnia prawidłowego czasu.", true);
+      return;
+    }
+    var index = core.locateAtTime(doc.segments, Math.round(seconds * 1000));
+    if (setSelected(index, true)) {
+      message("Wybrano ostatnią rozpoczętą wypowiedź dla czasu " +
+        core.clock(Math.round(seconds * 1000), true) +
+        ". Nie potwierdza to zgodności nagrania z transkrypcją.", false);
+    }
+  });
   window.addEventListener("pagehide", clearMedia);
-  function setSelected(index) {
+  function setSelected(index, reveal) {
     if (index !== selected && hasPendingEdit() &&
-        !window.confirm("W edytorze jest niezachowana poprawka. Odrzucić ją i przejść do innej wypowiedzi?")) return;
+        !window.confirm("W edytorze jest niezachowana poprawka. Odrzucić ją i przejść do innej wypowiedzi?")) return false;
     if (!doc) return;
     var item = doc.segments[index];
-    if (!item) return;
+    if (!item) return false;
+    if (reveal) {
+      var found = matches.indexOf(index);
+      if (found < 0) {
+        elements.search.value = "";
+        matches = core.search(doc, edits, "");
+        found = index;
+      }
+      page = Math.floor(found / PAGE_SIZE);
+    }
     selected = index;
     elements.selected.textContent = "Segment " + item.id + " · " +
       core.clock(item.start_ms, true).slice(0, 8);
@@ -176,6 +203,7 @@
     elements.reset.disabled = false;
     updateMediaControls();
     renderList(true);
+    return true;
   }
   function renderList(focusSelected) {
     elements.rows.replaceChildren();

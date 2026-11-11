@@ -229,6 +229,21 @@
     }
     return result;
   }
+  // The controller holds a validated, start-time-sorted export. Find the last
+  // started segment in O(log n), including overlapping cues and silent gaps.
+  // This does NOT claim that the imported audio actually matches the transcript.
+  function locateAtTime(segments, millis) {
+    if (!Array.isArray(segments) || !segments.length || !validTime(millis)) {
+      reject("Nieprawidłowy czas odtwarzania lub pusta transkrypcja.");
+    }
+    var left = 0, right = segments.length;
+    while (left < right) {
+      var mid = left + Math.floor((right - left) / 2);
+      if (segments[mid].start_ms <= millis) left = mid + 1;
+      else right = mid;
+    }
+    return Math.max(0, left - 1);
+  }
   function search(model, edits, term) {
     var doc = validateExport(model);
     var query = String(term || "").trim().toLocaleLowerCase();
@@ -248,7 +263,7 @@
     parseExport: parseExport, validateExport: validateExport,
     clock: clock, corrected: corrected, renderExport: renderExport,
     renderExports: renderExports, renderCorrections: renderCorrections,
-    parseCorrections: parseCorrections,
+    parseCorrections: parseCorrections, locateAtTime: locateAtTime,
     search: search
   };
   if (typeof module !== "undefined" && module.exports) module.exports = core;
