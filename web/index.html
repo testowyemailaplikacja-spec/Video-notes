@@ -71,6 +71,10 @@
           <textarea id="edit-text" rows="10" disabled spellcheck="true"></textarea>
           <button id="save-edit" class="primary" disabled>Zachowaj poprawkę</button>
           <button id="reset-edit" disabled>Przywróć tekst z pliku</button>
+          <div class="edit-history" role="group" aria-label="Historia zapisanych poprawek">
+            <button id="undo-edit" type="button" disabled>Cofnij zmianę</button>
+            <button id="redo-edit" type="button" disabled>Ponów zmianę</button>
+          </div>
           <p class="note">Przywrócenie dotyczy tekstu z zaimportowanego JSON (nie surowego ASR). Aby zachować poprawki, pobierz nowy plik. Oryginał pozostaje bez zmian.</p>
         </aside>
       </div>

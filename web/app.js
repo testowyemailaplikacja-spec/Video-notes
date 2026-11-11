@@ -13,13 +13,18 @@
   var patchRevision = 0;
   // Track new edits made while an asynchronous file import is in flight.
   var editRevision = 0;
+  // Bounded in-memory history: a correction is recorded only when explicitly saved.
+  var undoStack = [];
+  var redoStack = [];
+  var MAX_HISTORY = 100;
   var get = function (id) { return document.getElementById(id); };
   var elements = {
     source: get("source-file"), corrections: get("corrections-file"), status: get("status"), search: get("search"),
     count: get("match-count"), edits: get("edit-count"), rows: get("segment-rows"),
     previous: get("previous"), next: get("next"), page: get("page-number"),
     selected: get("selected-label"), text: get("edit-text"),
-    save: get("save-edit"), reset: get("reset-edit")
+    save: get("save-edit"), reset: get("reset-edit"),
+    undo: get("undo-edit"), redo: get("redo-edit")
   };
   function message(text, error) {
     elements.status.textContent = text;
@@ -34,6 +39,51 @@
   }
   function hasUnsavedWork() {
     return Boolean(Object.keys(edits).length || hasPendingEdit());
+  }
+  function updateHistoryControls() {
+    elements.undo.disabled = !undoStack.length;
+    elements.redo.disabled = !redoStack.length;
+  }
+  function recordChange(id, before, after) {
+    if (before === after) return;
+    undoStack.push({id: id, before: before, after: after});
+    if (undoStack.length > MAX_HISTORY) undoStack.shift();
+    redoStack.length = 0;
+    updateHistoryControls();
+  }
+  function clearHistory() {
+    undoStack.length = 0;
+    redoStack.length = 0;
+    updateHistoryControls();
+  }
+  function setEditedValue(id, value) {
+    var item = doc.segments.find(function (s) { return s.id === id; });
+    if (!item) throw new Error("Brak segmentu w historii edycji.");
+    if (value === item.text) delete edits[id];
+    else edits[id] = value;
+    if (selected !== null && doc.segments[selected].id === id) {
+      elements.text.value = value;
+    }
+    matches = core.search(doc, edits, elements.search.value);
+    renderList();
+  }
+  function travelHistory(source, target, operation) {
+    if (!doc || !source.length) return;
+    if (hasPendingEdit() && !window.confirm(
+      "W edytorze jest niezapisany tekst. Czy odrzucić tę wersję i " + operation + " zapisaną poprawkę?"
+    )) return;
+    var item = source.pop();
+    try {
+      setEditedValue(item.id, operation === "cofnąć" ? item.before : item.after);
+      target.push(item);
+      editRevision += 1;
+      updateHistoryControls();
+      message(operation === "cofnąć" ? "Cofnięto jedną zapisaną poprawkę." : "Ponowiono jedną zapisaną poprawkę.", false);
+    } catch (_error) {
+      source.push(item);
+      updateHistoryControls();
+      message("Historia nie pasuje do obecnej transkrypcji. Niczego nie zmieniono.", true);
+    }
   }
   function setSelected(index) {
     if (index !== selected && hasPendingEdit() &&
@@ -122,9 +172,11 @@
       return;
     }
     var item = doc.segments[selected];
+    var before = current(item);
     editRevision += 1;
     if (text === item.text) delete edits[item.id];
     else edits[item.id] = text;
+    recordChange(item.id, before, text);
     matches = core.search(doc, edits, elements.search.value);
     renderList();
     message("Poprawkę zachowano tylko w pamięci strony. Pobierz plik, aby nie utracić zmian.", false);
@@ -135,12 +187,20 @@
       "W edytorze jest niezapisana poprawka. Odrzucić ją i przywrócić tekst z importowanego pliku?"
     )) return;
     var item = doc.segments[selected];
+    var before = current(item);
     editRevision += 1;
     delete edits[item.id];
     elements.text.value = item.text;
+    recordChange(item.id, before, item.text);
     matches = core.search(doc, edits, elements.search.value);
     renderList();
     message("Przywrócono segment z importowanego pliku. Źródło na dysku pozostaje bez zmian.", false);
+  });
+  elements.undo.addEventListener("click", function () {
+    travelHistory(undoStack, redoStack, "cofnąć");
+  });
+  elements.redo.addEventListener("click", function () {
+    travelHistory(redoStack, undoStack, "ponowić");
   });
   elements.source.addEventListener("change", async function (event) {
     var file = event.target.files && event.target.files[0];
@@ -166,6 +226,7 @@
       }
       doc = loaded;
       edits = Object.create(null);
+      clearHistory();
       selected = null;
       page = 0;
       matches = core.search(doc, edits, "");
@@ -220,6 +281,7 @@
         return;
       }
       edits = restored;
+      clearHistory(); // A restored patch is a new editing baseline, not a fake history entry.
       editRevision += 1;
       matches = core.search(doc, edits, elements.search.value);
       page = 0;
