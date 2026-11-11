@@ -8,6 +8,45 @@
   var MAX_BYTES = 20 * 1024 * 1024;
   var MAX_SEGMENTS = 50000;
   var MAX_TEXT = 10000;
+  // Output cap is independent of the 20 MiB imported source limit:
+  // up to 50k independently edited 10k-character segments could otherwise
+  // trigger a hundreds-of-megabytes Blob/string allocation.
+  var MAX_OUTPUT_BYTES = 64 * 1024 * 1024;
+  // Desktop import-web-edits accepts at most 20 MiB.
+  var MAX_PATCH_BYTES = 20 * 1024 * 1024;
+  function exportTooLarge(limit) {
+    reject("Eksport przekroczył limit " + (limit / (1024 * 1024)) +
+      " MiB. Podziel transkrypcję lub skróć poprawki; oryginał i edycje pozostają bez zmian.");
+  }
+  // Conservative, constant-memory preflight before constructing huge output strings.
+  // The count includes per-segment JSON/cue overhead; after rendering a precise
+  // UTF-8 byte check catches escaping and non-ASCII expansion.
+  function checkBudget(doc, edits, patchOnly) {
+    var size = 128;
+    for (var item of doc.segments) {
+      var edited = Object.prototype.hasOwnProperty.call(edits, item.id) ? edits[item.id] : item.text;
+      if (patchOnly && edited === item.text) continue;
+      size += 256 + edited.length + (patchOnly ? item.text.length : 0);
+      if (size > (patchOnly ? MAX_PATCH_BYTES : MAX_OUTPUT_BYTES)) exportTooLarge(patchOnly ? MAX_PATCH_BYTES : MAX_OUTPUT_BYTES);
+    }
+  }
+  function utf8BytesUnderLimit(payload, limit) {
+    limit = limit || MAX_OUTPUT_BYTES;
+    if (payload.length > limit) exportTooLarge(limit);
+    var count = 0;
+    for (var i = 0; i < payload.length; i++) {
+      var ch = payload.charCodeAt(i);
+      if (ch < 0x80) count++;
+      else if (ch < 0x800) count += 2;
+      else if (ch >= 0xd800 && ch <= 0xdbff &&
+               i + 1 < payload.length &&
+               payload.charCodeAt(i + 1) >= 0xdc00 &&
+               payload.charCodeAt(i + 1) <= 0xdfff) { count += 4; i++; }
+      else count += 3;
+      if (count > limit) exportTooLarge(limit);
+    }
+    return payload;
+  }
 
   function reject(message) { throw new Error(message); }
   function plainObject(value) {
@@ -98,25 +137,26 @@
   // Build only the requested format; avoid allocating three extra large files per download.
   function renderExport(model, edits, filename) {
     var doc = corrected(model, edits || Object.create(null));
+    checkBudget(doc, edits || Object.create(null), false);
     if (filename === "transcript.txt") {
-      return doc.segments.map(function (s) { return s.text; }).join("\n") +
-        (doc.segments.length ? "\n" : "");
+      return utf8BytesUnderLimit(doc.segments.map(function (s) { return s.text; }).join("\n") +
+        (doc.segments.length ? "\n" : ""));
     }
     if (filename === "transcript.srt") {
       var srt = doc.segments.map(function (s, i) {
         return String(i + 1) + "\n" + clock(s.start_ms, false) + " --> " +
           clock(s.end_ms, false) + "\n" + cueText(s.text, false);
       }).join("\n\n");
-      return srt + (srt ? "\n" : "");
+      return utf8BytesUnderLimit(srt + (srt ? "\n" : ""));
     }
     if (filename === "transcript.vtt") {
       var vtt = doc.segments.map(function (s) {
         return clock(s.start_ms, true) + " --> " + clock(s.end_ms, true) +
           "\n" + cueText(s.text, true);
       }).join("\n\n");
-      return "WEBVTT\n\n" + vtt + (doc.segments.length ? "\n" : "");
+      return utf8BytesUnderLimit("WEBVTT\n\n" + vtt + (doc.segments.length ? "\n" : ""));
     }
-    if (filename === "transcript.json") return JSON.stringify(doc, null, 2) + "\n";
+    if (filename === "transcript.json") return utf8BytesUnderLimit(JSON.stringify(doc, null, 2) + "\n");
     reject("Nieobsługiwany format eksportu.");
   }
   // Preserve compatibility for existing programmatic callers.
@@ -138,6 +178,7 @@
         reject("Poprawka odnosi się do nieznanego segmentu albo jest za długa.");
       }
     }
+    checkBudget(doc, map, true);
     var changes = [];
     doc.segments.forEach(function (item) {
       if (Object.prototype.hasOwnProperty.call(map, item.id) && map[item.id] !== item.text) {
@@ -147,8 +188,8 @@
         });
       }
     });
-    return JSON.stringify({schema: "videonotes-web-corrections-v1",
-      project_id: doc.project_id, changes: changes}, null, 2) + String.fromCharCode(10);
+    return utf8BytesUnderLimit(JSON.stringify({schema: "videonotes-web-corrections-v1",
+      project_id: doc.project_id, changes: changes}, null, 2) + String.fromCharCode(10), MAX_PATCH_BYTES);
   }
   function search(model, edits, term) {
     var doc = validateExport(model);
@@ -165,7 +206,7 @@
     return results;
   }
   var core = {
-    SCHEMA: SCHEMA, MAX_BYTES: MAX_BYTES, MAX_TEXT: MAX_TEXT,
+    SCHEMA: SCHEMA, MAX_BYTES: MAX_BYTES, MAX_TEXT: MAX_TEXT, MAX_OUTPUT_BYTES: MAX_OUTPUT_BYTES, MAX_PATCH_BYTES: MAX_PATCH_BYTES,
     parseExport: parseExport, validateExport: validateExport,
     clock: clock, corrected: corrected, renderExport: renderExport,
     renderExports: renderExports, renderCorrections: renderCorrections,

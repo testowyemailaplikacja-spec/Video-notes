@@ -42,3 +42,7 @@ Wpis `NOT_RUN` powinien zawierać tylko `case_id`, `kind` i `result`. `FAIL` lub
 **Nigdy nie dodawaj do repozytorium surowego lokalnego pliku `wyniki.json`, nagrań, transkrypcji, nazwisk, ścieżek, danych urządzeń, sekretów ani modeli.** Podsumowanie z `--check` nadaje się do dalszej weryfikacji tylko pod warunkiem osobnego, niezależnego potwierdzenia dowodów.
 
 Nawet `SELF_REPORTED_PASS` dla całej macierzy **nie oznacza automatycznego DONE** i nie upoważnia do publikacji. Decyzja o wydaniu oraz integracji z Wiedora pozostaje osobna.
+
+## Kontrola zakresu i dat — 11.11.2026
+
+Wprowadzono dodatkowe ograniczenia walidatora: lokalny plik rejestru do 2 MiB, maksymalnie 512 wpisów, zakaz dat przyszłych. Nie da się przekazać do dalszego odbioru raportu datowanego na jutro, który przesłania wcześniejszy negatywny wynik. Wszystkie testy nadal są **deklaracją operatora**, nie niezależnym potwierdzeniem testu fizycznego. Wpisy pozostają poza GitHub.

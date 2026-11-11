@@ -59,3 +59,7 @@ Ten test potwierdza zachowanie Chromium na runnerze Linux **dopiero po zielonym 
 ## Przenoszenie poprawek do projektu desktopowego (08.11.2026)
 
 Lokalny edytor udostępnia dodatkowy przycisk **Poprawki do programu (JSON)**. Pobierana paczka zawiera tylko zmienione segmenty, ich identyfikatory i czasy oraz tekst przed/po korekcie. Komenda `import-web-edits` w Pythonie pozwala najpierw zobaczyć plan zmian, a dopiero z flagą `--apply` zapisać je do osobnego pliku `edits.json`. Konflikt tekstu lub tożsamości segmentu blokuje całą operację bez częściowego zapisu. Szczegóły, ograniczenia i testy: [VN07_ROUNDTRIP_EDITS.md](VN07_ROUNDTRIP_EDITS.md). Nie jest to synchronizacja portalu ani pełny odbiór VN-07.
+
+## Ochrona przed nadmiernym rozmiarem eksportu (11.11.2026)
+
+Zmieniany w pamięci dokument może zawierać do 50 000 segmentów, a każda ręczna poprawka do 10 000 znaków. Ta kombinacja, mimo limitu importu JSON 20 MiB, pozwalałaby bez kontroli wygenerować setki MB podczas eksportu. Dlatego dodano kontrolę wstępną i końcową ograniczającą pojedynczy **eksport TXT/SRT/VTT/JSON do 64 MiB UTF-8**, a **poprawki JSON do 20 MiB UTF-8** zgodnie z limitem importera desktopowego. Odmowa eksportu nie usuwa wpisanych poprawek, nie nadpisuje źródła i nie kontaktuje się z serwerem. Testy obejmują wiele segmentów oraz polskie znaki i rozrost przy escaping WebVTT. Długie materiały wymagają podziału lub desktopowego eksportu; nie udajemy streamingu tej przeglądarkowej wersji beta. Etap VN-07 nadal W_TRAKCIE.
