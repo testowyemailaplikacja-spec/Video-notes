@@ -12,8 +12,11 @@
   // up to 50k independently edited 10k-character segments could otherwise
   // trigger a hundreds-of-megabytes Blob/string allocation.
   var MAX_OUTPUT_BYTES = 64 * 1024 * 1024;
-  function exportTooLarge() {
-    reject("Eksport przekroczył limit 64 MiB. Podziel transkrypcję lub skróć poprawki; oryginał i edycje pozostają bez zmian.");
+  // Desktop import-web-edits accepts at most 20 MiB.
+  var MAX_PATCH_BYTES = 20 * 1024 * 1024;
+  function exportTooLarge(limit) {
+    reject("Eksport przekroczył limit " + (limit / (1024 * 1024)) +
+      " MiB. Podziel transkrypcję lub skróć poprawki; oryginał i edycje pozostają bez zmian.");
   }
   // Conservative, constant-memory preflight before constructing huge output strings.
   // The count includes per-segment JSON/cue overhead; after rendering a precise
@@ -24,11 +27,12 @@
       var edited = Object.prototype.hasOwnProperty.call(edits, item.id) ? edits[item.id] : item.text;
       if (patchOnly && edited === item.text) continue;
       size += 256 + edited.length + (patchOnly ? item.text.length : 0);
-      if (size > MAX_OUTPUT_BYTES) exportTooLarge();
+      if (size > (patchOnly ? MAX_PATCH_BYTES : MAX_OUTPUT_BYTES)) exportTooLarge(patchOnly ? MAX_PATCH_BYTES : MAX_OUTPUT_BYTES);
     }
   }
-  function utf8BytesUnderLimit(payload) {
-    if (payload.length > MAX_OUTPUT_BYTES) exportTooLarge();
+  function utf8BytesUnderLimit(payload, limit) {
+    limit = limit || MAX_OUTPUT_BYTES;
+    if (payload.length > limit) exportTooLarge(limit);
     var count = 0;
     for (var i = 0; i < payload.length; i++) {
       var ch = payload.charCodeAt(i);
@@ -39,7 +43,7 @@
                payload.charCodeAt(i + 1) >= 0xdc00 &&
                payload.charCodeAt(i + 1) <= 0xdfff) { count += 4; i++; }
       else count += 3;
-      if (count > MAX_OUTPUT_BYTES) exportTooLarge();
+      if (count > limit) exportTooLarge(limit);
     }
     return payload;
   }
@@ -185,7 +189,7 @@
       }
     });
     return utf8BytesUnderLimit(JSON.stringify({schema: "videonotes-web-corrections-v1",
-      project_id: doc.project_id, changes: changes}, null, 2) + String.fromCharCode(10));
+      project_id: doc.project_id, changes: changes}, null, 2) + String.fromCharCode(10), MAX_PATCH_BYTES);
   }
   function search(model, edits, term) {
     var doc = validateExport(model);
@@ -202,7 +206,7 @@
     return results;
   }
   var core = {
-    SCHEMA: SCHEMA, MAX_BYTES: MAX_BYTES, MAX_TEXT: MAX_TEXT, MAX_OUTPUT_BYTES: MAX_OUTPUT_BYTES,
+    SCHEMA: SCHEMA, MAX_BYTES: MAX_BYTES, MAX_TEXT: MAX_TEXT, MAX_OUTPUT_BYTES: MAX_OUTPUT_BYTES, MAX_PATCH_BYTES: MAX_PATCH_BYTES,
     parseExport: parseExport, validateExport: validateExport,
     clock: clock, corrected: corrected, renderExport: renderExport,
     renderExports: renderExports, renderCorrections: renderCorrections,

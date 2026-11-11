@@ -151,7 +151,7 @@ test("all export formats and web correction patches enforce a bounded output bud
   for (const item of doc.segments) edits[item.id] = huge;
   assert.throws(() => core.renderExport(doc, edits, "transcript.txt"), /64 MiB/);
   assert.throws(() => core.renderExport(doc, edits, "transcript.json"), /64 MiB/);
-  assert.throws(() => core.renderCorrections(doc, edits), /64 MiB/);
+  assert.throws(() => core.renderCorrections(doc, edits), /20 MiB/);
   assert.equal(JSON.stringify(source), original);
   assert.equal(doc.segments[0].text, "Test");
   const standard = core.renderExports(source, {"c0000000-s00000": "Zażółć gęślą jaźń"});
@@ -168,4 +168,20 @@ test("non-ASCII byte count and subtitle escaping cannot circumvent output cap", 
   assert.throws(() => core.renderExport(doc, {}, "transcript.txt"), /64 MiB/);
   assert.throws(() => core.renderExport(doc, {}, "transcript.vtt"), /64 MiB/);
   assert.equal(doc.segments[0].text.length, 8999);
+});
+
+test("browser correction patch never exceeds desktop import's 20 MiB limit", () => {
+  assert.equal(core.MAX_PATCH_BYTES, 20 * 1024 * 1024);
+  const raw = {schema: core.SCHEMA, project_id: "patch-import", language: "pl", complete: true,
+    segments: Array.from({length: 3100}, (_, i) => ({
+      id: "c-" + i, start_ms: i * 1000, end_ms: i * 1000 + 900, text: "source"
+    }))
+  };
+  const changed = Object.create(null);
+  const longEdit = "a".repeat(7500);
+  for (const row of raw.segments) changed[row.id] = longEdit;
+  assert.throws(() => core.renderCorrections(raw, changed), /20 MiB/);
+  assert.equal(raw.segments[0].text, "source");
+  const small = Object.create(null); small["c-0"] = "Bezpieczna korekta";
+  assert.equal(JSON.parse(core.renderCorrections(raw, small)).changes.length, 1);
 });
