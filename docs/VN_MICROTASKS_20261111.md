@@ -1,8 +1,10 @@
 # KWN / Video Notes — mikroplan pozostałych odbiorów (11.11.2026)
 
-**Stan zastany:** `docs/VN_STATUS.json` z 09.11: 0/9 DONE, 8/9 W_TRAKCIE, 1/9 PLANOWANE. Ostatnie pakiety #103–105 obejmowały ręczną weryfikację twierdzeń; 15/15 CI finalnych dla #103–104. Nie powtarzamy już wdrożonych funkcji.
+> **Aktualizacja 11.11.2026:** 2/37 mikrozadań DONE (VN-07-01, VN-07-04: izolowany kontrakt i jawna granica beta); VN-07-05 IN_PROGRESS po scaleniu PR [Constant_app #189](https://github.com/testowyemailaplikacja-spec/Constant_app/pull/189) do develop i Netlify. Pozostałe 34 TODO; **0/9 pełnych etapów DONE**. Odbiory fizyczne/human/legal wciąż niezaliczone. Szczegóły [VN07_WIEDORA_BRIDGE_20261111.md](VN07_WIEDORA_BRIDGE_20261111.md).
 
-**Źródło szczegółowej kolejki:** [VN_MICROTASKS.json](VN_MICROTASKS.json): 37 nierozliczonych mikrozadań. Weryfikator: `python scripts/check_vn_microtasks.py`. Kolejka nie zastępuje statusu etapów.
+**Stan zastany (historyczny punkt odniesienia):** `docs/VN_STATUS.json` z 09.11: 0/9 DONE, 8/9 W_TRAKCIE, 1/9 PLANOWANE. Ostatnie pakiety #103–105 obejmowały ręczną weryfikację twierdzeń; 15/15 CI finalnych dla #103–104. Nie powtarzamy już wdrożonych funkcji.
+
+**Źródło szczegółowej kolejki:** [VN_MICROTASKS.json](VN_MICROTASKS.json): 37 mikrozadań (11.11: 2 DONE, 1 IN_PROGRESS, 34 TODO). Weryfikator: `python scripts/check_vn_microtasks.py`. Kolejka nie zastępuje statusu etapów.
 
 ## Zasady
 
@@ -68,11 +70,11 @@
 
 ### VN-07 — 5 mikrozadań
 
-- **VN-07-01 (P0, DEV)**: Zaprojektować i przetestować izolowany kontrakt adaptera WWW bez naruszania Wiedory. Bramka: `WEB-01`.
+- **VN-07-01 (P0, DEV, DONE 11.11)**: Zaprojektować i przetestować izolowany kontrakt adaptera WWW bez naruszania Wiedory. Bramka: `WEB-01`.
 - **VN-07-02 (P0, HUMAN_TEST)**: Ręcznie zweryfikować file:// na fizycznym Windows Chrome, Edge i Firefox. Bramka: `WEB-01`; po VN-07-01.
 - **VN-07-03 (P0, HUMAN_TEST)**: Przeprowadzić test klawiatury, czytnika ekranu, dużego JSON i prywatności sieciowej. Bramka: `WEB-02`; po VN-07-02.
-- **VN-07-04 (P1, DEV)**: Zrealizować rzeczywisty adapter ASR/nagrywania WWW lub jawnie ograniczyć zakres beta. Bramka: `HOST-01`; po VN-07-01.
-- **VN-07-05 (P1, PORTAL)**: Po osobnej autoryzacji dodać izolowaną betę Wiedora i wykonać regresję hosta. Bramka: `HOST-01`; po VN-07-03, VN-07-04, VN-06-04.
+- **VN-07-04 (P1, DEV, DONE 11.11)**: Zrealizować rzeczywisty adapter ASR/nagrywania WWW lub jawnie ograniczyć zakres beta. Bramka: `HOST-01`; po VN-07-01.
+- **VN-07-05 (P1, PORTAL, IN_PROGRESS, formal gate blocked)**: Po osobnej autoryzacji dodać izolowaną betę Wiedora i wykonać regresję hosta. Bramka: `HOST-01`; po VN-07-03, VN-07-04, VN-06-04.
 
 ### VN-08 — 2 mikrozadań
 

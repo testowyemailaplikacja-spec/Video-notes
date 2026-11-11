@@ -389,10 +389,16 @@
       "stage": "VN-07",
       "priority": "P0",
       "owner": "DEV",
-      "status": "TODO",
+      "status": "DONE",
       "title": "Zaprojektować i przetestować izolowany kontrakt adaptera WWW bez naruszania Wiedory",
       "acceptance_id": "WEB-01",
-      "depends_on": []
+      "depends_on": [],
+      "evidence_refs": [
+        "https://github.com/testowyemailaplikacja-spec/Constant_app/pull/189",
+        "https://github.com/testowyemailaplikacja-spec/Constant_app/blob/develop/docs/notatki/KWN_BRIDGE_BROWSER_ACCEPTANCE_20261111.md",
+        "https://github.com/testowyemailaplikacja-spec/Video-notes/blob/develop/docs/VN07_WEB_ADAPTER.md"
+      ],
+      "acceptance_note": "Done for bounded static WEB beta contract/scope only; NOT physical Windows/ASR/whole VN-07. Evidence: pinned host merge SHA 88b011..., Netlify branch deploy 6af48486..., live Chromium/50k and V8 contract."
     },
     {
       "id": "VN-07-02",
@@ -423,26 +429,36 @@
       "stage": "VN-07",
       "priority": "P1",
       "owner": "DEV",
-      "status": "TODO",
+      "status": "DONE",
       "title": "Zrealizować rzeczywisty adapter ASR/nagrywania WWW lub jawnie ograniczyć zakres beta",
       "acceptance_id": "HOST-01",
       "depends_on": [
         "VN-07-01"
-      ]
+      ],
+      "evidence_refs": [
+        "https://github.com/testowyemailaplikacja-spec/Constant_app/pull/189",
+        "https://github.com/testowyemailaplikacja-spec/Constant_app/blob/develop/docs/notatki/KWN_BRIDGE_BROWSER_ACCEPTANCE_20261111.md",
+        "https://github.com/testowyemailaplikacja-spec/Video-notes/blob/develop/docs/VN07_WEB_ADAPTER.md"
+      ],
+      "acceptance_note": "Done for bounded static WEB beta contract/scope only; NOT physical Windows/ASR/whole VN-07. Evidence: pinned host merge SHA 88b011..., Netlify branch deploy 6af48486..., live Chromium/50k and V8 contract."
     },
     {
       "id": "VN-07-05",
       "stage": "VN-07",
       "priority": "P1",
       "owner": "PORTAL",
-      "status": "TODO",
+      "status": "IN_PROGRESS",
       "title": "Po osobnej autoryzacji dodać izolowaną betę Wiedora i wykonać regresję hosta",
       "acceptance_id": "HOST-01",
       "depends_on": [
         "VN-07-03",
         "VN-07-04",
         "VN-06-04"
-      ]
+      ],
+      "evidence_refs": [
+        "https://github.com/testowyemailaplikacja-spec/Constant_app/pull/189"
+      ],
+      "acceptance_note": "Beta merged/deployed on develop with host smoke and unchanged main; formal HOST-01 remains blocked by VN-07-03 and VN-06-04 plus GitHub full-regression runner and human evidence."
     },
     {
       "id": "VN-08-01",
