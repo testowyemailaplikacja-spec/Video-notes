@@ -64,6 +64,10 @@ async function browserScenario() {
   if (editor.value !== "Pierwsza wypowiedź.") throw new Error("Błędna treść edytora");
   editor.value = "Poprawiony tekst użytkownika";
   editor.dispatchEvent(new Event("input", {bubbles: true}));
+  document.querySelector("#segment-rows button.segment-choice").click();
+  if (editor.value !== "Poprawiony tekst użytkownika") {
+    throw new Error("Clicking selected row discarded unsaved textarea draft");
+  }
 
   // Capture the real generated Blob without writing a file during headless CI.
   const nativeCreateObjectURL = URL.createObjectURL.bind(URL);
