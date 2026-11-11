@@ -25,3 +25,7 @@
 3. Formalne odbiory VN-00–06 i legal/licencje; po nich HOST-01 i ewentualne odblokowanie testów platformy tylko za zgodą właściciela.
 
 Repo robocze Video-notes pozostaje właścicielem przyszłych zmian produktu. Integracje do Wiedory mają być rzadkimi, przypiętymi do SHA pakietami.
+
+## Paczka export-hardening 11.11.2026
+
+Po źródłowych PR Video-notes #109 i #110 wdrożono osobną synchronizację [Constant_app #193](https://github.com/testowyemailaplikacja-spec/Constant_app/pull/193) do `develop`, commit `ce7a96ff97ed4faf16f13729029fa1d9a7f661ed`; Netlify deploy `6af494c6928af7c9f72d3786` READY. Dostarczono limity TXT/SRT/VTT/JSON ≤64 MiB, JSON poprawek ≤20 MiB i SW cache v20, przy zachowaniu legacy i main. Pinned źródło: Video-notes develop `18edfba82303dae8c6ccd2d5987eb76117bca3c0`. Netlify preview READY, źródło 10/10 kontroli V8 PASS. **Nie** wykonano pełnego `verify:full` hosta: GitHub Jobs kończą się przed krokami. Na źródle testy Windows i przeglądarek PASS, Ubuntu FFmpeg nie mógł zainstalować się przez DNS i timeout, więc pełna regresja NOT_RUN/FAIL infrastrukturalny. Fizyczna Windows/human/LEGAL nadal NOT_RUN.
