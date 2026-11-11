@@ -180,6 +180,21 @@
   });
   window.addEventListener("pagehide", clearMedia);
   function setSelected(index, reveal) {
+    // Clicking the already-selected row (or jumping to its playback position)
+    // must NEVER silently replace an in-progress textarea draft.
+    if (index === selected && hasPendingEdit()) {
+      if (reveal) {
+        var visible = matches.indexOf(index);
+        if (visible < 0) {
+          elements.search.value = "";
+          matches = core.search(doc, edits, "");
+          visible = index;
+        }
+        page = Math.floor(visible / PAGE_SIZE);
+        renderList(true);
+      }
+      return true;
+    }
     if (index !== selected && hasPendingEdit() &&
         !window.confirm("W edytorze jest niezachowana poprawka. Odrzucić ją i przejść do innej wypowiedzi?")) return false;
     if (!doc) return;

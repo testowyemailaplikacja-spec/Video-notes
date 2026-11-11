@@ -523,3 +523,35 @@ test("playhead jumper stays disabled before metadata or after removing source", 
   ux.elements["source-player"].events.error();
   assert.equal(ux.elements["jump-playhead"].disabled, true);
 });
+
+test("selecting the same transcript row never erases an unsaved draft", async () => {
+  const ux = boot();
+  await ux.importFile(source("selected", 3));
+  ux.select(0);
+  ux.elements["edit-text"].value = "Niezapisany szkic na bieżącym segmencie";
+  ux.elements["edit-text"].events.input();
+  ux.select(0);
+  assert.equal(ux.elements["edit-text"].value, "Niezapisany szkic na bieżącym segmencie");
+  assert.equal(ux.state.prompts.length, 0);
+  assert.equal(unload(ux).prevented, true);
+});
+test("playhead pointing to current segment preserves draft even if filter hides it", async () => {
+  const ux = boot();
+  await ux.importFile(source("selected", 4));
+  ux.importMedia();
+  const player = ux.elements["source-player"];
+  player.readyState = 1; player.duration = 10;
+  player.events.loadedmetadata();
+  ux.select(2);
+  ux.elements["edit-text"].value = "Wersja robocza nie wolno usuwać";
+  ux.elements["edit-text"].events.input();
+  ux.elements["search"].value = "text 0";
+  ux.elements["search"].events.input();
+  assert.equal(ux.elements["match-count"].textContent, "1 z 4 wypowiedzi");
+  player.currentTime = 3.1; // seg-2
+  ux.elements["jump-playhead"].events.click();
+  assert.equal(ux.elements["search"].value, "");
+  assert.equal(ux.elements["edit-text"].value, "Wersja robocza nie wolno usuwać");
+  assert.match(ux.elements["selected-label"].textContent, /seg-2/);
+  assert.equal(ux.state.prompts.length, 0);
+});
