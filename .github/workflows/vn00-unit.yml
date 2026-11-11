@@ -13,6 +13,22 @@ on:
 permissions:
   contents: read
 jobs:
+  unit-core-linux:
+    name: Offline Python source/contracts (Linux; FFmpeg not required)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Check Python syntax and offline KWN contracts separately from media runner
+        run: |
+          python -m compileall -q videonotes tests scripts
+          python -m unittest tests.test_microtasks tests.test_acceptance_evidence tests.test_contracts tests.test_quality tests.test_web_corrections tests.test_semantic_review -v
+          python -m videonotes --version
+      - name: Assert acceptance queue is internally consistent (not a physical PASS)
+        run: python scripts/check_vn_microtasks.py
   unit-linux:
     name: Python stdlib and real FFmpeg synthetic media (Linux)
     runs-on: ubuntu-24.04
@@ -25,9 +41,20 @@ jobs:
       - name: Verify local FFmpeg tooling (bounded install only if absent)
         run: |
           if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
-            timeout 240s sudo apt-get update -qq
-            timeout 300s sudo apt-get install -y --no-install-recommends ffmpeg
+            echo "FFMPEG_MISSING: runner lacks ffmpeg/ffprobe; attempt bounded installation."
+            timeout 40s sudo apt-get update -qq || {
+              echo "::error::FFMPEG_INFRA_BLOCKED: apt update failed or timed out (check runner DNS)." >&2
+              exit 1
+            }
+            timeout 70s sudo apt-get install -y --no-install-recommends ffmpeg || {
+              echo "::error::FFMPEG_INFRA_BLOCKED: apt install failed or timed out; real media tests NOT_RUN." >&2
+              exit 1
+            }
           fi
+          command -v ffmpeg >/dev/null && command -v ffprobe >/dev/null || {
+            echo "::error::FFMPEG_INFRA_BLOCKED: ffmpeg or ffprobe still missing; cannot run media tests." >&2
+            exit 1
+          }
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
       - name: Run all tests (including grounded numbers/acronyms in semantic drafts)
