@@ -10,11 +10,12 @@
   var selected = null;
   var page = 0;
   var sourceRevision = 0;
+  var patchRevision = 0;
   // Track new edits made while an asynchronous file import is in flight.
   var editRevision = 0;
   var get = function (id) { return document.getElementById(id); };
   var elements = {
-    source: get("source-file"), status: get("status"), search: get("search"),
+    source: get("source-file"), corrections: get("corrections-file"), status: get("status"), search: get("search"),
     count: get("match-count"), edits: get("edit-count"), rows: get("segment-rows"),
     previous: get("previous"), next: get("next"), page: get("page-number"),
     selected: get("selected-label"), text: get("edit-text"),
@@ -170,6 +171,7 @@
       matches = core.search(doc, edits, "");
       elements.search.value = "";
       elements.search.disabled = false;
+      elements.corrections.disabled = false;
       elements.text.disabled = true;
       elements.text.value = "";
       elements.save.disabled = true;
@@ -186,6 +188,51 @@
       if (revision === sourceRevision) message("Nie można otworzyć pliku: " + error.message, true);
     } finally {
       if (revision === sourceRevision) elements.source.value = "";
+    }
+  });
+
+  // A saved correction pack is only applicable to the same source JSON and
+  // never overwrites a later import or an edit made during asynchronous read.
+  elements.corrections.addEventListener("change", async function (event) {
+    var file = event.target.files && event.target.files[0];
+    if (!file) return;
+    var revision = ++patchRevision;
+    var startSourceRevision = sourceRevision;
+    var startEditRevision = editRevision;
+    if (!doc) {
+      message("Najpierw otwórz lokalną transkrypcję transcript.json.", true);
+      elements.corrections.value = "";
+      return;
+    }
+    if (hasUnsavedWork() &&
+        !window.confirm("Masz bieżące poprawki. Zastąpić je zapisanymi poprawkami z pliku?")) {
+      elements.corrections.value = "";
+      return;
+    }
+    try {
+      if (file.size > core.MAX_PATCH_BYTES) throw new Error("Paczka poprawek przekracza 20 MiB.");
+      var payload = await file.text();
+      if (revision !== patchRevision || startSourceRevision !== sourceRevision) return;
+      var restored = core.parseCorrections(doc, payload);
+      if (editRevision !== startEditRevision && hasUnsavedWork() &&
+          !window.confirm("Podczas odczytu wprowadzono kolejne zmiany. Czy je odrzucić?")) {
+        message("Zachowano późniejsze poprawki; przywracanie anulowano.", false);
+        return;
+      }
+      edits = restored;
+      editRevision += 1;
+      matches = core.search(doc, edits, elements.search.value);
+      page = 0;
+      if (selected !== null) elements.text.value = current(doc.segments[selected]);
+      renderList();
+      message("Przywrócono " + Object.keys(edits).length +
+        " poprawek tylko w pamięci. Pobierz plik, aby zapisać wynik.", false);
+    } catch (error) {
+      if (revision === patchRevision && startSourceRevision === sourceRevision) {
+        message("Nie zastosowano poprawek: " + error.message, true);
+      }
+    } finally {
+      if (revision === patchRevision) elements.corrections.value = "";
     }
   });
   document.querySelectorAll("button[data-export]").forEach(function (button) {

@@ -88,6 +88,32 @@ async function browserScenario() {
       patch.changes[0].after !== "Poprawiony tekst użytkownika") {
     throw new Error("Niezgodny format poprawek między WWW i desktopem");
   }
+
+  // Round-trip a previously downloaded correction pack on the same original.
+  const fileInput = document.getElementById("corrections-file");
+  if (!fileInput || fileInput.disabled) throw new Error("No saved correction import input");
+  window.confirm = () => true;
+  Object.defineProperty(fileInput, "files", {configurable:true,value:[
+    new File([JSON.stringify(patch)],"web-corrections.json",{type:"application/json"})
+  ]});
+  fileInput.dispatchEvent(new Event("change",{bubbles:true}));
+  const restoredUntil=Date.now()+5000;
+  while(!status.textContent.includes("Przywrócono")&&Date.now()<restoredUntil) {
+    await new Promise(resolve=>setTimeout(resolve,25));
+  }
+  if (!status.textContent.includes("Przywrócono 1 poprawek") ||
+      editor.value !== "Poprawiony tekst użytkownika") {
+    throw new Error("Saved patch failed to restore exact corrected text");
+  }
+  Object.defineProperty(fileInput, "files", {configurable:true,value:[
+    new File([JSON.stringify({...patch,project_id:"foreign"})],"foreign.json",{type:"application/json"})
+  ]});
+  fileInput.dispatchEvent(new Event("change",{bubbles:true}));
+  await new Promise(resolve=>setTimeout(resolve,100));
+  if(!status.textContent.includes("Nie zastosowano") ||
+     editor.value!=="Poprawiony tekst użytkownika") {
+    throw new Error("Foreign saved patch changed or erased existing corrections");
+  }
   // A rejected replacement may not silently lose the saved correction.
   window.confirm = () => false;
   const newer = new File([JSON.stringify({...fixture, project_id: "another", segments: []})],

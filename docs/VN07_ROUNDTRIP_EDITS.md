@@ -23,3 +23,7 @@ Nie importuj pełnego `transcript.json` przez `import-web-edits`: to inny format
 ## Odbiór
 
 Testy Node i Python potwierdzają strukturę paczki, poprawki Unicode, brak zapisu bez `--apply`, przywrócenie oryginału, konflikty, niedozwolone pola, duplikaty, limit 20 MB oraz zachowanie niepowiązanych poprawek. Testy przeglądarkowe w CI należy osobno potwierdzić po scaleniu. **VN-07 pozostaje W TRAKCIE**: brak integracji do Wiedora, rzeczywistego przeglądarkowego ASR i fizycznego odbioru Windows. Brak wnioskowania o zakończeniu etapu na podstawie testów automatycznych.
+
+## Odzyskanie pliku poprawek przez przeglądarkę — 11.11.2026
+
+Można teraz wczytać poprzednio pobraną paczkę `web-corrections.json` bezpośrednio w offline edytorze. Najpierw otwórz ten sam `exports/transcript.json`, a następnie wybierz plik w sekcji importu poprawek. Przywrócenie wymaga zgodności projektu, identyfikatorów, tekstu źródłowego i znaczników czasu; obce pola, powielone ID, uszkodzone i za duże pliki są odrzucane bez częściowego zastosowania. Poprawki pozostają w pamięci strony do świadomego eksportu. To nie jest synchronizacja kont, automatyczny backup ani weryfikacja fizycznego Windows.

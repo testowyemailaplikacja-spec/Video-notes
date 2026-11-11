@@ -185,3 +185,33 @@ test("browser correction patch never exceeds desktop import's 20 MiB limit", () 
   const small = Object.create(null); small["c-0"] = "Bezpieczna korekta";
   assert.equal(JSON.parse(core.renderCorrections(raw, small)).changes.length, 1);
 });
+
+test("saved patch reimport restores unicode corrections only to exact source", () => {
+  const doc = fixture();
+  const changes = {"c0000000-s00000": "Zażółć gęślą jaźń", "c0000000-s00001": ""};
+  const saved = core.renderCorrections(doc, changes);
+  const imported = core.parseCorrections(doc, saved);
+  assert.equal(Object.getPrototypeOf(imported), null);
+  assert.equal(imported["c0000000-s00000"], changes["c0000000-s00000"]);
+  assert.equal(imported["c0000000-s00001"], "");
+  assert.equal(doc.segments[0].text, "Dzień dobry, witam na wykładzie.");
+  assert.throws(() => core.parseCorrections({...doc,project_id:"other"},saved), /nie pasuje/);
+  const tampered = fixture(); tampered.segments[0].text = "Obca treść";
+  assert.throws(() => core.parseCorrections(tampered,saved), /źródłowe/);
+  const reTimed = fixture(); reTimed.segments[0].start_ms = 1;
+  assert.throws(() => core.parseCorrections(reTimed,saved), /źródłowe/);
+});
+test("patch import rejects duplicate IDs, foreign fields, nulls and malicious strings", () => {
+  const doc = fixture();
+  const safe=JSON.parse(core.renderCorrections(doc,{"c0000000-s00000":"Korekta"}));
+  const read = obj => core.parseCorrections(doc,JSON.stringify(obj));
+  assert.throws(() => core.parseCorrections(doc,"{broken"),/JSON/);
+  assert.throws(() => core.parseCorrections(doc,"x".repeat(core.MAX_PATCH_BYTES+1)),/20 MiB/);
+  assert.throws(() => read({...safe,secret:"bad"}),/format/);
+  assert.throws(() => read({...safe,changes:[safe.changes[0],safe.changes[0]]}),/zduplikowaną/);
+  assert.throws(() => read({...safe,changes:[{...safe.changes[0],id:"alien"}]}),/obcą/);
+  assert.throws(() => read({...safe,changes:[{...safe.changes[0],before:"forged"}]}),/źródłowe/);
+  assert.throws(() => read({...safe,changes:[{...safe.changes[0],unexpected:"x"}]}),/nieprawidłową/);
+  assert.throws(() => read({...safe,changes:[{...safe.changes[0],after:"bad\u0000"}]}),/nieprawidłową/);
+  assert.equal(Object.keys(read({...safe,changes:[]})).length,0);
+});
