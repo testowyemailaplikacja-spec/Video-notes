@@ -285,8 +285,14 @@ async function main() {
       if (browser.exitCode !== null || browser.signalCode !== null) throw new Error("Chromium exited before CDP became ready; " + chromeErrors.slice(-1500));
       const portFile = path.join(userData, "DevToolsActivePort");
       if (fs.existsSync(portFile)) {
-        port = Number(fs.readFileSync(portFile, "utf8").split(/\r?\n/)[0]);
-        if (port) break;
+        // Windows Edge/Chrome can expose this file before releasing its write
+        // lock. EBUSY/EACCES is transient while CDP is starting.
+        try {
+          port = Number(fs.readFileSync(portFile, "utf8").split(/\r?\n/)[0]);
+          if (port) break;
+        } catch (error) {
+          if (!["EBUSY", "EACCES", "EPERM", "ENOENT"].includes(error.code)) throw error;
+        }
       }
       await pause(100);
     }
