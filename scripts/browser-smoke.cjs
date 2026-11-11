@@ -53,6 +53,11 @@ async function browserScenario() {
   if (!label.textContent.startsWith("2 z 2")) {
     throw new Error("Import lokalnego JSON nie zakończył się: " + status.textContent);
   }
+  const historyUndo = document.getElementById("undo-edit");
+  const historyRedo = document.getElementById("redo-edit");
+  if (!historyUndo || !historyRedo || !historyUndo.disabled || !historyRedo.disabled) {
+    throw new Error("Missing or incorrectly initialized edit history controls");
+  }
   const first = document.querySelector("#segment-rows button.segment-choice");
   if (!first) throw new Error("Brak przycisku do wyboru segmentu");
   first.click();
@@ -72,6 +77,15 @@ async function browserScenario() {
     throw new Error("Eksport pominął niezapisany szkic lub nie pokazał ostrzeżenia");
   }
   document.getElementById("save-edit").click();
+  if (historyUndo.disabled || !historyRedo.disabled) throw new Error("Undo did not become available");
+  historyUndo.click();
+  if (editor.value !== "Pierwsza wypowiedź." || historyRedo.disabled) {
+    throw new Error("Undo failed to restore source text");
+  }
+  historyRedo.click();
+  if (editor.value !== "Poprawiony tekst użytkownika") {
+    throw new Error("Redo failed to restore saved edit");
+  }
   txt.click();
   if (captures.length !== 1) throw new Error("Nie wygenerowano lokalnego TXT po zapisie");
   const text = await captures[0].text();
@@ -271,8 +285,14 @@ async function main() {
       if (browser.exitCode !== null || browser.signalCode !== null) throw new Error("Chromium exited before CDP became ready; " + chromeErrors.slice(-1500));
       const portFile = path.join(userData, "DevToolsActivePort");
       if (fs.existsSync(portFile)) {
-        port = Number(fs.readFileSync(portFile, "utf8").split(/\r?\n/)[0]);
-        if (port) break;
+        // Windows Edge/Chrome can expose this file before releasing its write
+        // lock. EBUSY/EACCES is transient while CDP is starting.
+        try {
+          port = Number(fs.readFileSync(portFile, "utf8").split(/\r?\n/)[0]);
+          if (port) break;
+        } catch (error) {
+          if (!["EBUSY", "EACCES", "EPERM", "ENOENT"].includes(error.code)) throw error;
+        }
       }
       await pause(100);
     }

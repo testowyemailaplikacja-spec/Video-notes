@@ -311,3 +311,90 @@ test("newly entered edits while patch reads require fresh consent", async () => 
   assert.match(ux.elements["status"].textContent,/Zachowano późniejsze/);
   assert.equal(ux.state.prompts.length,1);
 });
+
+test("undo and redo restore a saved correction without changing the imported transcript", async () => {
+  const ux = boot();
+  const original = source("history", 2);
+  await ux.importFile(original);
+  ux.select(0);
+  ux.elements["edit-text"].value = "Pierwsza korekta";
+  ux.elements["save-edit"].events.click();
+  assert.equal(ux.elements["undo-edit"].disabled, false);
+  assert.equal(ux.elements["redo-edit"].disabled, true);
+  ux.elements["undo-edit"].events.click();
+  assert.equal(ux.elements["edit-text"].value, "history text 0");
+  assert.match(ux.elements["edit-count"].textContent, /^0 poprawek/);
+  assert.equal(ux.elements["redo-edit"].disabled, false);
+  ux.elements["redo-edit"].events.click();
+  assert.equal(ux.elements["edit-text"].value, "Pierwsza korekta");
+  assert.match(ux.elements["edit-count"].textContent, /^1 poprawek/);
+  assert.equal(original.segments[0].text, "history text 0");
+});
+
+test("multiple saved changes, reset and redo branch are bounded and correct", async () => {
+  const ux = boot();
+  await ux.importFile(source("history", 1));
+  ux.select(0);
+  ux.elements["edit-text"].value = "Wersja A";
+  ux.elements["save-edit"].events.click();
+  ux.elements["edit-text"].value = "Wersja B";
+  ux.elements["save-edit"].events.click();
+  ux.elements["reset-edit"].events.click();
+  assert.equal(ux.elements["edit-text"].value, "history text 0");
+  ux.elements["undo-edit"].events.click();
+  assert.equal(ux.elements["edit-text"].value, "Wersja B");
+  ux.elements["undo-edit"].events.click();
+  assert.equal(ux.elements["edit-text"].value, "Wersja A");
+  ux.elements["redo-edit"].events.click();
+  assert.equal(ux.elements["edit-text"].value, "Wersja B");
+  ux.elements["edit-text"].value = "Wersja C";
+  ux.elements["save-edit"].events.click();
+  assert.equal(ux.elements["redo-edit"].disabled, true);
+});
+
+test("history does not discard an unsaved draft without confirmation", async () => {
+  const ux = boot();
+  await ux.importFile(source("pending", 1));
+  ux.select(0);
+  ux.elements["edit-text"].value = "Zapisane";
+  ux.elements["save-edit"].events.click();
+  ux.elements["edit-text"].value = "Szkic jeszcze niezapisany";
+  ux.elements["edit-text"].events.input();
+  ux.elements["undo-edit"].events.click();
+  assert.equal(ux.elements["edit-text"].value, "Szkic jeszcze niezapisany");
+  assert.equal(ux.state.prompts.length, 1);
+  ux.state.allow = true;
+  ux.elements["undo-edit"].events.click();
+  assert.equal(ux.elements["edit-text"].value, "pending text 0");
+});
+
+test("new transcript and imported patch clear old document history", async () => {
+  const ux = boot();
+  await ux.importFile(source("first", 1));
+  ux.select(0);
+  ux.elements["edit-text"].value = "Old";
+  ux.elements["save-edit"].events.click();
+  ux.state.allow = true;
+  await ux.importFile(source("second", 1));
+  assert.equal(ux.elements["undo-edit"].disabled, true);
+  ux.select(0);
+  ux.elements["edit-text"].value = "Second";
+  ux.elements["save-edit"].events.click();
+  const patch = JSON.parse(core.renderCorrections(source("second", 1), {"seg-0": "Restored"}));
+  await ux.importPatch(patch);
+  assert.equal(ux.elements["edit-text"].value, "Restored");
+  assert.equal(ux.elements["undo-edit"].disabled, true);
+});
+
+test("history does not grow without bound while saving thousands of changes", async () => {
+  const ux = boot();
+  await ux.importFile(source("many", 1));
+  ux.select(0);
+  for (let i = 0; i < 105; i++) {
+    ux.elements["edit-text"].value = "Revision " + i;
+    ux.elements["save-edit"].events.click();
+  }
+  for (let i = 0; i < 100; i++) ux.elements["undo-edit"].events.click();
+  assert.equal(ux.elements["undo-edit"].disabled, true);
+  assert.equal(ux.elements["edit-text"].value, "Revision 4");
+});

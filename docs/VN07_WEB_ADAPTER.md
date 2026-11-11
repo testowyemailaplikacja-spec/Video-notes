@@ -67,3 +67,7 @@ Zmieniany w pamięci dokument może zawierać do 50 000 segmentów, a każda rę
 ## Ręczny import wcześniej zapisanych poprawek
 
 Użytkownik może ponownie wczytać własną paczkę `web-corrections.json` po otwarciu odpowiadającej jej źródłowej transkrypcji. Odrzucamy zmieniony project_id, czasy, teksty źródłowe, duplikaty, obce pola oraz nadmiarowe pliki; import jest całościowy, bez częściowych zapisów. Nowe edycje wykonane podczas odczytu wymagają ponownej zgody. Nie ma automatycznego zapisu do chmury ani dysku. Testy realnych przeglądarek sprawdzają także próbę przywrócenia i odmowę obcej paczki. Odbiór fizyczny Windows/klawiatura/NVDA nadal otwarty.
+
+## VN-07 — historia korekt w pamięci (11.11.2026)
+
+W edytorze WWW dodano przyciski **Cofnij zmianę** i **Ponów zmianę** dla ręcznie zapisanych poprawek tekstowych oraz przywrócenia segmentu do oryginalnej wartości. Historia liczy maksymalnie 100 rzeczywistych zmian; nie obejmuje niezapisanego tekstu w polu edycji. Próba cofnięcia przy niezapisanym szkicu wymaga potwierdzenia. Nowy eksport źródła albo świadomy import pliku `web-corrections.json` czyści historię poprzedniej sesji, aby nie przenosić obcych zmian. Cofanie nie zapisuje automatycznie danych na dysku ani do chmury. W celu utrwalenia efektu trzeba pobrać plik eksportu. Testy: testy DOM + rzeczywiste przeglądarki CI. Nie stanowi to końcowego odbioru VN-07 na fizycznym Windows.
