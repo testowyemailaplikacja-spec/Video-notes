@@ -66,6 +66,8 @@ async function browserScenario() {
   editor.dispatchEvent(new Event("input", {bubbles: true}));
 
   // Capture the real generated Blob without writing a file during headless CI.
+  const nativeCreateObjectURL = URL.createObjectURL.bind(URL);
+  const nativeRevokeObjectURL = URL.revokeObjectURL.bind(URL);
   const captures = [];
   URL.createObjectURL = function (blob) { captures.push(blob); return "blob:synthetic-smoke"; };
   URL.revokeObjectURL = function () {};
@@ -139,6 +141,49 @@ async function browserScenario() {
   if (!document.getElementById("edit-count").textContent.startsWith("1 poprawek")) {
     throw new Error("Anulowany import usunął poprawki");
   }
+
+  // Check real local media playback, not a fake Blob URL. The WAV is synthetic,
+  // created in this browser process; no speech or private recording is involved.
+  URL.createObjectURL = nativeCreateObjectURL;
+  URL.revokeObjectURL = nativeRevokeObjectURL;
+  const rate=8000, count=rate*4;
+  const buffer=new ArrayBuffer(44+count), view=new DataView(buffer);
+  function waveStr(offset,value) {
+    for (let i=0;i<value.length;i++) view.setUint8(offset+i,value.charCodeAt(i));
+  }
+  waveStr(0,"RIFF"); view.setUint32(4,36+count,true); waveStr(8,"WAVE");
+  waveStr(12,"fmt "); view.setUint32(16,16,true);
+  view.setUint16(20,1,true); view.setUint16(22,1,true);
+  view.setUint32(24,rate,true); view.setUint32(28,rate,true);
+  view.setUint16(32,1,true); view.setUint16(34,8,true);
+  waveStr(36,"data"); view.setUint32(40,count,true);
+  new Uint8Array(buffer,44).fill(128);
+  const mediaInput=document.getElementById("source-media");
+  const mediaPlayer=document.getElementById("source-player");
+  const seekButton=document.getElementById("seek-segment");
+  if(!mediaInput||mediaInput.disabled||!mediaPlayer||!seekButton) {
+    throw new Error("Missing local playback UI");
+  }
+  Object.defineProperty(mediaInput,"files",{configurable:true,value:[
+    new File([buffer],"synthetic-silence.wav",{type:"audio/wav"})
+  ]});
+  mediaInput.dispatchEvent(new Event("change",{bubbles:true}));
+  const mediaUntil=Date.now()+7000;
+  while(mediaPlayer.readyState<1 && Date.now()<mediaUntil) {
+    await new Promise(resolve=>setTimeout(resolve,50));
+  }
+  if(mediaPlayer.readyState<1)throw new Error("Local synthetic WAV metadata not loaded: "+status.textContent);
+  document.querySelectorAll("#segment-rows button.segment-choice")[1].click();
+  if(seekButton.disabled)throw new Error("Seek remains disabled after selecting a segment");
+  seekButton.click();
+  const seekUntil=Date.now()+3000;
+  while(Math.abs(mediaPlayer.currentTime-2)>0.2 && Date.now()<seekUntil) {
+    await new Promise(resolve=>setTimeout(resolve,30));
+  }
+  if(Math.abs(mediaPlayer.currentTime-2)>0.2) {
+    throw new Error("Local WAV seek to 2s failed: "+mediaPlayer.currentTime);
+  }
+  if(!mediaPlayer.paused)throw new Error("Media playback started without user consent");
   // WEB-02 automated subtest: genuine browser import/search/page navigation with 50k rows.
   // The fixture is synthetic, never contains a private recording, and stays within MAX_BYTES.
   window.confirm = () => true;
@@ -161,6 +206,7 @@ async function browserScenario() {
     await new Promise(resolve => setTimeout(resolve, 30));
   }
   if (!label.textContent.startsWith("50000 z 50000")) throw new Error("50k import failed: " + status.textContent);
+  if (!mediaPlayer.hidden || !seekButton.disabled) throw new Error("Replacing the source retained a foreign recording");
   if (document.querySelectorAll("#segment-rows button.segment-choice").length !== 75) {
     throw new Error("50k table was not restricted to 75 visible buttons");
   }
