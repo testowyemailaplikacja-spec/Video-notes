@@ -76,6 +76,14 @@
             <button id="redo-edit" type="button" disabled>Ponów zmianę</button>
           </div>
           <p class="note">Przywrócenie dotyczy tekstu z zaimportowanego JSON (nie surowego ASR). Aby zachować poprawki, pobierz nowy plik. Oryginał pozostaje bez zmian.</p>
+          <section class="local-media" aria-labelledby="media-heading">
+            <h3 id="media-heading">Odsłuch nagrania (opcjonalnie)</h3>
+            <label for="source-media">Wybierz lokalny plik audio lub wideo</label>
+            <input id="source-media" type="file" accept="audio/*,video/*,.wav,.mp4,.mkv,.webm,.ogg,.m4a" disabled>
+            <video id="source-player" controls preload="metadata" playsinline hidden aria-label="Odtwarzacz lokalnego nagrania"></video>
+            <button id="seek-segment" type="button" disabled>Przejdź do czasu wypowiedzi</button>
+            <p class="note">Plik nie jest wysyłany do serwera. Upewnij się, że nagranie odpowiada wybranej transkrypcji. Odtwarzanie nie uruchamia się samo; nie wszystkie kodeki OBS działają w przeglądarce.</p>
+          </section>
         </aside>
       </div>
     </section>

@@ -30,11 +30,14 @@ class Element {
   appendChild(node) { this.children.push(node); }
   append(...nodes) { this.children.push(...nodes); }
   setAttribute(key, value) { this[key] = value; }
+  removeAttribute(key) { delete this[key]; }
+  pause() { this.pauseCount = (this.pauseCount || 0) + 1; }
+  load() { this.loadCount = (this.loadCount || 0) + 1; }
 }
 
 function boot() {
   const elements = Object.create(null);
-  const state = {allow: false, prompts: [], downloads: []};
+  const state = {allow: false, prompts: [], downloads: [], revoked: []};
   const exportButtons = ["transcript.txt", "transcript.srt", "transcript.vtt", "transcript.json", "web-corrections.json"].map(name => {
     const button = new Element();
     button.getAttribute = key => key === "data-export" ? name : null;
@@ -62,7 +65,7 @@ function boot() {
   const code = fs.readFileSync(path.join(__dirname, "../web/app.js"), "utf8");
   vm.runInNewContext(code, {window: win, document: doc,
     Blob: class { constructor(parts) {state.payload = parts.join("");} },
-    URL: {createObjectURL: () => "blob:local", revokeObjectURL() {} },
+    URL: {createObjectURL: () => "blob:local", revokeObjectURL(url) { state.revoked.push(url); } },
     setTimeout: fn => fn()
   }, {filename: "web/app.js"});
   async function importFile(data, read = async () => JSON.stringify(data)) {
@@ -75,11 +78,16 @@ function boot() {
       target: {files:[{size:1024,name:"web-corrections.json",text:read}]}
     });
   }
+  function importMedia(size = 1024) {
+    return elements["source-media"].events.change({
+      target: {files:[{size, name:"synthetic.wav", type:"audio/wav"}]}
+    });
+  }
   function select(index) {
     const row = elements["segment-rows"].children[index];
     row.children[1].children[0].events.click();
   }
-  return {elements, state, win, doc, importFile, importPatch, select, exportButtons};
+  return {elements, state, win, doc, importFile, importPatch, importMedia, select, exportButtons};
 }
 
 function unload(ux) {
@@ -397,4 +405,66 @@ test("history does not grow without bound while saving thousands of changes", as
   for (let i = 0; i < 100; i++) ux.elements["undo-edit"].events.click();
   assert.equal(ux.elements["undo-edit"].disabled, true);
   assert.equal(ux.elements["edit-text"].value, "Revision 4");
+});
+
+test("local audio file remains an object URL; seeking uses segment time only after explicit click", async () => {
+  const ux = boot();
+  await ux.importFile(source("audio", 3));
+  assert.equal(ux.elements["source-media"].disabled, false);
+  assert.equal(ux.elements["seek-segment"].disabled, true);
+  ux.importMedia();
+  const player = ux.elements["source-player"];
+  assert.equal(player.src, "blob:local");
+  assert.equal(player.hidden, false);
+  assert.equal(ux.elements["seek-segment"].disabled, true);
+  ux.select(2);
+  assert.equal(ux.elements["seek-segment"].disabled, false);
+  player.readyState = 1;
+  player.duration = 30;
+  ux.elements["seek-segment"].events.click();
+  assert.equal(player.currentTime, 3);
+  assert.equal(player.playCount, undefined);
+  assert.match(ux.elements["status"].textContent, /Przesunięto lokalny odtwarzacz/);
+});
+
+test("pending seek completes on metadata and rejects mismatched recording lengths", async () => {
+  const ux = boot();
+  await ux.importFile(source("audio", 3));
+  ux.importMedia();
+  ux.select(1);
+  const player = ux.elements["source-player"];
+  player.readyState = 0;
+  ux.elements["seek-segment"].events.click();
+  assert.match(ux.elements["status"].textContent, /Wczytywanie nagrania/);
+  player.readyState = 1;
+  player.duration = 1;
+  player.events.loadedmetadata();
+  assert.equal(player.currentTime, undefined);
+  assert.match(ux.elements["status"].textContent, /wykracza poza/);
+  player.duration = 4;
+  ux.elements["seek-segment"].events.click();
+  assert.equal(player.currentTime, 1.5);
+});
+
+test("replacing transcript revokes local recording URL and disables previous seek", async () => {
+  const ux = boot();
+  await ux.importFile(source("first", 2));
+  ux.importMedia();
+  ux.select(0);
+  await ux.importFile(source("second", 1));
+  assert.equal(ux.elements["source-player"].hidden, true);
+  assert.equal(ux.elements["seek-segment"].disabled, true);
+  assert.deepEqual(ux.state.revoked, ["blob:local"]);
+  assert.equal(ux.elements["source-player"].src, undefined);
+});
+
+test("unsupported local codec is reported without exposing file paths or persisting audio", async () => {
+  const ux = boot();
+  await ux.importFile(source("audio", 1));
+  ux.importMedia();
+  ux.elements["source-player"].events.error();
+  assert.equal(ux.elements["source-player"].hidden, true);
+  assert.match(ux.elements["status"].textContent, /kodeka/);
+  assert.equal(ux.state.revoked.length, 1);
+  assert.equal(ux.elements["seek-segment"].disabled, true);
 });
