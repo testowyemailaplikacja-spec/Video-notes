@@ -1,6 +1,6 @@
 {
   "schema": "videonotes-progress-v1",
-  "updated_date": "2026-11-09",
+  "updated_date": "2026-11-11",
   "owner_repo": "testowyemailaplikacja-spec/Video-notes",
   "integration_policy": "Develop KWN/Video-notes only. Constant_app and Netlify get only later, independently accepted larger batches.",
   "main_unchanged": "4da53b3bff580e07a16218e5f7017cecf8ff7aed",
@@ -199,13 +199,15 @@
         "PR #35: real headless Firefox file:// WebDriver on Ubuntu runner, local import/edit/export and synthetic 50k/focus scenario PASS alongside 4 existing CI jobs, workflow 42416372511; not physical Windows Firefox or screen-reader acceptance.",
         "PR #70: genuine Tkinter widget interactions run on GitHub-hosted Windows 3.13 VM as well as Ubuntu Xvfb, without skipping, with note history/crash/draft guards and full-WAV selection, source/browser and GUI CI 7/7 PASS (42469389311 and 42469389310). Does not constitute physical Windows, screen reader or full offline installation acceptance.",
         "PR #85: local browser web-corrections-v1 patch (only changed segments, ID/time/before/after) + desktop CLI `import-web-edits` preview and opt-in --apply with conflict rejection and raw-ASR preservation; real Chrome/Edge Windows, Firefox/Chromium Linux, source Windows/Linux, private Inno synthetic install, Windows DEV EXE 7/7 CI PASS (42496562215, 42496562164, 42496562085); merged to develop `deaef2a4`. Not a Wiedora portal deployment or full web ASR.",
-        "PR #100: web→desktop imported patch and concurrent manual edits serialized under one per-project process lock; preview stays read-only, stale recovery opt-in, tests actual separate process, 7/7 CI PASS (42601392194,42601392182,42601392249). Does not deploy or enable browser ASR / Wiedora portal."
+        "PR #100: web→desktop imported patch and concurrent manual edits serialized under one per-project process lock; preview stays read-only, stale recovery opt-in, tests actual separate process, 7/7 CI PASS (42601392194,42601392182,42601392249). Does not deploy or enable browser ASR / Wiedora portal.",
+        "11.11 PR Constant_app #189: pinned Video-notes web editor under /apps/notatki-web/video-notes; develop squash 88b01188639213ce8a959f857f796fd690635198; Netlify branch 6af48486b6e205574befb7a5 READY. Live Chromium import/edit/search/50k/offline and HTTP legacy/main isolation PASS; npm verify/full + physical Windows/paid runner unavailable. VN-07 stage stays W_TRAKCIE."
       ],
       "blockers": [
         "Physical Windows Firefox/Chrome/Edge browser tests, keyboard and screen-reader accessibility acceptance; headless Firefox Linux and Chrome/Edge Windows CI are not human acceptance",
         "Full real web ASR/recording adapter with matching desktop results",
         "Wiedora isolated integration behind KWN gate and host regression",
-        "Separate authorization for Netlify staging / any portal deployment"
+        "Separate authorization for Netlify staging / any portal deployment",
+        "Full formal HOST-01/NVDA/physical Windows 3 browsers, actual download, legal release, host verify:full runner"
       ]
     },
     {

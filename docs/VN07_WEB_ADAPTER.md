@@ -1,5 +1,8 @@
 # VN-07 — samodzielna przeglądarkowa przeglądarka transkrypcji (prototyp offline)
 
+> **Stan na 11.11.2026:** historyczny opis poniżej dotyczy 06–08.11. Adapter WWW przeniesiono już jako niezależną, ograniczoną funkcjonalnie betę do Wiedora develop. Źródła i wersja desktopowa pozostają w Video-notes. Szczegóły: [VN07_WIEDORA_BRIDGE_20261111.md](VN07_WIEDORA_BRIDGE_20261111.md). Nie oznacza to pełnego odbioru VN-07 ani przeniesienia ASR desktop do przeglądarki.
+
+
 Data: 2026-11-06. Kod wyłącznie w repozytorium Video-notes. Nie jest jeszcze zintegrowany z Wiedora, Netlify, Supabase ani kontami.
 
 ## Uruchomienie
