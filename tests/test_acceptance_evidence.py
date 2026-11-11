@@ -2,7 +2,13 @@
 from __future__ import annotations
 
 import copy
+import os
+import stat
+import subprocess
+import sys
+import tempfile
 import unittest
+from pathlib import Path
 
 from scripts.vn_acceptance_evidence import CASES, empty_template, evaluate, validate
 
@@ -69,6 +75,31 @@ class ManualAcceptanceTests(unittest.TestCase):
         report = evaluate({"schema": "videonotes-manual-evidence-v1", "entries": [a, dict(a)]})
         self.assertFalse(report["valid"])
         self.assertTrue(any("duplicate case/kind/date" in error for error in report["errors"]))
+
+    def test_malformed_types_are_rejected_without_crashing(self):
+        row = self.make_pass("HW-01", "PHYSICAL_WINDOWS")
+        row["case_id"] = []
+        invalid = evaluate({"schema": "videonotes-manual-evidence-v1", "entries": [row]})
+        self.assertFalse(invalid["valid"])
+        row["case_id"] = "HW-01"
+        row["result"] = ["PASS"]
+        invalid = evaluate({"schema": "videonotes-manual-evidence-v1", "entries": [row]})
+        self.assertFalse(invalid["valid"])
+
+    def test_template_is_private_and_never_overwritten(self):
+        script = Path(__file__).resolve().parents[1] / "scripts" / "vn_acceptance_evidence.py"
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "manual.json"
+            first = subprocess.run([sys.executable, str(script), "--init", str(path)],
+                                   capture_output=True, text=True, check=False)
+            self.assertEqual(first.returncode, 0, first.stderr)
+            original = path.read_bytes()
+            second = subprocess.run([sys.executable, str(script), "--init", str(path)],
+                                    capture_output=True, text=True, check=False)
+            self.assertNotEqual(second.returncode, 0)
+            self.assertEqual(path.read_bytes(), original)
+            if os.name == "posix":
+                self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
 
     def test_strict_urls_and_hashes(self):
         a = self.make_pass("HW-01", "PHYSICAL_WINDOWS")
