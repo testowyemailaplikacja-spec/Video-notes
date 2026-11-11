@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+from datetime import date, timedelta
 import os
 import stat
 import subprocess
@@ -65,7 +66,8 @@ class ManualAcceptanceTests(unittest.TestCase):
     def test_latest_failure_revokes_prior_positive_self_report(self):
         a = self.make_pass("HW-01", "PHYSICAL_WINDOWS")
         b = copy.deepcopy(a)
-        b["checked_at"] = "2026-11-12"
+        a["checked_at"] = "2026-11-10"
+        b["checked_at"] = "2026-11-11"
         b["result"] = "FAIL"
         result = evaluate({"schema": "videonotes-manual-evidence-v1", "entries": [a, b]})
         self.assertEqual(result["results"]["HW-01"], "SELF_REPORTED_FAIL")
@@ -100,6 +102,32 @@ class ManualAcceptanceTests(unittest.TestCase):
             self.assertEqual(path.read_bytes(), original)
             if os.name == "posix":
                 self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+
+    def test_future_dated_evidence_cannot_override_valid_existing_result(self):
+        current = self.make_pass("HW-01", "PHYSICAL_WINDOWS")
+        current["checked_at"] = date.today().isoformat()
+        forged = dict(current)
+        forged["checked_at"] = (date.today() + timedelta(days=1)).isoformat()
+        forged["result"] = "PASS"
+        result = evaluate({"schema": "videonotes-manual-evidence-v1", "entries": [current, forged]})
+        self.assertFalse(result["valid"])
+        self.assertTrue(any("future" in error for error in result["errors"]))
+
+    def test_bulk_entries_are_rejected_without_leaking_content(self):
+        rows = [self.make_pass("HW-01", "PHYSICAL_WINDOWS") for _ in range(513)]
+        report = evaluate({"schema": "videonotes-manual-evidence-v1", "entries": rows})
+        self.assertFalse(report["valid"])
+        self.assertTrue(any("Too many" in error for error in report["errors"]))
+
+    def test_oversized_local_file_is_refused(self):
+        script = Path(__file__).resolve().parents[1] / "scripts" / "vn_acceptance_evidence.py"
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "large.json"
+            path.write_bytes(b"x" * (2 * 1024 * 1024 + 1))
+            run = subprocess.run([sys.executable, str(script), "--check", str(path)],
+                                 capture_output=True, text=True, check=False)
+            self.assertNotEqual(run.returncode, 0)
+            self.assertIn("2 MiB", run.stderr)
 
     def test_strict_urls_and_hashes(self):
         a = self.make_pass("HW-01", "PHYSICAL_WINDOWS")

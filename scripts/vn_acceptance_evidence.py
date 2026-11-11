@@ -16,6 +16,8 @@ from datetime import date
 from pathlib import Path
 
 SCHEMA = "videonotes-manual-evidence-v1"
+MAX_EVIDENCE_BYTES = 2 * 1024 * 1024
+MAX_EVIDENCE_ENTRIES = 512
 REPO = "testowyemailaplikacja-spec/Video-notes"
 EVIDENCE_LINK = re.compile(
     r"https://github\.com/testowyemailaplikacja-spec/Video-notes/"
@@ -66,6 +68,8 @@ def validate(payload: object) -> list[str]:
         return ["Invalid root format"]
     if payload.get("schema") != SCHEMA or not isinstance(payload.get("entries"), list):
         return ["Invalid schema or entries"]
+    if len(payload["entries"]) > MAX_EVIDENCE_ENTRIES:
+        return ["Too many evidence entries (limit 512)"]
     errors: list[str] = []
     seen: set[tuple[str, str, str]] = set()
     for index, row in enumerate(payload["entries"]):
@@ -91,8 +95,10 @@ def validate(payload: object) -> list[str]:
         try:
             if not isinstance(checked, str) or date.fromisoformat(checked).isoformat() != checked:
                 raise ValueError("not an ISO date")
+            if date.fromisoformat(checked) > date.today():
+                raise ValueError("future date")
         except ValueError:
-            errors.append(prefix + ": missing/invalid checked_at YYYY-MM-DD")
+            errors.append(prefix + ": missing/invalid or future checked_at YYYY-MM-DD")
         if not isinstance(row.get("commit_sha"), str) or not SHA.fullmatch(row["commit_sha"]):
             errors.append(prefix + ": missing/invalid commit SHA")
         if row.get("attested_by_human") is not True:
@@ -176,6 +182,8 @@ def main() -> int:
         print("Local NOT_RUN template created. Keep it private.")
         return 0
     try:
+        if args.check.stat().st_size > MAX_EVIDENCE_BYTES:
+            parser.error("Evidence file exceeds 2 MiB; cannot inspect safely")
         payload = json.loads(args.check.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError):
         parser.error("Cannot load local JSON evidence")
