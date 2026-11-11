@@ -160,10 +160,73 @@ async function browserScenario() {
           networkRequests: network.length};
 }
 
+async function prepareRealDownloadFixture() {
+  const untilReady = Date.now() + 6000;
+  while ((!window.VideoNotesWebCore || document.readyState !== "complete") && Date.now() < untilReady) {
+    await new Promise(resolve => setTimeout(resolve, 40));
+  }
+  const fixture = {
+    schema: "videonotes-export-v1", project_id: "real-download-smoke",
+    language: "pl", complete: true,
+    segments: [
+      {id: "seg-001", start_ms: 0, end_ms: 1700, text: "Fragment <oryginalny>."},
+      {id: "seg-002", start_ms: 2000, end_ms: 3400, text: "Zdanie drugie."}
+    ]
+  };
+  const input = document.getElementById("source-file");
+  if (!input) throw new Error("Missing file picker");
+  Object.defineProperty(input, "files", {configurable: true, value: [
+    new File([JSON.stringify(fixture)], "download-input.json", {type: "application/json"})
+  ]});
+  input.dispatchEvent(new Event("change", {bubbles: true}));
+  const deadline = Date.now() + 6000;
+  while (!document.getElementById("match-count").textContent.startsWith("2 z 2") && Date.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, 40));
+  }
+  if (!document.getElementById("match-count").textContent.startsWith("2 z 2")) {
+    throw new Error("Download fixture import did not complete");
+  }
+  const first = document.querySelector("#segment-rows .segment-choice");
+  first.click();
+  const edit = document.getElementById("edit-text");
+  edit.value = "Zażółć & <B>\\nZapisane po korekcie.";
+  edit.dispatchEvent(new Event("input", {bubbles: true}));
+  document.getElementById("save-edit").click();
+  return {
+    imported: 2,
+    corrections: document.getElementById("edit-count").textContent,
+    source: fixture.segments[0].text
+  };
+}
+
+function assertRealDownloads(directory) {
+  // These are disk-backed bytes, not a mocked createObjectURL/anchor click.
+  const contents = Object.fromEntries(
+    ["transcript.txt", "transcript.srt", "transcript.vtt", "transcript.json", "web-corrections.json"]
+      .map(name => [name, fs.readFileSync(path.join(directory, name), "utf8")])
+  );
+  assert.match(contents["transcript.txt"], /Zażółć & <B>/);
+  assert.match(contents["transcript.txt"], /Zdanie drugie/);
+  assert.match(contents["transcript.srt"], /00:00:00,000 --> 00:00:01,700/);
+  assert.match(contents["transcript.vtt"], /Zażółć &amp; &lt;B&gt;/);
+  const transcript = JSON.parse(contents["transcript.json"]);
+  assert.equal(transcript.project_id, "real-download-smoke");
+  assert.equal(transcript.segments[0].text, "Zażółć & <B>\\nZapisane po korekcie.");
+  assert.equal(transcript.segments[1].text, "Zdanie drugie.");
+  const patch = JSON.parse(contents["web-corrections.json"]);
+  assert.equal(patch.schema, "videonotes-web-corrections-v1");
+  assert.equal(patch.project_id, "real-download-smoke");
+  assert.equal(patch.changes.length, 1);
+  assert.equal(patch.changes[0].before, "Fragment <oryginalny>.");
+  assert.equal(patch.changes[0].after, transcript.segments[0].text);
+  return Object.keys(contents).length;
+}
+
 async function main() {
   const root = path.resolve(__dirname, "../web/index.html");
   if (!fs.existsSync(root)) throw new Error("web/index.html missing");
   const userData = fs.mkdtempSync(path.join(os.tmpdir(), "kwn-chrome-"));
+  const realDownloads = fs.mkdtempSync(path.join(os.tmpdir(), "kwn-real-download-"));
   const browserPath = process.env.CHROME_BIN || "chromium";
   const browser = cp.spawn(browserPath, [
     "--headless=new", "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage",
@@ -249,6 +312,44 @@ async function main() {
     assert.equal(payload.deniedReplacePreserved, true);
     assert.equal(payload.networkRequests, 0);
     process.stdout.write("Chromium file:// KWN import/edit/export/replace smoke PASS\n");
+    // A separate fresh page avoids the in-memory anchor/Blob mocks used by
+    // cross-browser functional smoke; verify what really lands on disk.
+    try {
+      await cdp(10, "Browser.setDownloadBehavior", {behavior: "allow", downloadPath: realDownloads});
+    } catch (_error) {
+      await cdp(11, "Page.setDownloadBehavior", {behavior: "allow", downloadPath: realDownloads});
+    }
+    const fresh = await cdp(12, "Page.navigate", {url: pathToFileURL(root).href});
+    if (fresh.errorText) throw new Error("Fresh download page refused: " + fresh.errorText);
+    const prepared = await cdp(13, "Runtime.evaluate", {
+      expression: "(" + prepareRealDownloadFixture.toString() + ")()",
+      awaitPromise: true, returnByValue: true, userGesture: true
+    }, 20000);
+    assert.equal(prepared.result.value.imported, 2);
+    assert.match(prepared.result.value.corrections, /1 poprawek/);
+    const names = ["transcript.txt", "transcript.srt", "transcript.vtt", "transcript.json", "web-corrections.json"];
+    for (let i = 0; i < names.length; i++) {
+      const name = names[i];
+      const trigger = await cdp(20 + i, "Runtime.evaluate", {
+        expression: "document.querySelector(" + JSON.stringify('button[data-export="' + name + '"]') + ").click()",
+        userGesture: true, returnByValue: true
+      });
+      if (trigger.result?.subtype === "error") throw new Error("Download click failed: " + name);
+      let downloaded = false;
+      for (let attempt = 0; attempt < 120; attempt++) {
+        const files = fs.readdirSync(realDownloads);
+        const complete = path.join(realDownloads, name);
+        if (files.includes(name) && fs.statSync(complete).size > 0 &&
+            !files.some(file => file.endsWith(".crdownload"))) {
+          downloaded = true;
+          break;
+        }
+        await pause(60);
+      }
+      if (!downloaded) throw new Error("Browser did not save expected file: " + name);
+    }
+    assert.equal(assertRealDownloads(realDownloads), 5);
+    process.stdout.write("Chrome/Edge/Chromium real local downloaded TXT/SRT/VTT/JSON/patch bytes PASS\n");
   } finally {
     if (socket) socket.close();
     const exited = new Promise(resolve => {
@@ -258,10 +359,12 @@ async function main() {
     });
     browser.kill("SIGTERM");
     await exited;
-    try {
-      fs.rmSync(userData, {recursive: true, force: true, maxRetries: 10, retryDelay: 150});
-    } catch (error) {
-      process.stderr.write("Chromium temporary-profile cleanup warning: " + error.code + "\n");
+    for (const temporary of [userData, realDownloads]) {
+      try {
+        fs.rmSync(temporary, {recursive: true, force: true, maxRetries: 10, retryDelay: 150});
+      } catch (error) {
+        process.stderr.write("Chromium temporary-profile cleanup warning: " + error.code + "\n");
+      }
     }
   }
 }

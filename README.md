@@ -17,7 +17,7 @@ CI sprawdza kod źródłowy na Linux i Windows oraz plik Windows DEV EXE. **Nie 
 
 ## Wersja przeglądarkowa offline — prototyp VN-07
 
-Otwórz lokalnie `web/index.html` i wybierz plik `exports/transcript.json` utworzony przez program Windows/Python (`python -m videonotes export KATALOG_PROJEKTU`). Możesz bez serwera i internetu przeszukiwać wypowiedzi, nanosić poprawki i pobierać TXT/SRT/VTT/JSON. **Nie ma jeszcze transkrypcji ASR w przeglądarce ani integracji z Wiedorą.** [Instrukcja i ograniczenia](docs/VN07_WEB_ADAPTER.md).
+Otwórz lokalnie `web/index.html` i wybierz plik `exports/transcript.json` utworzony przez program Windows/Python (`python -m videonotes export KATALOG_PROJEKTU`). Możesz bez serwera i internetu przeszukiwać wypowiedzi, nanosić poprawki i pobierać TXT/SRT/VTT/JSON. **ASR nadal nie działa w tej statycznej przeglądarce.** Osobną, ograniczoną betę edytora eksportów zintegrowano 11.11.2026 z `Constant_app/develop` pod `/apps/notatki-web/video-notes/`, bez przenoszenia silnika Windows; szczegóły w [raporcie integracji](docs/VN07_WIEDORA_BRIDGE_20261111.md). [Instrukcja i ograniczenia](docs/VN07_WEB_ADAPTER.md).
 
 **Eksport DOCX dla konspektu (VN-03):** dodaj opcję `--docx` do polecenia `advanced-notes`, aby otrzymać `exports/notes-advanced.docx` z cytatami i znacznikami czasu, bez API lub instalacji pakietów. Nie jest to podsumowanie semantyczne ani PDF. Etap VN-03 nadal W TRAKCIE.
 
@@ -243,3 +243,8 @@ Komendy `semantic-review-init`, `semantic-review-mark --confirm`, `semantic-revi
 ### Okno ręcznej recenzji szkicu AI
 
 W aplikacji desktop otwórz **Analiza opcjonalna → Oceń szkic AI**, wskaż lokalny szkic JSON, utwórz osobny katalog recenzji, porównaj cytaty i jawnie zatwierdź lub odrzuć każde twierdzenie. Eksport możliwy po kompletnej kontroli; decyzje deklaruje użytkownik, nie weryfikuje ich oprogramowanie.
+
+
+## Uzupełnienie testów przeglądarkowych 11.11.2026
+
+Po dodaniu ochrony rozmiarów eksportu test automatyczny Chromium/Chrome/Edge sprawdza także **rzeczywisty plik zapisany na dysku** z lokalnej strony `file://` (TXT, SRT, VTT, JSON i paczka korekt desktop), osobno od wcześniejszych makiet Blob. Testuje wyłącznie oryginalne, syntetyczne wypowiedzi i nie przekazuje treści do sieci. Rzeczywiste Chrome/Edge w CI nie zastępują fizycznych ręcznych odbiorów na urządzeniu użytkownika, Firefox ani czytnika ekranu.
