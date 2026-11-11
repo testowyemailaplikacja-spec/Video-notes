@@ -184,6 +184,16 @@ async function browserScenario() {
     throw new Error("Local WAV seek to 2s failed: "+mediaPlayer.currentTime);
   }
   if(!mediaPlayer.paused)throw new Error("Media playback started without user consent");
+  // Reverse direction: use the player's clock to reveal the matching cue.
+  const playhead=document.getElementById("jump-playhead");
+  if(!playhead||playhead.disabled)throw new Error("Playhead navigation disabled after media metadata");
+  document.querySelectorAll("#segment-rows button.segment-choice")[0].click();
+  mediaPlayer.currentTime=2.05;
+  playhead.click();
+  if(!document.getElementById("selected-label").textContent.includes("s-002") ||
+     editor.value!=="Druga wypowiedź.") {
+    throw new Error("Playhead did not locate second segment");
+  }
   // WEB-02 automated subtest: genuine browser import/search/page navigation with 50k rows.
   // The fixture is synthetic, never contains a private recording, and stays within MAX_BYTES.
   window.confirm = () => true;

@@ -468,3 +468,58 @@ test("unsupported local codec is reported without exposing file paths or persist
   assert.equal(ux.state.revoked.length, 1);
   assert.equal(ux.elements["seek-segment"].disabled, true);
 });
+
+test("playhead selection jumps to matching paginated row with no linear DOM redraw", async () => {
+  const ux = boot();
+  await ux.importFile(source("timeline", 180));
+  ux.importMedia();
+  const player = ux.elements["source-player"];
+  player.readyState = 1; player.duration = 1000;
+  player.events.loadedmetadata();
+  assert.equal(ux.elements["jump-playhead"].disabled, false);
+  player.currentTime = 150 * 1.5 + 0.15;
+  ux.elements["jump-playhead"].events.click();
+  assert.match(ux.elements["selected-label"].textContent, /seg-150/);
+  assert.equal(ux.elements["page-number"].textContent, "Strona 3 / 3");
+  assert.equal(ux.elements["segment-rows"].children.length, 30);
+  assert.equal(ux.elements["edit-text"].value, "timeline text 150");
+});
+test("playhead jump reveals filtered-out segment only after safe draft confirmation", async () => {
+  const ux = boot();
+  await ux.importFile(source("classes", 5));
+  ux.importMedia();
+  ux.elements["source-player"].readyState = 1;
+  ux.elements["source-player"].duration = 15;
+  ux.elements["source-player"].events.loadedmetadata();
+  ux.elements["search"].value = "text 0";
+  ux.elements["search"].events.input();
+  ux.select(0);
+  ux.elements["edit-text"].value = "Mój niezapisany szkic";
+  ux.elements["edit-text"].events.input();
+  ux.elements["source-player"].currentTime = 3.2;
+  ux.elements["jump-playhead"].events.click();
+  assert.equal(ux.elements["search"].value, "text 0");
+  assert.match(ux.elements["selected-label"].textContent, /seg-0/);
+  assert.equal(ux.elements["edit-text"].value, "Mój niezapisany szkic");
+  assert.equal(ux.state.prompts.length, 1);
+  ux.state.allow = true;
+  ux.elements["jump-playhead"].events.click();
+  assert.equal(ux.elements["search"].value, "");
+  assert.match(ux.elements["selected-label"].textContent, /seg-2/);
+  assert.equal(ux.elements["edit-text"].value, "classes text 2");
+});
+test("playhead jumper stays disabled before metadata or after removing source", async () => {
+  const ux = boot();
+  await ux.importFile(source("media", 2));
+  assert.equal(ux.elements["jump-playhead"].disabled, true);
+  ux.importMedia();
+  assert.equal(ux.elements["jump-playhead"].disabled, true);
+  ux.elements["source-player"].readyState = 1;
+  ux.elements["source-player"].events.loadedmetadata();
+  assert.equal(ux.elements["jump-playhead"].disabled, false);
+  ux.elements["source-player"].currentTime = Number.NaN;
+  ux.elements["jump-playhead"].events.click();
+  assert.match(ux.elements["status"].textContent, /prawidłowego czasu/);
+  ux.elements["source-player"].events.error();
+  assert.equal(ux.elements["jump-playhead"].disabled, true);
+});

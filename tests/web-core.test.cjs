@@ -215,3 +215,29 @@ test("patch import rejects duplicate IDs, foreign fields, nulls and malicious st
   assert.throws(() => read({...safe,changes:[{...safe.changes[0],after:"bad\u0000"}]}),/nieprawidłową/);
   assert.equal(Object.keys(read({...safe,changes:[]})).length,0);
 });
+
+test("binary timestamp lookup handles start, gaps, overlaps and equal starts", () => {
+  const rows = [
+    {start_ms: 1000, end_ms: 3000},
+    {start_ms: 2000, end_ms: 2800},
+    {start_ms: 2000, end_ms: 4000},
+    {start_ms: 7000, end_ms: 9000}
+  ];
+  assert.equal(core.locateAtTime(rows, 0), 0);
+  assert.equal(core.locateAtTime(rows, 1999), 0);
+  assert.equal(core.locateAtTime(rows, 2000), 2);
+  assert.equal(core.locateAtTime(rows, 6999), 2);
+  assert.equal(core.locateAtTime(rows, 7000), 3);
+  assert.equal(core.locateAtTime(rows, 9000), 3);
+  assert.throws(() => core.locateAtTime([], 1000), /pusta transkrypcja/);
+  assert.throws(() => core.locateAtTime(rows, NaN), /Nieprawidłowy czas/);
+  assert.throws(() => core.locateAtTime(rows, -1), /Nieprawidłowy czas/);
+});
+test("timestamp lookup supports 50k items without scanning the entire source", () => {
+  const rows = Array.from({length: 50000}, (_, i) => ({start_ms: i * 1500, end_ms: i * 1500 + 1000}));
+  for (let i = 0; i < 50000; i += 97) {
+    assert.equal(core.locateAtTime(rows, i * 1500), i);
+    assert.equal(core.locateAtTime(rows, i * 1500 + 1100), i);
+  }
+  assert.equal(core.locateAtTime(rows, 49999 * 1500), 49999);
+});

@@ -82,7 +82,8 @@
             <input id="source-media" type="file" accept="audio/*,video/*,.wav,.mp4,.mkv,.webm,.ogg,.m4a" disabled>
             <video id="source-player" controls preload="metadata" playsinline hidden aria-label="Odtwarzacz lokalnego nagrania"></video>
             <button id="seek-segment" type="button" disabled>Przejdź do czasu wypowiedzi</button>
-            <p class="note">Plik nie jest wysyłany do serwera. Upewnij się, że nagranie odpowiada wybranej transkrypcji. Odtwarzanie nie uruchamia się samo; nie wszystkie kodeki OBS działają w przeglądarce.</p>
+            <button id="jump-playhead" type="button" disabled>Wybierz wypowiedź z czasu nagrania</button>
+            <p class="note">Plik nie jest wysyłany do serwera. Upewnij się, że nagranie odpowiada wybranej transkrypcji. Odtwarzanie nie uruchamia się samo; nie wszystkie kodeki OBS działają w przeglądarce. Wybór według czasu wskazuje ostatnią rozpoczętą wypowiedź, również podczas przerwy między segmentami. Jeśli lista jest filtrowana, wyszukiwanie zostanie wyczyszczone tylko wtedy, gdy trzeba odsłonić odnaleziony segment.</p>
           </section>
         </aside>
       </div>
