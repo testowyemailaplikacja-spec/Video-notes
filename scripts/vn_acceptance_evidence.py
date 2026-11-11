@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import re
 from collections import Counter
 from datetime import date
@@ -75,10 +76,11 @@ def validate(payload: object) -> list[str]:
         case = row.get("case_id")
         kind = row.get("kind")
         result = row.get("result")
-        if case not in CASES or kind not in CASES.get(case, ()):
+        if (not isinstance(case, str) or case not in CASES or
+                not isinstance(kind, str) or kind not in CASES[case]):
             errors.append(prefix + ": unrecognized case/kind")
             continue
-        if result not in {"PASS", "FAIL", "NOT_RUN"}:
+        if not isinstance(result, str) or result not in {"PASS", "FAIL", "NOT_RUN"}:
             errors.append(prefix + ": invalid result")
             continue
         checked = row.get("checked_at")
@@ -165,7 +167,8 @@ def main() -> int:
     args = parser.parse_args()
     if args.init is not None:
         try:
-            with args.init.open("x", encoding="utf-8") as stream:
+            fd = os.open(args.init, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as stream:
                 json.dump(empty_template(), stream, ensure_ascii=False, indent=2)
                 stream.write("\n")
         except FileExistsError:
