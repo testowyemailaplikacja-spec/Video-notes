@@ -70,11 +70,16 @@ function boot() {
       target: {files: [{size: 1024, name: data.project_id, text: read}]}
     });
   }
+  async function importPatch(data, read = async () => JSON.stringify(data)) {
+    return elements["corrections-file"].events.change({
+      target: {files:[{size:1024,name:"web-corrections.json",text:read}]}
+    });
+  }
   function select(index) {
     const row = elements["segment-rows"].children[index];
     row.children[1].children[0].events.click();
   }
-  return {elements, state, win, doc, importFile, select, exportButtons};
+  return {elements, state, win, doc, importFile, importPatch, select, exportButtons};
 }
 
 function unload(ux) {
@@ -247,4 +252,62 @@ test("browser patch button exports only saved corrections and protects drafts", 
   assert.equal(patch.changes.length, 1);
   assert.equal(patch.changes[0].before, "desktop text 1");
   assert.equal(patch.changes[0].after, "Nowa poprawka do desktopu");
+});
+
+test("matching saved patch restores corrected text without changing original source", async () => {
+  const ux = boot(), original = source("same",2);
+  await ux.importFile(original);
+  assert.equal(ux.elements["corrections-file"].disabled, false);
+  await ux.importPatch(JSON.parse(core.renderCorrections(original,{"seg-1":"Własna korekta."})));
+  assert.match(ux.elements["edit-count"].textContent,/^1 poprawek/);
+  ux.select(1);
+  assert.equal(ux.elements["edit-text"].value,"Własna korekta.");
+  ux.exportButtons[0].events.click();
+  assert.match(ux.state.downloads[0].payload,/Własna korekta/);
+  assert.equal(original.segments[1].text,"same text 1");
+});
+test("declined patch replacement preserves edits; explicit consent replaces them", async () => {
+  const ux=boot(), original=source("same",2);
+  await ux.importFile(original);
+  ux.select(0);
+  ux.elements["edit-text"].value="Moja praca";
+  ux.elements["save-edit"].events.click();
+  const saved=JSON.parse(core.renderCorrections(original,{"seg-0":"Nowa wartość"}));
+  await ux.importPatch(saved);
+  assert.equal(ux.elements["edit-text"].value,"Moja praca");
+  assert.equal(ux.state.prompts.length,1);
+  ux.state.allow=true;
+  await ux.importPatch(saved);
+  assert.equal(ux.elements["edit-text"].value,"Nowa wartość");
+});
+test("foreign patch is rejected and stale async patch cannot replace a new source", async () => {
+  const ux=boot(),original=source("origin",2);
+  await ux.importFile(original);
+  const alien=JSON.parse(core.renderCorrections(source("other",2),{"seg-0":"Obcy"}));
+  await ux.importPatch(alien);
+  assert.match(ux.elements["status"].textContent,/Nie zastosowano/);
+  assert.match(ux.elements["edit-count"].textContent,/^0 poprawek/);
+  const saved=JSON.parse(core.renderCorrections(original,{"seg-0":"Nie zapisuj"}));
+  let release;
+  const pending=ux.importPatch(saved,()=>new Promise(resolve=>{release=resolve;}));
+  await ux.importFile(source("newsource",1));
+  release(JSON.stringify(saved));
+  await pending;
+  assert.match(ux.elements["match-count"].textContent,/^1 z 1/);
+  assert.match(ux.elements["edit-count"].textContent,/^0 poprawek/);
+});
+test("newly entered edits while patch reads require fresh consent", async () => {
+  const ux=boot(),original=source("original",2);
+  await ux.importFile(original);
+  const saved=JSON.parse(core.renderCorrections(original,{"seg-0":"Odtwórz"}));
+  let release;
+  const pending=ux.importPatch(saved,()=>new Promise(resolve=>{release=resolve;}));
+  ux.select(0);
+  ux.elements["edit-text"].value="Nowsza ręczna zmiana";
+  ux.elements["edit-text"].events.input();
+  release(JSON.stringify(saved));
+  await pending;
+  assert.equal(ux.elements["edit-text"].value,"Nowsza ręczna zmiana");
+  assert.match(ux.elements["status"].textContent,/Zachowano późniejsze/);
+  assert.equal(ux.state.prompts.length,1);
 });
