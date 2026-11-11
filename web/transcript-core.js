@@ -191,6 +191,44 @@
     return utf8BytesUnderLimit(JSON.stringify({schema: "videonotes-web-corrections-v1",
       project_id: doc.project_id, changes: changes}, null, 2) + String.fromCharCode(10), MAX_PATCH_BYTES);
   }
+  // Reapply an explicitly saved browser patch only to the exact source.
+  // No partial changes, cloud calls or persistent storage.
+  function parseCorrections(model, source) {
+    var doc = validateExport(model);
+    if (typeof source !== "string" || source.length > MAX_PATCH_BYTES) {
+      reject("Plik poprawek przekracza limit 20 MiB lub nie jest poprawnym tekstem.");
+    }
+    var patch;
+    try { patch = JSON.parse(source); }
+    catch (_error) { reject("Plik poprawek nie jest poprawnym JSON."); }
+    if (!plainObject(patch) ||
+        Object.keys(patch).sort().join(",") !== "changes,project_id,schema" ||
+        patch.schema !== "videonotes-web-corrections-v1" ||
+        patch.project_id !== doc.project_id ||
+        !Array.isArray(patch.changes) || patch.changes.length > MAX_SEGMENTS) {
+      reject("Paczka nie pasuje do transkrypcji lub ma niepoprawny format.");
+    }
+    var byId = new Map(doc.segments.map(function (item) { return [item.id, item]; }));
+    var seen = new Set();
+    var result = Object.create(null);
+    for (var row of patch.changes) {
+      if (!plainObject(row) ||
+          Object.keys(row).sort().join(",") !== "after,before,end_ms,id,start_ms" ||
+          typeof row.id !== "string" || !/^[A-Za-z0-9_-]{1,60}$/.test(row.id) ||
+          seen.has(row.id) || !byId.has(row.id) ||
+          !validText(row.before, MAX_TEXT) || !validText(row.after, MAX_TEXT)) {
+        reject("Paczka zawiera obcą, zduplikowaną lub nieprawidłową poprawkę.");
+      }
+      var base = byId.get(row.id);
+      if (row.start_ms !== base.start_ms || row.end_ms !== base.end_ms ||
+          row.before !== base.text) {
+        reject("Tekst lub czasy źródłowe zmieniły się; nie zastosowano żadnej poprawki.");
+      }
+      seen.add(row.id);
+      if (row.after !== row.before) result[row.id] = row.after;
+    }
+    return result;
+  }
   function search(model, edits, term) {
     var doc = validateExport(model);
     var query = String(term || "").trim().toLocaleLowerCase();
@@ -210,6 +248,7 @@
     parseExport: parseExport, validateExport: validateExport,
     clock: clock, corrected: corrected, renderExport: renderExport,
     renderExports: renderExports, renderCorrections: renderCorrections,
+    parseCorrections: parseCorrections,
     search: search
   };
   if (typeof module !== "undefined" && module.exports) module.exports = core;

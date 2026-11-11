@@ -27,6 +27,11 @@
       </div>
       <label for="source-file" class="upload-label">Wybierz transcript.json</label>
       <input id="source-file" type="file" accept=".json,application/json">
+      <div class="patch-import">
+        <label for="corrections-file">Wczytaj pobrane wcześniej poprawki (web-corrections.json)</label>
+        <input id="corrections-file" type="file" accept=".json,application/json" disabled>
+        <p>Najpierw otwórz odpowiadającą im transkrypcję. Niepasujące lub uszkodzone poprawki nie zmienią dokumentu.</p>
+      </div>
       <p id="status" class="status" role="status" aria-live="polite">Plik pozostaje tylko na tym urządzeniu. Zmiany nie są zapisywane automatycznie.</p>
     </section>
     <section class="workbench" aria-label="Podgląd i poprawki transkrypcji">
