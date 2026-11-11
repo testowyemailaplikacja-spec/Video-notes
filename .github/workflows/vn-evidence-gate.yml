@@ -1,0 +1,31 @@
+name: KWN manual evidence safety gate
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - 'scripts/vn_acceptance_evidence.py'
+      - 'tests/test_acceptance_evidence.py'
+      - 'docs/VN_MANUAL_EVIDENCE.md'
+      - '.github/workflows/vn-evidence-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  evidence-gate:
+    name: Metadata-only evidence guard
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Execute privacy/false-PASS tests
+        run: python -m unittest tests.test_acceptance_evidence -v
+      - name: Generate a private-free NOT_RUN template and report
+        run: |
+          python scripts/vn_acceptance_evidence.py --init selftest-evidence.json
+          python scripts/vn_acceptance_evidence.py --check selftest-evidence.json
