@@ -63,8 +63,18 @@ def render_exports(folder: Path) -> dict[str, bytes]:
 
 def export_project(folder: Path) -> list[Path]:
     folder = Path(folder)
+    # A concurrent manual correction may land after the first transcript
+    # render. Do not overwrite reviewed TXT/SRT/VTT/JSON with an obsolete
+    # snapshot. Re-render all four payloads against the current data before
+    # publishing the first output.
+    rendered = render_exports(folder)
+    if rendered != render_exports(folder):
+        raise VideoNotesError(
+            "Transkrypcja lub poprawki zmieniły się podczas przygotowania eksportu; "
+            "poprzednie pliki pozostawiono bez zmian."
+        )
     result = []
-    for name, payload in render_exports(folder).items():
+    for name, payload in rendered.items():
         dest = folder / "exports" / name
         atomic_write(dest, payload)
         result.append(dest)
