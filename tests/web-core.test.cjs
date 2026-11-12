@@ -15,6 +15,43 @@ function fixture() {
   };
 }
 
+test("browser JSON parser rejects duplicate root and nested keys, including unicode aliases", () => {
+  const doc = JSON.stringify(fixture());
+  const duplicateSchema = doc.replace(
+    '"schema":"videonotes-export-v1"',
+    '"schema":"videonotes-export-v1","schema":"videonotes-export-v1"'
+  );
+  assert.throws(() => core.parseExport(duplicateSchema), /Zduplikowany klucz JSON/);
+  const duplicateText = doc.replace(
+    '"text":"Dzień dobry, witam na wykładzie."',
+    '"text":"A suspicious edit","text":"Dzień dobry, witam na wykładzie."'
+  );
+  assert.throws(() => core.parseExport(duplicateText), /Zduplikowany klucz JSON/);
+  const escapedAlias = doc.replace(
+    '"text":"Dzień dobry, witam na wykładzie."',
+    '"\\u0074ext":"Injected","text":"Dzień dobry, witam na wykładzie."'
+  );
+  assert.throws(() => core.parseExport(escapedAlias), /Zduplikowany klucz JSON/);
+  const colonAndBraces = fixture();
+  colonAndBraces.segments[0].text = 'Literal text: {"after":"not a property"}, \\';
+  assert.equal(core.parseExport(JSON.stringify(colonAndBraces)).segments[0].text,
+               colonAndBraces.segments[0].text);
+});
+
+test("browser patch import refuses duplicate edit after fields before applying any changes", () => {
+  const doc = fixture();
+  const edited = Object.create(null);
+  edited[doc.segments[0].id] = "Nowa własna poprawka";
+  const patch = core.renderCorrections(doc, edited);
+  const bad = patch.replace('"after":"Nowa własna poprawka"',
+                            '"after":"Injected", "after":"Nowa własna poprawka"');
+  assert.throws(() => core.parseCorrections(doc, bad), /Zduplikowany klucz JSON/);
+  const escaped = patch.replace('"after":"Nowa własna poprawka"',
+                                '"\\u0061fter":"Injected", "after":"Nowa własna poprawka"');
+  assert.throws(() => core.parseCorrections(doc, escaped), /Zduplikowany klucz JSON/);
+  assert.equal(core.parseCorrections(doc, patch)[doc.segments[0].id], edited[doc.segments[0].id]);
+});
+
 test("parse validates schema and returns independent source copy", () => {
   const raw = fixture();
   const parsed = core.parseExport(JSON.stringify(raw));
