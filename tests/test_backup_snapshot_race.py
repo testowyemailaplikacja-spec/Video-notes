@@ -70,7 +70,7 @@ class SnapshotConsistencyTest(unittest.TestCase):
         deleted = []
         def concurrent_remove(folder, filename):
             content = _read_source_json(folder, filename)
-            if filename.startswith("notes-history/") and not deleted:
+            if Path(folder).name == "notes-history" and filename.endswith(".json") and not deleted:
                 entries[0].unlink()
                 deleted.append(True)
             return content
