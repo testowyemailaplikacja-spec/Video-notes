@@ -174,7 +174,7 @@ class LocalASRLabTest(unittest.TestCase):
     @patch("videonotes.asr_lab.probe")
     @patch("videonotes.asr_lab.extract_chunk")
     def test_refuse_empty_or_invalid_reference_before_expensive_inference(self, extract, probe, executable):
-        for raw in (b"", b"!!! /// ???", b"\\xff\\xfe\\xff", b"x" * 300_001):
+        for raw in (b"", b"!!! /// ???", bytes([0xff, 0xfe, 0xff]), b"x" * 300_001):
             with self.subTest(data_len=len(raw)):
                 self.reference.write_bytes(raw)
                 with self.assertRaises(VideoNotesError):
