@@ -195,6 +195,52 @@ class SpeechIntervalIndexTest(unittest.TestCase):
         self.assertEqual(self.find(rows, 601)[0]["segment_id"], "c")
         self.assertIsNone(self.find(rows, 600, gap=99)[0])
 
+    def test_equal_start_prefers_lexical_id_for_covering_and_gap_cases(self):
+        covering = [
+            {"id": "z-last", "start_ms": 100, "end_ms": 500, "text": "Z"},
+            {"id": "m-short", "start_ms": 100, "end_ms": 150, "text": "M"},
+            {"id": "a-first", "start_ms": 100, "end_ms": 500, "text": "A"},
+        ]
+        self.assertEqual(self.find(covering, 300)[0]["segment_id"], "a-first")
+        # The first covering interval cannot be an already ended short peer.
+        self.assertEqual(self.find(covering, 120)[0]["segment_id"], "a-first")
+        all_ended = [
+            {"id": "z-last", "start_ms": 100, "end_ms": 200, "text": "Z"},
+            {"id": "a-first", "start_ms": 100, "end_ms": 200, "text": "A"},
+        ]
+        self.assertEqual(self.find(all_ended, 300)[0]["segment_id"], "a-first")
+        self.assertEqual(self.find(all_ended, 10)[0]["segment_id"], "a-first")
+
+    def test_random_equal_start_order_matches_exhaustive_lexical_oracle(self):
+        import random
+        rng = random.Random(144)
+        rows = []
+        for group in range(120):
+            peers = [
+                {"id": f"s-{rng.randrange(900):04d}-{group:03d}-{i}",
+                 "start_ms": group * 97,
+                 "end_ms": group * 97 + rng.randrange(1, 1900),
+                 "text": "synthetic"}
+                for i in range(4)
+            ]
+            rng.shuffle(peers)
+            rows.extend(peers)
+        raw = {x["id"]: x for x in rows}
+        starts = [x["start_ms"] for x in rows]
+        prefix_end, best = _time_index(rows, raw)
+        for moment in [0, 1, 300, 2000, 7000, 12000, 20000] + [
+            rng.randrange(0, 22000) for _ in range(240)
+        ]:
+            chosen, delay = _nearest(moment, rows, starts, raw, 100_000,
+                                     prefix_end, best)
+            expected = min(rows, key=lambda x: (
+                max(x["start_ms"] - moment, moment - x["end_ms"], 0),
+                x["start_ms"], x["id"]
+            ))
+            self.assertEqual(chosen["segment_id"], expected["id"])
+            self.assertEqual(delay, max(expected["start_ms"] - moment,
+                                        moment - expected["end_ms"], 0))
+
     def test_index_matches_exhaustive_reference_for_nested_intervals(self):
         import random
         randomizer = random.Random(72)

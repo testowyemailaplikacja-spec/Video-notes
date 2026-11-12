@@ -24,3 +24,7 @@ Teraz indeks przedziałów zawiera maksimum końca w prefiksie. Wyszukiwanie bin
 ## Spójność zapisywanego Markdown (12.11.2026)
 
 Przy eksportowaniu indeksu czasowego slajd–wypowiedź do Markdown aplikacja odczytuje zweryfikowany indeks, a potem sprawdza jeszcze raz SHA-256 pliku rzeczywiście użytego do renderowania. Przed zapisem porównuje również pełny, powtórnie zweryfikowany raport i źródła. Jeżeli plik został podmieniony albo tekst OCR został zmieniony w odczycie między kontrolą a renderowaniem, eksport jest odrzucany. Testy symulują obie sytuacje bez prywatnych nagrań. To kontrola pochodzenia i spójności, nie potwierdzenie, że OCR lub mowa są merytorycznie zgodne; odbiór na realnych slajdach jest nadal otwarty.
+
+## Powtarzające się czasy początkowe wypowiedzi (12.11.2026)
+
+W niektórych surowych transkrypcjach kilka segmentów ASR zaczyna się dokładnie w tej samej milisekundzie. Indeks OCR–mowa rozstrzyga teraz taki remis deterministycznie po **leksykalnym identyfikatorze segmentu**, niezależnie od kolejności wpisów w transkrypcji. Dotyczy to zarówno segmentów pokrywających moment slajdu, jak i najbliższego odcinka przed/po slajdzie. Testy obejmują odwróconą kolejność ID oraz porównanie wielu losowych przedziałów z pełnym przeglądem wszystkich segmentów. Nadal jest to dopasowanie według czasu, a nie dowód zgodności treści slajdu z wypowiedzią.
