@@ -42,6 +42,8 @@ def _inspect_part(path: Path, *, timeline_start_ms: int) -> dict:
     current_quiet_ms = 0
     quiet_ranges: list[dict] = []
     active_quiet_start_ms: int | None = None
+    leading_quiet_ms = 0
+    still_in_leading_silence = True
     with wave.open(str(path), "rb") as audio:
         if (audio.getnchannels(), audio.getsampwidth(), audio.getframerate()) != (1, 2, SAMPLE_RATE):
             raise VideoNotesError("Diagnostyka wymaga PCM mono 16 kHz/16 bit.")
@@ -80,8 +82,11 @@ def _inspect_part(path: Path, *, timeline_start_ms: int) -> dict:
                     active_quiet_start_ms = timeline_start_ms + offset_ms
                 quiet_duration_ms += duration_ms
                 current_quiet_ms += duration_ms
+                if still_in_leading_silence:
+                    leading_quiet_ms += duration_ms
                 longest_quiet_ms = max(longest_quiet_ms, current_quiet_ms)
             else:
+                still_in_leading_silence = False
                 if active_quiet_start_ms is not None and len(quiet_ranges) < MAX_SILENCE_EXAMPLES:
                     quiet_ranges.append({
                         "start_ms": active_quiet_start_ms,
@@ -106,6 +111,9 @@ def _inspect_part(path: Path, *, timeline_start_ms: int) -> dict:
         "silence_examples": quiet_ranges,
         "_sum_squares": sum_squares,
         "_peak": peak,
+        "_leading_quiet_ms": leading_quiet_ms,
+        "_trailing_quiet_ms": current_quiet_ms,
+        "_all_quiet": still_in_leading_silence,
     }
 
 
@@ -126,6 +134,10 @@ def analyze_finished_recording(folder: Path) -> dict:
     clipped = 0
     silent = 0
     longest = 0
+    # Consecutive quiet windows can span the boundary between two WAV takes.
+    # The old implementation restarted the counter for each file, so a long
+    # silence across two parts was reported shorter than the real recording.
+    open_quiet_ms = 0
     timeline_ms = 0
     for segment in checked["segments"]:
         stats = _inspect_part(folder / segment["name"], timeline_start_ms=timeline_ms)
@@ -139,10 +151,19 @@ def analyze_finished_recording(folder: Path) -> dict:
         peak = max(peak, stats["_peak"])
         clipped += stats["clipped_samples"]
         silent += stats["silent_duration_ms"]
-        longest = max(longest, stats["longest_silence_ms"])
+        longest = max(longest, stats["longest_silence_ms"],
+                      open_quiet_ms + stats["_leading_quiet_ms"])
+        if stats["_all_quiet"]:
+            open_quiet_ms += stats["duration_ms"]
+        else:
+            open_quiet_ms = stats["_trailing_quiet_ms"]
         timeline_ms += stats["duration_ms"]
     if not samples:
         raise VideoNotesError("Brak próbek audio do diagnostyki.")
+    # PCM may change even while we're scanning. Repeat journal/hash validation
+    # before claiming a completed, integrity-checked signal report.
+    if recording_status(folder) != checked:
+        raise VideoNotesError("Sesja WAV zmieniła się podczas diagnostyki; raportu nie zaakceptowano.")
     total_ms = samples * 1000 // SAMPLE_RATE
     rms_dbfs = _dbfs(math.sqrt(sum_squares / samples))
     peak_dbfs = _dbfs(peak)
