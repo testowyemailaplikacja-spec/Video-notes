@@ -30,13 +30,13 @@ TRANSACTION_FILE = ".notes-transaction.json"
 LOCK_PATTERN = re.compile(rb"pid=([1-9][0-9]{0,9})\r?\n")
 
 
-def _write_notes_lock_pid(descriptor: int) -> None:
-    """Make a newly acquired lock independently inspectable after a crash."""
+def _write_notes_lock_pid(descriptor: int) -> os.stat_result:
+    """Write PID and capture post-write identity before closing the descriptor."""
     with os.fdopen(descriptor, "w", encoding="ascii") as writer:
         writer.write(f"pid={os.getpid()}\n")
         writer.flush()
         os.fsync(writer.fileno())
-
+        return os.fstat(writer.fileno())
 
 def notes_lock_status(folder: Path) -> dict:
     """Inspect local notes lock without signalling or terminating any process."""
@@ -292,8 +292,7 @@ def recover_interrupted_note_update(folder: Path, *, confirm: bool = False) -> d
             "Blokada notatek jest aktywna lub pozostała po awarii. Sprawdź proces przed jej ręcznym usunięciem."
         ) from error
     try:
-        owner = os.fstat(descriptor)
-        _write_notes_lock_pid(descriptor)
+        owner = _write_notes_lock_pid(descriptor)
         intent = load_json(path)
         required = {"schema", "project_id", "snapshot_revision",
                     "old_notes_sha256", "old_edits_sha256",
@@ -362,8 +361,7 @@ def regenerate_basic_notes(folder: Path, *, window_minutes: int = 5, points_per_
     except FileExistsError as error:
         raise VideoNotesError("Trwa inna operacja na notatkach.") from error
     try:
-        owner = os.fstat(descriptor)
-        _write_notes_lock_pid(descriptor)
+        owner = _write_notes_lock_pid(descriptor)
         # Once the guard is held, verify files did not change since reading them.
         if load_json(folder / "notes.json") != old_notes or load_json(folder / "notes-edits.json") != old_edits:
             raise VideoNotesError("Notatki zmieniono równocześnie. Spróbuj ponownie.")
@@ -403,8 +401,7 @@ def restore_note_version(folder: Path, revision: str) -> str:
     except FileExistsError as error:
         raise VideoNotesError("Trwa inna operacja na notatkach.") from error
     try:
-        owner = os.fstat(descriptor)
-        _write_notes_lock_pid(descriptor)
+        owner = _write_notes_lock_pid(descriptor)
         if load_json(folder / "notes.json") != old_notes or load_json(folder / "notes-edits.json") != old_edits:
             raise VideoNotesError("Notatki zmieniono równocześnie.")
         _transaction_guard(folder)
