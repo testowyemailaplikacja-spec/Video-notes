@@ -8,6 +8,7 @@ when optional psutil monitoring is unavailable.
 from __future__ import annotations
 
 import json
+import math
 import os
 import subprocess
 import sys
@@ -38,6 +39,7 @@ def _run_process(command: list[str], *, timeout_seconds: int = 3600) -> dict:
     env.update({"HF_HUB_OFFLINE": "1", "HF_HUB_DISABLE_TELEMETRY": "1",
                 "TRANSFORMERS_OFFLINE": "1", "OMP_NUM_THREADS": env.get("OMP_NUM_THREADS", "4")})
     peak: int | None = None
+    cpu_observed: float | None = None
     try:
         proc = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                                 stderr=subprocess.DEVNULL, shell=False, env=env)
@@ -53,9 +55,20 @@ def _run_process(command: list[str], *, timeout_seconds: int = 3600) -> dict:
             if watcher:
                 try:
                     current = watcher.memory_info().rss
+                    parent_cpu = watcher.cpu_times()
+                    total_cpu = parent_cpu.user + parent_cpu.system
                     for child in watcher.children(recursive=True):
-                        current += child.memory_info().rss
+                        try:
+                            current += child.memory_info().rss
+                            child_cpu = child.cpu_times()
+                            total_cpu += child_cpu.user + child_cpu.system
+                        except (psutil.NoSuchProcess, psutil.AccessDenied):
+                            # A very short-lived worker is not a reason to
+                            # report a made-up RAM/CPU measurement.
+                            continue
                     peak = max(peak or 0, current)
+                    # Sampling is a lower bound, not total lifetime CPU usage.
+                    cpu_observed = max(cpu_observed or 0.0, total_cpu)
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
                     pass
             time.sleep(0.05)
@@ -66,7 +79,43 @@ def _run_process(command: list[str], *, timeout_seconds: int = 3600) -> dict:
             proc.kill()
             proc.wait()
     return {"wall_seconds": round(time.perf_counter() - start, 3),
-            "peak_rss_bytes": peak, "ram_measured": peak is not None}
+            "peak_rss_bytes": peak, "ram_measured": peak is not None,
+            "cpu_seconds_observed": round(cpu_observed, 3) if cpu_observed is not None else None,
+            "cpu_measured": cpu_observed is not None}
+
+
+def _safe_process_metrics(measurements: dict, label: str) -> dict:
+    """Sanitize measurements before writing a shareable report.
+
+    A runner may accidentally include its command line, model path or private
+    transcript. Never serialize arbitrary keys and never accept NaN/Inf as JSON.
+    """
+    error = VideoNotesError(f"Nieprawidłowe metryki procesu {label}.")
+    if not isinstance(measurements, dict):
+        raise error
+    wall = measurements.get("wall_seconds")
+    if type(wall) not in (int, float) or not math.isfinite(wall) or not 0 <= wall <= 86400:
+        raise error
+    peak = measurements.get("peak_rss_bytes")
+    if peak is not None and (type(peak) is not int or not 0 <= peak <= (1 << 63) - 1):
+        raise error
+    ram_flag = measurements.get("ram_measured", peak is not None)
+    if type(ram_flag) is not bool or ram_flag != (peak is not None):
+        raise error
+    cpu = measurements.get("cpu_seconds_observed")
+    if cpu is not None and (type(cpu) not in (int, float) or not math.isfinite(cpu) or
+                            not 0 <= cpu <= 86400 * 64):
+        raise error
+    cpu_flag = measurements.get("cpu_measured", cpu is not None)
+    if type(cpu_flag) is not bool or cpu_flag != (cpu is not None):
+        raise error
+    return {
+        "wall_seconds": round(wall, 3),
+        "peak_rss_bytes": peak,
+        "ram_measured": ram_flag,
+        "cpu_seconds_observed": round(cpu, 3) if cpu is not None else None,
+        "cpu_measured": cpu_flag,
+    }
 
 
 def run_real_benchmark(source: Path, reference: Path, *, cpp_executable: str,
@@ -96,6 +145,10 @@ def run_real_benchmark(source: Path, reference: Path, *, cpp_executable: str,
     reference = Path(reference).expanduser().resolve()
     if not reference.is_file():
         raise VideoNotesError("Brakuje ręcznie sprawdzonej referencyjnej transkrypcji TXT.")
+    # A bogus/oversized reference must fail before running expensive ASR,
+    # not after two full inference passes. This is an offline self-comparison:
+    # it validates UTF-8, size and a non-empty normalized spoken-word sample.
+    compare_text_files(reference, {"reference_preflight": reference})
     if output is not None and Path(output).exists():
         raise VideoNotesError("Raport już istnieje; nie nadpisuję poprzednich wyników.")
     meta = probe(source, ffprobe)
@@ -110,6 +163,7 @@ def run_real_benchmark(source: Path, reference: Path, *, cpp_executable: str,
         wav = tmp / "identical-input.wav"
         extract_chunk(source, track["index"], start_ms=offset, duration_ms=duration,
                       destination=wav, ffmpeg=ffmpeg)
+        pcm_digest = sha256_file(wav)  # Same exact temporary input for both engines.
         cpp_output_base = tmp / "whisper_cpp"
         cpp_output = tmp / "whisper_cpp.txt"
         faster_output = tmp / "faster_whisper.txt"
@@ -132,11 +186,10 @@ def run_real_benchmark(source: Path, reference: Path, *, cpp_executable: str,
                 measurements = process_runner(command)
             except VideoNotesError as error:
                 raise VideoNotesError(f"Lokalny silnik {label} nie ukończył benchmarku.") from error
-            if not isinstance(measurements, dict) or not isinstance(measurements.get("wall_seconds"), (int, float)):
-                raise VideoNotesError(f"Nieprawidłowe metryki procesu {label}.")
+            metrics = _safe_process_metrics(measurements, label)
             if not expected.is_file():
                 raise VideoNotesError(f"Silnik {label} nie zapisał wynikowej transkrypcji TXT.")
-            stats[label] = measurements
+            stats[label] = metrics
         comparison = compare_text_files(reference, {label: file for label, _, file in commands})
     report = {
         "schema": REPORT_SCHEMA, "source_sha256": sha256_file(source),
@@ -146,12 +199,12 @@ def run_real_benchmark(source: Path, reference: Path, *, cpp_executable: str,
         "faster_config_sha256": sha256_file(faster_model_dir / "config.json"),
         "local_subprocesses_executed": True, "engine_binary_identity_independently_verified": False,
         "input_clip": {"start_ms": offset, "duration_ms": duration, "stream_index": track["index"],
-                       "wav_sample_rate": 16000, "wav_channels": 1},
+                       "wav_sample_rate": 16000, "wav_channels": 1, "pcm_sha256": pcm_digest},
         "settings": {"language": language, "cpu_threads": threads, "beam_size": 5, "gpu": False},
         "accuracy": comparison["results"], "timing_and_memory": stats,
         "license_recheck_required": True,
-        "interpretation": "Local benchmark. Quality requires human-reviewed reference; reported RSS requires installed psutil.",
+        "interpretation": "Local benchmark with a human-reviewed reference. RSS and sampled CPU seconds require psutil; observed CPU is a lower bound, not complete CPU time.",
     }
     if output is not None:
-        atomic_write(Path(output), (json.dumps(report, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
+        atomic_write(Path(output), (json.dumps(report, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode("utf-8"))
     return report

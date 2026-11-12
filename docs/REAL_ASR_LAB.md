@@ -84,3 +84,10 @@ Test `scripts/real_asr_smoke.py` po rozpoznaniu polskiego i angielskiego syntety
 4. Konspekt zaawansowany `MD/JSON/DOCX` powstaje z **rzeczywistego lokalnego wyniku ASR**, zawiera cytaty o prawidłowych ID i czasach, poprawioną treść w Word DOCX oraz nie dodaje obcych wypowiedzi.
 
 To test **ekstrakcyjnego konspektu źródłowego**, nie semantycznego rozumienia wykładu. Zestaw testowy generowany jest wyłącznie w jednorazowym CI, bez prywatnych nagrań i bez wysyłania transkrypcji. Status wykonania należy potwierdzić na GitHub Actions powiązanym z PR przed oznaczeniem `PASS`. Formalny odbiór VN-02/VN-03 nadal wymaga jakościowej oceny prawdziwych materiałów i urządzeń.
+
+
+## Aktualizacja pomiarów i prywatności — 12.11.2026 (VN-00)
+
+Przed uruchomieniem rzeczywistego rozpoznawania program lokalnie weryfikuje plik referencyjny: UTF-8, limit 300 KB, niepustą treść i dopuszczalną liczbę słów. Błędny wzorzec nie uruchamia FFmpeg ani modeli. Raport przechowuje teraz `input_clip.pcm_sha256`: hash *identycznego tymczasowego WAV*, z którego korzystały oba silniki. Zwalidowane metryki to wyłącznie `wall_seconds`, `peak_rss_bytes`, `ram_measured`, `cpu_seconds_observed`, `cpu_measured`. Wszystkie inne pola otrzymane od uruchamiacza są pomijane, więc ścieżki lokalne i tekst nie dostaną się przypadkiem do raportu. `NaN`, `Infinity`, ujemny RAM/czas i sprzeczne flagi pomiarowe są odrzucane, a raport nie jest wtedy tworzony.
+
+Licznik `cpu_seconds_observed` bazuje na próbkach procesu i jego żyjących dzieci, wymaga lokalnie zainstalowanego `psutil` i **stanowi dolne oszacowanie**, nie pełny bilans zużycia CPU. Jeśli pomiar jest niedostępny, otrzymuje `null`, a `cpu_measured=false`. Zarówno te testy CI, jak i hash PCM nie dowodzą jakości rzeczywistej transkrypcji: VN-00-01/02 nadal wymagają legalnych naturalnych nagrań i referencji użytkownika, a wybór silnika musi nastąpić dopiero po ocenie jakości i licencji.
