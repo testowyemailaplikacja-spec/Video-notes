@@ -21,7 +21,6 @@ from .contracts import sha256_file
 from .errors import VideoNotesError
 from .media import choose_stream, executable, extract_chunk, probe
 from .quality import compare_text_files, validate_reference_file
-from .storage import atomic_write
 
 REPORT_SCHEMA = "videonotes-real-asr-benchmark-v1"
 MAX_SECONDS = 600
@@ -118,6 +117,34 @@ def _safe_process_metrics(measurements: dict, label: str) -> dict:
     }
 
 
+def _publish_unique_report(destination: Path, payload: bytes) -> None:
+    """Publish a fully written benchmark report without replacing a rival run."""
+    path = Path(destination).expanduser().absolute()
+    if path.exists() or path.is_symlink():
+        raise VideoNotesError("Raport benchmarku już istnieje; wybierz nową nazwę.")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    staged: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=path.parent, prefix=".vn-asr-report-",
+                                         suffix=".tmp", delete=False) as stream:
+            staged = stream.name
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        # os.replace would silently overwrite a report created AFTER the early
+        # exists() check. Same-filesystem hardlink gives atomic no-clobber on
+        # supported POSIX/NTFS filesystems.
+        try:
+            os.link(staged, path)
+        except FileExistsError as error:
+            raise VideoNotesError("Raport benchmarku zapisano już równolegle; nie nadpisuję go.") from error
+        except OSError as error:
+            raise VideoNotesError("Nie można bezpiecznie zapisać raportu ASR bez nadpisywania.") from error
+    finally:
+        if staged:
+            Path(staged).unlink(missing_ok=True)
+
+
 def run_real_benchmark(source: Path, reference: Path, *, cpp_executable: str,
                        cpp_model: Path, faster_model_dir: Path,
                        language: str = "pl", threads: int = 4,
@@ -148,7 +175,7 @@ def run_real_benchmark(source: Path, reference: Path, *, cpp_executable: str,
     # Validate UTF-8, file size and reference tokens in O(n) before running
     # expensive FFmpeg/ASR. This does NOT establish alignment with the clip.
     validate_reference_file(reference)
-    if output is not None and Path(output).exists():
+    if output is not None and (Path(output).exists() or Path(output).is_symlink()):
         raise VideoNotesError("Raport już istnieje; nie nadpisuję poprzednich wyników.")
     meta = probe(source, ffprobe)
     track = choose_stream(meta, stream)
@@ -222,5 +249,5 @@ def run_real_benchmark(source: Path, reference: Path, *, cpp_executable: str,
         "interpretation": "Local benchmark with a human-reviewed reference. RSS and sampled CPU seconds require psutil; observed CPU is a lower bound, not complete CPU time.",
     }
     if output is not None:
-        atomic_write(Path(output), (json.dumps(report, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode("utf-8"))
+        _publish_unique_report(Path(output), (json.dumps(report, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode("utf-8"))
     return report
