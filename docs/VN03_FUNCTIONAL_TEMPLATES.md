@@ -48,3 +48,7 @@ W **notatce podstawowej** analogiczny przycisk **„Przejdź do źródła transk
 ## Ochrona przewodnika przed eksportem nieaktualnej transkrypcji (12.11.2026)
 
 Przy generowaniu lokalnego przewodnika do nauki (Markdown/JSON i opcjonalnie Word/PDF) aplikacja przygotowuje pełną zawartość w pamięci, a następnie **ponownie odczytuje zweryfikowaną transkrypcję i poprawki ręczne przed pierwszym zapisem wyników**. Jeśli użytkownik poprawił segment w czasie renderowania lub czasochłonnej konwersji PDF, eksport jest odrzucany, a dotychczasowe dokumenty pozostają nienaruszone. Testy celowo zmieniają poprawkę transkrypcji po zbudowaniu przewodnika i w trakcie tworzenia PDF. Mechanizm ogranicza publikowanie nieaktualnych notatek, lecz nie zapewnia wieloplikowej transakcji względem dowolnych procesów zewnętrznych, które mogą zmienić dane w chwili późniejszej.
+
+## Ochrona konspektu przed eksportem nieaktualnych cytatów (12.11.2026)
+
+Po renderowaniu wszystkich formatów konspektu (Markdown/JSON oraz opcjonalnie DOCX/PDF) silnik **ponownie buduje cały konspekt z bieżącej transkrypcji i jej poprawek**, zanim zapisze pierwszy plik. Zmiana treści wykładu podczas konwersji PDF odrzuca eksport i zachowuje dotychczasowe dokumenty. Testy wymuszają taką poprawkę w trakcie generowania PDF, następnie sprawdzają cztery wcześniejsze pliki. Wieloplikowy zapis pozostaje sekwencyjny i nie jest transakcją wobec awarii dysku po rozpoczęciu publikacji.

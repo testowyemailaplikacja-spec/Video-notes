@@ -98,3 +98,7 @@ Wszystkie operacje notatek, które korzystają z `.notes.lock` (utworzenie, edyc
 ## Zgodność decyzji przy eksporcie notatek AI — 12.11.2026
 
 Podczas eksportowania zatwierdzonych twierdzeń szkicu aplikacja ponownie sprawdza **pełny zestaw decyzji** (każdą zgodę/odrzucenie, notatkę recenzenta, manifest oraz źródłowy szkic), zamiast porównywać wyłącznie liczbę twierdzeń zatwierdzonych i odrzuconych. Wcześniej podmiana dwóch decyzji między odczytami mogła pozostawić te same liczniki, a wynik zawierałby twierdzenia zatwierdzone w nieaktualnej wersji rejestru. Obecnie taki eksport jest wstrzymywany bez zapisywania pliku. Testy symulują podmianę dwóch decyzji oraz zmianę notatki recenzenta po pierwszym odczycie. Nie jest to dowód prawdziwości twierdzeń ani tożsamości człowieka; decyzje są deklaracjami użytkownika, a niekooperujący proces zewnętrzny nadal może wykonać zmianę po ostatniej weryfikacji.
+
+## Eksport podstawowego PDF ze spójną notatką (12.11.2026)
+
+Podczas opcjonalnej konwersji notatki podstawowej do PDF w lokalnym LibreOffice użytkownik może równolegle poprawić notatkę. Po wygenerowaniu PDF i przed nadpisaniem istniejącego dokumentu aplikacja **ponownie odczytuje zweryfikowaną notatkę oraz ręczne poprawki**. Jeśli choćby jedna zmiana nastąpiła podczas przetwarzania, stary PDF zostaje nienaruszony, a operacja odmawia publikacji. Test syntetycznie wprowadza edycję podczas konwersji. Nie jest to zamiennik weryfikacji wyglądu PDF w Word/LibreOffice na fizycznym Windows.

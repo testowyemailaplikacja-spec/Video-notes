@@ -14,8 +14,9 @@ from tests.test_notes import fixture
 from videonotes.advanced_notes import export_advanced_outline
 from videonotes.cli import main
 from videonotes.errors import VideoNotesError
-from videonotes.notes import generate_basic_notes
+from videonotes.notes import generate_basic_notes, read_basic_notes, edit_note_point
 from videonotes.pdf_export import export_basic_notes_pdf, render_pdf_from_docx
+from videonotes.storage import load_json, save_json
 
 PDF = b"%PDF-1.4\n1 0 obj <<>> endobj\ntrailer <<>>\n%%EOF\n"
 
@@ -46,6 +47,49 @@ class PDFOfflineTest(unittest.TestCase):
                 self.assertEqual(main(["notes-export", str(self.root), "--pdf", "--docx"]), 2)
         for name, body in originals.items():
             self.assertEqual((exports / name).read_bytes(), body)
+
+    def test_basic_pdf_does_not_overwrite_reviewed_file_if_note_changes_during_conversion(self):
+        folder = self.root / "exports"
+        folder.mkdir(exist_ok=True)
+        target = folder / "notes-basic.pdf"
+        target.write_bytes(b"USER REVIEWED OLD PDF")
+        notes, _ = read_basic_notes(self.root)
+        point = notes["sections"][0]["points"][0]["id"]
+        called = []
+        def edit_during_pdf(docx, *, office):
+            edit_note_point(self.root, point, "New manual note written while PDF is rendering")
+            called.append(True)
+            return PDF
+        with patch("videonotes.pdf_export.render_pdf_from_docx",
+                   side_effect=edit_during_pdf):
+            with self.assertRaisesRegex(VideoNotesError, "zmieniły się"):
+                export_basic_notes_pdf(self.root)
+        self.assertEqual(called, [True])
+        self.assertEqual(target.read_bytes(), b"USER REVIEWED OLD PDF")
+        self.assertIn("New manual note", (self.root / "notes-edits.json").read_text("utf-8"))
+
+    def test_advanced_outline_does_not_overwrite_any_format_after_transcript_edit(self):
+        folder = self.root / "exports"
+        folder.mkdir(exist_ok=True)
+        names = ("notes-advanced.md", "notes-advanced.json",
+                 "notes-advanced.docx", "notes-advanced.pdf")
+        existing = {name: (b"PREVIOUS REVIEWED " + name.encode()) for name in names}
+        for name, payload in existing.items():
+            (folder / name).write_bytes(payload)
+        called = []
+        def new_transcript_edit(docx, *, office):
+            document = load_json(self.root / "edits.json")
+            document["edits"]["c0000000-s00000"] = "Latest manual transcript correction during PDF"
+            save_json(self.root / "edits.json", document)
+            called.append(True)
+            return PDF
+        with patch("videonotes.pdf_export.render_pdf_from_docx",
+                   side_effect=new_transcript_edit):
+            with self.assertRaisesRegex(VideoNotesError, "zmieniły się"):
+                export_advanced_outline(self.root, include_docx=True, include_pdf=True)
+        self.assertEqual(called, [True])
+        for name, payload in existing.items():
+            self.assertEqual((folder / name).read_bytes(), payload)
 
     def test_advanced_pdf_preflight_failure_preserves_all_previous_exports(self):
         output = self.root / "exports"
