@@ -72,6 +72,48 @@ class SlideToSpeechTest(unittest.TestCase):
         self.assertIn("c0000001-s00000", markdown)
         self.assertNotIn("# Slide: DHCP IP", markdown)
 
+    def test_index_replaced_after_verification_is_not_exported(self):
+        self.create_ocr()
+        align_slides_to_speech(self.project, self.ocr, self.index)
+        from videonotes import slide_alignment as module
+        original_load = module.load_json
+        calls = []
+        def racing_index(path):
+            data = original_load(path)
+            if Path(path) == self.index:
+                calls.append(True)
+                if len(calls) == 2:
+                    replaced = json.loads(json.dumps(data))
+                    replaced["frames"][0]["ocr_text"] = "FAKE OCR inserted after verify"
+                    save_json(self.index, replaced)
+            return data
+        with patch("videonotes.slide_alignment.load_json", side_effect=racing_index):
+            with self.assertRaisesRegex(VideoNotesError, "zmienił się podczas eksportu"):
+                export_slide_speech_markdown(self.project, self.ocr, self.index, self.md)
+        self.assertEqual(len(calls), 2)
+        self.assertFalse(self.md.exists())
+
+    def test_unverified_index_data_in_render_read_is_rejected(self):
+        self.create_ocr()
+        align_slides_to_speech(self.project, self.ocr, self.index)
+        original = self.index.read_bytes()
+        from videonotes import slide_alignment as module
+        original_load = module.load_json
+        calls = []
+        def alternate_render_read(path):
+            data = original_load(path)
+            if Path(path) == self.index:
+                calls.append(True)
+                if len(calls) == 2:
+                    data["frames"][0]["ocr_text"] = "Fabricated slide text"
+            return data
+        with patch("videonotes.slide_alignment.load_json", side_effect=alternate_render_read):
+            with self.assertRaisesRegex(VideoNotesError, "zmieniły się podczas eksportu"):
+                export_slide_speech_markdown(self.project, self.ocr, self.index, self.md)
+        self.assertGreaterEqual(len(calls), 3)
+        self.assertFalse(self.md.exists())
+        self.assertEqual(self.index.read_bytes(), original)
+
     def test_low_gap_does_not_invent_speech_link(self):
         self.create_ocr()
         # At t=60s transcript segment starts 60s, so both frames match
