@@ -43,10 +43,20 @@ def _digest(data: bytes) -> str:
 
 
 def _read_source_json(folder: Path, name: str) -> bytes:
+    """Limit actual bytes, not just stat(), when archiving changing user data."""
     file = folder / name
-    if file.is_symlink() or not file.is_file() or file.stat().st_size > MAX_ITEM_BYTES:
-        raise VideoNotesError("Nieprawidłowy plik projektu lub niedozwolony symlink.")
-    return file.read_bytes()
+    try:
+        if file.is_symlink() or not file.is_file() or file.stat().st_size > MAX_ITEM_BYTES:
+            raise VideoNotesError("Nieprawidłowy plik projektu lub niedozwolony symlink.")
+        # A project JSON can grow or be replaced between stat and read.
+        # read_bytes() would allocate an unbounded amount of memory in that race.
+        with file.open("rb") as reader:
+            content = reader.read(MAX_ITEM_BYTES + 1)
+        if len(content) > MAX_ITEM_BYTES or file.is_symlink():
+            raise VideoNotesError("Plik projektu zmienił się albo przekroczył limit w trakcie odczytu.")
+        return content
+    except OSError as error:
+        raise VideoNotesError("Nie można bezpiecznie odczytać pliku projektu do kopii.") from error
 
 
 def _ensure_backup_source_unchanged(folder: Path, project: dict, transcript: dict,
