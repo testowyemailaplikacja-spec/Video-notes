@@ -113,3 +113,7 @@ Polecenie `benchmark` (porównujące gotowe pliki TXT, niezależnie od uruchomie
 ## Limit odczytu plików TXT także podczas zmiany pliku (12.11.2026)
 
 Porównywanie WER/CER odczytuje teraz **maksymalnie 300 001 bajtów** i odrzuca zawartość przekraczającą limit 300 000 bajtów, nawet jeśli plik był mały podczas początkowego `stat()`, ale urósł tuż przed odczytem. Unikamy w ten sposób niekontrolowanego wczytania wielogigabajtowego pliku do RAM. Wzorce i kandydaci będący dowiązaniami symbolicznymi także są odrzucani. Dwa testy sprawdzają takie dowiązania i deterministyczny wzrost pliku między kontrolą rozmiaru a odczytem. Metryki pozostają lokalne; naturalna referencja PL/EN i ręczny odsłuch nadal są bramkami VN-00.
+
+## Ochrona przed osieroconymi procesami benchmarku (12.11.2026)
+
+Każdy lokalny silnik działa w osobnej grupie procesów. Przekroczenie limitu czasu, niezerowy kod wyjścia lub przerwanie benchmarku powoduje zatrzymanie także jego procesów potomnych (grupa POSIX albo `taskkill /T /F` na Windows), bez wypisywania mowy lub lokalnych ścieżek. Testy automatyczne Linux sprawdzają proces potomny, który inaczej pozostałby aktywny. Test kodu Windows nie zastępuje odbioru na fizycznym komputerze ani porównania jakości ASR na naturalnej mowie.
