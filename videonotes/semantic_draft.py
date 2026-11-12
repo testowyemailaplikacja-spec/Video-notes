@@ -344,6 +344,11 @@ def verify_semantic_draft(folder: Path, document: Path) -> dict:
 def export_semantic_markdown(folder: Path, document: Path, output: Path) -> dict:
     verified = verify_semantic_draft(folder, document)
     doc = load_json(document)
+    # Verification and rendering use separate reads. Refuse an unverified
+    # revision that appeared between them, even if the replaced file is valid
+    # JSON and its claims happen to render as plausible prose.
+    if sha256_file(Path(document)) != verified["document_sha256"]:
+        raise VideoNotesError("Szkic AI zmienił się podczas eksportu; niczego nie zapisano.")
     lines = [
         "# NIEZWERYFIKOWANY szkic semantyczny", "",
         "> Tekst wygenerował lokalny model. Odnośniki prowadzą do transkrypcji,",
@@ -366,6 +371,11 @@ def export_semantic_markdown(folder: Path, document: Path, output: Path) -> dict
                     lines.append("    " + item)
                 lines.append("")
     content = "\n".join(lines).rstrip() + "\n"
+    # Compare actual source, validated draft and the exact document rendered.
+    # A concurrent replacement cannot silently become an approved citation.
+    if (verify_semantic_draft(folder, document) != verified
+            or load_json(document) != doc):
+        raise VideoNotesError("Szkic lub transkrypcja zmieniły się podczas eksportu.")
     _safe_new_text(output, content)
     return {"output": str(Path(output).absolute()), **verified}
 
