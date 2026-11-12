@@ -106,8 +106,16 @@ def _wav_paths(folder: Path) -> list[Path]:
     return sorted(path for path in Path(folder).glob("part-*.wav") if PATTERN.fullmatch(path.name))
 
 
+def _unrecognized_parts(folder: Path) -> list[str]:
+    """Do not silently ignore malformed or out-of-range recorder part names."""
+    return sorted(item.name for item in Path(folder).iterdir()
+                  if item.name.startswith("part-") and not PATTERN.fullmatch(item.name))
+
+
 def inspect_wav_segments(folder: Path) -> list[dict]:
     """Strict inspection: every part must be present, contiguous and readable."""
+    if _unrecognized_parts(folder):
+        raise VideoNotesError("Sesja zawiera nierozpoznane części WAV; wymagana ręczna kontrola.")
     paths = _wav_paths(folder)
     if any(part.name != f"part-{index:05d}.wav" for index, part in enumerate(paths)):
         raise VideoNotesError("Brakuje części WAV nagrania albo numeracja części jest przerwana.")
@@ -131,7 +139,13 @@ def recording_status(folder: Path) -> dict:
     policy = info.get("hash_policy")
     if policy not in (None, "sha256-v1"):
         raise VideoNotesError("Nieobsługiwana polityka kontroli integralności nagrania.")
+    invalid_parts = _unrecognized_parts(folder)
     if info["status"] == "finished":
+        # A stray part-00000.wav.tmp or part-100000.wav may be an
+        # interrupted/overflowed recording. A finished session must not
+        # silently present only the recognized subset as the full lecture.
+        if invalid_parts:
+            raise VideoNotesError("Ukończona sesja zawiera nierozpoznaną część WAV; wymagana kontrola.")
         segments = inspect_wav_segments(folder)
         # Previously, deleting a finished part could silently shorten the
         # reported recording. Cross-check the completion journal too.
@@ -163,16 +177,18 @@ def recording_status(folder: Path) -> dict:
         damaged: list[str] = []
     else:
         segments = []
-        damaged = []
+        damaged = list(invalid_parts)
         for part in _wav_paths(folder):
             try:
                 segments.append(_inspect_single_wav(part))
             except VideoNotesError:
                 # Do not follow symlinks or mutate user data to 'fix' it.
                 damaged.append(part.name)
+    # Include invalid/symlink staging entries too: finished means NO pending
+    # capture artifacts, not merely "no valid staging directories".
     pending_takes = sorted(
-        part.name for part in folder.glob(".vn-take-*")
-        if part.is_dir() and not part.is_symlink()
+        part.name for part in folder.iterdir()
+        if part.name.startswith(".vn-take-")
     )
     if info["status"] == "finished" and pending_takes:
         raise VideoNotesError("Sesja ma niezatwierdzone WAV w .vn-take; wymaga ręcznej kontroli.")
