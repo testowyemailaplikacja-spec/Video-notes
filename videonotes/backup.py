@@ -257,6 +257,7 @@ def relink_backup(folder: Path, source: Path, model: Path, *, whisper_cli: str, 
     """Attach matching local source and model without changing transcript IDs."""
     folder = Path(folder)
     project, _transcript, _edits = read_project(folder)
+    original_project = copy.deepcopy(project)
     source = Path(source).expanduser().resolve()
     model = Path(model).expanduser().resolve()
     if not source.is_file() or not model.is_file():
@@ -270,6 +271,20 @@ def relink_backup(folder: Path, source: Path, model: Path, *, whisper_cli: str, 
         raise VideoNotesError("Ścieżka audio lub czas trwania są niezgodne z kopią.")
     if not isinstance(whisper_cli, str) or not whisper_cli.strip():
         raise VideoNotesError("Podaj lokalny program whisper-cli.")
+    # FFprobe may take time on a long lecture. Refuse a relink if the chosen
+    # media/model changed after their initial SHA-256 check or if another
+    # operation updated the restored project's metadata in the meantime.
+    if (not source.is_file() or source.stat().st_size != project["source"]["size_bytes"]
+            or sha256_file(source) != project["source"]["sha256"]
+            or not model.is_file()
+            or sha256_file(model) != project["processing"]["model_sha256"]):
+        raise VideoNotesError(
+            "Nagranie lub model zmieniły się podczas podłączania; projekt pozostawiono bez zmian."
+        )
+    if read_project(folder)[0] != original_project:
+        raise VideoNotesError(
+            "Projekt został zmieniony równolegle; nie nadpisuję nowych ustawień."
+        )
     project["source"]["path"] = str(source)
     project["processing"]["model_path"] = str(model)
     project["processing"]["whisper_cli"] = whisper_cli
