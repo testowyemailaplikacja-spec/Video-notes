@@ -61,6 +61,13 @@ def export_basic_notes_pdf(folder: Path, *, office: str = "libreoffice") -> Path
     from .notes import read_basic_notes
     notes, changes = read_basic_notes(folder)
     content = render_pdf_from_docx(render_basic_docx(notes, changes), office=office)
+    # A local office conversion can take minutes. If an editor changes notes
+    # while PDF is rendering, refuse to replace the previously reviewed PDF.
+    if read_basic_notes(folder) != (notes, changes):
+        raise VideoNotesError(
+            "Notatki lub ręczne poprawki zmieniły się podczas tworzenia PDF; "
+            "nie nadpisano poprzedniego dokumentu."
+        )
     target = Path(folder) / "exports" / "notes-basic.pdf"
     atomic_write(target, content)
     return target
