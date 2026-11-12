@@ -91,11 +91,49 @@
       complete: value.complete, segments: segments
     };
   }
+  // JSON.parse silently keeps only the LAST occurrence of a duplicate
+  // property. The Python desktop patch importer refuses duplicates; keep the
+  // browser's import rules identical. Syntax is parsed FIRST by JSON.parse;
+  // this bounded scan only tracks keys inside objects (never string values).
+  function parseUniqueJSON(source) {
+    var parsed = JSON.parse(source);
+    var frames = [];
+    for (var i = 0; i < source.length; i += 1) {
+      var symbol = source[i];
+      if (symbol === '{') {
+        frames.push({kind: 'object', keys: new Set()});
+      } else if (symbol === '[') {
+        frames.push({kind: 'array'});
+      } else if (symbol === '}' || symbol === ']') {
+        frames.pop();
+      } else if (symbol === '"') {
+        var from = i;
+        for (i += 1; i < source.length; i += 1) {
+          if (source[i] === '\\') {
+            i += 1;
+          } else if (source[i] === '"') {
+            break;
+          }
+        }
+        var end = i + 1;
+        while (end < source.length && /\s/.test(source[end])) end += 1;
+        if (source[end] === ':' && frames.length &&
+            frames[frames.length - 1].kind === 'object') {
+          var key = JSON.parse(source.slice(from, i + 1));
+          var seen = frames[frames.length - 1].keys;
+          if (seen.has(key)) reject("Zduplikowany klucz JSON w pliku KWN.");
+          seen.add(key);
+        }
+      }
+    }
+    return parsed;
+  }
+
   function parseExport(source) {
     if (!validText(source, MAX_BYTES)) reject("Plik jest zbyt duży lub nie zawiera poprawnego tekstu.");
     var parsed;
-    try { parsed = JSON.parse(source); }
-    catch (_error) { reject("Plik nie jest poprawnym JSON."); }
+    try { parsed = parseUniqueJSON(source); }
+    catch (error) { if (error.message.includes("Zduplikowany klucz JSON")) throw error; reject("Plik nie jest poprawnym JSON."); }
     return validateExport(parsed);
   }
   function clock(ms, vtt) {
@@ -199,8 +237,8 @@
       reject("Plik poprawek przekracza limit 20 MiB lub nie jest poprawnym tekstem.");
     }
     var patch;
-    try { patch = JSON.parse(source); }
-    catch (_error) { reject("Plik poprawek nie jest poprawnym JSON."); }
+    try { patch = parseUniqueJSON(source); }
+    catch (error) { if (error.message.includes("Zduplikowany klucz JSON")) throw error; reject("Plik poprawek nie jest poprawnym JSON."); }
     if (!plainObject(patch) ||
         Object.keys(patch).sort().join(",") !== "changes,project_id,schema" ||
         patch.schema !== "videonotes-web-corrections-v1" ||
