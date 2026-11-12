@@ -205,7 +205,7 @@ def export_reviewed_semantic_markdown(folder: Path, draft: Path, review: Path,
         raise VideoNotesError("Dokończ decyzje dla wszystkich twierdzeń przed eksportem.")
     if not status["approved_by_user"]:
         raise VideoNotesError("Brak zatwierdzonych twierdzeń do eksportu.")
-    _, data, _, _, decisions = _checked_review(folder, draft, review)
+    evidence, data, claims, manifest, decisions = _checked_review(folder, draft, review)
     lines = [
         "# Lokalna notatka po ręcznym oznaczeniu twierdzeń", "",
         "> Użytkownik deklaruje ocenę cytatów. Aplikacja nie weryfikuje",
@@ -231,8 +231,17 @@ def export_reviewed_semantic_markdown(folder: Path, draft: Path, review: Path,
                     lines.append("    " + part)
                 lines.append("")
     content = ("\n".join(lines).rstrip() + "\n").encode("utf-8")
-    # Refuse to export if any decision, source or draft has changed.
-    if semantic_review_status(folder, draft, review) != status:
+    # Counts alone are insufficient: two concurrent replacements can swap
+    # an APPROVE and a REJECT while the approved/rejected totals stay equal.
+    # Re-read the ENTIRE validated decision snapshot immediately before
+    # publishing, not just semantic_review_status counters.
+    final_evidence, final_data, final_claims, final_manifest, final_decisions = _checked_review(
+        folder, draft, review
+    )
+    if (final_evidence != evidence or final_data != data
+            or final_claims != claims or final_manifest != manifest
+            or final_decisions != decisions
+            or semantic_review_status(folder, draft, review) != status):
         raise VideoNotesError("Decyzje lub źródło zmieniły się podczas eksportu.")
     target = Path(output).expanduser().absolute()
     if target.suffix.lower() != ".md" or target.exists() or target.is_symlink():
