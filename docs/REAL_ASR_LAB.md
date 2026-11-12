@@ -95,3 +95,9 @@ Licznik `cpu_seconds_observed` bazuje na próbkach procesu i jego żyjących dzi
 ### Liniowa weryfikacja referencji przed inferencją — 12.11.2026
 
 Przed wykonaniem czasochłonnego `whisper.cpp` i `faster-whisper` wywoływana jest oddzielna, liniowa kontrola lokalnego wzorca. Czyta tylko ograniczony plik TXT, sprawdza UTF-8, niepusty tekst oraz limit 6000 słów. Nie wykonuje niepotrzebnego porównania Levenshteina wzorca z nim samym (co ma istotne znaczenie dla dużych referencji). Zwraca wyłącznie powodzenie lub zredagowany błąd, bez prywatnych słów i ścieżek. Walidacja nie potwierdza jednak, że tekst faktycznie pochodzi z wybranego fragmentu audio; wymaga to fizycznego odbioru użytkownika.
+
+## Integralność benchmarku (12.11.2026)
+
+Polecenie `benchmark-real` wylicza SHA-256 nagrania, ręcznej referencji, pliku modelu whisper.cpp oraz lokalnych składników CTranslate2 (`model.bin`, `config.json`, `vocabulary.txt`) **przed** uruchomieniem obu silników. Po analizie porównuje je ponownie i odrzuca wynik, jeśli którykolwiek plik zmienił się podczas pomiaru. Dodatkowo po każdym silniku kontroluje SHA-256 identycznego wejściowego WAV/PCM, aby pierwszy proces nie mógł po cichu zmienić próbki dla drugiego. Nie publikuje JSON z niespójnymi danymi, nie zapisuje prywatnych transkrypcji.
+
+To zabezpiecza powtarzalność pomiaru, ale **nie dowodzi** autentyczności licencji, zgodności wag/modeli ani jakości na naturalnych nagraniach. Ponowne hashowanie dużego nagrania i modeli dodaje operacje dyskowe poza mierzonym czasem procesów; należy uwzględnić ten koszt przy długich próbach. Testy regresyjne celowo zmieniają osobno źródło, referencję, oba modele i PCM i sprawdzają brak publikacji.
