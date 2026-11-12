@@ -25,6 +25,50 @@ class WhisperAdapterTest(unittest.TestCase):
             with self.subTest(item=item), self.assertRaises(VideoNotesError):
                 parse_whisper_output(item, offset_ms=0, duration_ms=1000)
 
+    def test_exact_duplicates_removed_without_dropping_repeated_speech(self):
+        payload = {"transcription": [
+            {"offsets": {"from": 10, "to": 90}, "text": " tak "},
+            {"offsets": {"from": 10, "to": 90}, "text": "tak"},
+            {"offsets": {"from": 100, "to": 180}, "text": "tak"},
+            {"offsets": {"from": 10, "to": 90}, "text": "inny tekst"},
+        ]}
+        result = parse_whisper_output(payload, offset_ms=1000, duration_ms=200)
+        self.assertEqual(len(result), 3)
+        self.assertEqual([row["text"] for row in result], ["tak", "inny tekst", "tak"])
+        self.assertEqual([row["start_ms"] for row in result], [1010, 1010, 1100])
+
+    def test_whisper_json_rejects_duplicate_keys_and_symlinked_outputs(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            model = root / "model.bin"
+            model.write_bytes(b"test-only")
+            executable = root / "whisper-cli"
+            executable.write_text("mock")
+            external = root / "external.json"
+            external.write_text('{"transcription":[]}')
+            def duplicate_json(args, **kwargs):
+                Path(args[args.index("--output-file") + 1] + ".json").write_text(
+                    '{"transcription":[],"transcription":[{"text":"UNTRUSTED","offsets":{"from":0,"to":5}}]}'
+                )
+            with patch("videonotes.asr.executable", return_value=str(executable)), patch(
+                "videonotes.asr._run", side_effect=duplicate_json
+            ):
+                with self.assertRaisesRegex(VideoNotesError, "powielone pola"):
+                    WhisperCpp(str(executable), model).transcribe(root / "input.wav",
+                                                                 language="pl", offset_ms=0, duration_ms=500)
+            def symlink_json(args, **kwargs):
+                target = Path(args[args.index("--output-file") + 1] + ".json")
+                try:
+                    target.symlink_to(external)
+                except (OSError, NotImplementedError):
+                    raise unittest.SkipTest("Symlink unavailable on this runner")
+            with patch("videonotes.asr.executable", return_value=str(executable)), patch(
+                "videonotes.asr._run", side_effect=symlink_json
+            ):
+                with self.assertRaisesRegex(VideoNotesError, "niedozwolony"):
+                    WhisperCpp(str(executable), model).transcribe(root / "input.wav",
+                                                                 language="pl", offset_ms=0, duration_ms=500)
+
     def test_whisper_cpp_call_never_uses_shell_or_network(self):
         with tempfile.TemporaryDirectory() as folder:
             base = Path(folder)
