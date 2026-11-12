@@ -5,6 +5,7 @@ never interpreted as a replacement for raw ASR, the full transcript or notes.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -24,6 +25,31 @@ def _valid_text(value: object) -> bool:
     return isinstance(value, str) and len(value) <= MAX_TEXT_LENGTH and "\x00" not in value
 
 
+def _unique_object(pairs: list[tuple[str, object]]) -> dict:
+    """Reject ambiguous duplicate JSON fields, including nested patch items."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise VideoNotesError("Plik poprawek zawiera powielone klucze JSON.")
+        result[key] = value
+    return result
+
+
+def _load_patch(path: Path) -> tuple[dict, str]:
+    """Bound raw bytes even if a file grows after the initial stat call."""
+    try:
+        if path.is_symlink() or not path.is_file():
+            raise VideoNotesError("Wymagany jest zwykły, lokalny plik poprawek WWW.")
+        with path.open("rb") as reader:
+            raw = reader.read(MAX_PATCH_BYTES + 1)
+        if len(raw) > MAX_PATCH_BYTES:
+            raise VideoNotesError("Plik poprawek WWW przekracza limit 20 MB.")
+        data = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_object)
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise VideoNotesError("Nie można odczytać poprawnego pliku poprawek WWW.") from error
+    return data, hashlib.sha256(raw).hexdigest()
+
+
 def import_web_corrections(folder: Path, patch_file: Path, *, apply: bool = False) -> dict:
     """Read-only preview or coordinated all-or-none edits in desktop project."""
     if apply:
@@ -38,12 +64,7 @@ def _import_web_corrections_unlocked(folder: Path, patch_file: Path, *, apply: b
     """Validate exact pre-edit source and reject entire batch on conflicts."""
     folder, patch_file = Path(folder), Path(patch_file)
     project, transcript, edits = read_project(folder)
-    try:
-        if patch_file.stat().st_size > MAX_PATCH_BYTES:
-            raise VideoNotesError("Plik poprawek WWW przekracza limit 20 MB.")
-        patch = json.loads(patch_file.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as error:
-        raise VideoNotesError("Nie można odczytać poprawnego pliku poprawek WWW.") from error
+    patch, patch_digest = _load_patch(patch_file)
     if (not isinstance(patch, dict) or set(patch) != {"schema", "project_id", "changes"}
             or patch["schema"] != PATCH_SCHEMA or patch["project_id"] != project["id"]
             or not isinstance(patch["changes"], list)
@@ -83,9 +104,13 @@ def _import_web_corrections_unlocked(folder: Path, patch_file: Path, *, apply: b
         # Recheck immediately before saving: refuse edits changed since the
         # preview. The standard atomic writer never modifies transcript.json.
         latest_project, latest_transcript, latest_edits = read_project(folder)
-        if (latest_project["id"] != project["id"] or latest_transcript != transcript
+        if (latest_project != project or latest_transcript != transcript
                 or latest_edits != edits):
             raise VideoNotesError("Projekt zmieniono podczas importu. Niczego nie zapisano.")
+        # Do not apply a previously parsed patch if another process replaced
+        # the import file (or even re-used the same JSON keys) in the meantime.
+        if _load_patch(patch_file)[1] != patch_digest:
+            raise VideoNotesError("Plik poprawek WWW zmienił się podczas importu. Niczego nie zapisano.")
         save_json(folder / "edits.json", revised)
     return {
         "schema": PATCH_SCHEMA, "project_id": project["id"], "mode": "applied" if apply else "preview",
