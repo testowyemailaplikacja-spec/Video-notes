@@ -199,6 +199,16 @@ def salvage_recording(folder: Path, output: Path, *, confirm_stopped: bool = Fal
                 if sha256_file(source) != info["sha256"]:
                     raise VideoNotesError("Plik WAV został zmieniony w czasie odzyskiwania.")
         _inspect_single_wav(Path(tempname))
+        # Verify the complete source selection and the recording journal AGAIN
+        # after all copying. A previously read take might change while another
+        # take is being copied, and the journal might be finalized externally.
+        # Never present a stale/changed prefix as a safe salvage result.
+        latest, latest_paths = _inspect_recovery(root)
+        if latest != report or latest_paths != paths:
+            raise VideoNotesError(
+                "Pliki WAV lub dziennik nagrania zmieniły się podczas odzyskiwania; "
+                "wyniku nie opublikowano."
+            )
         try:
             os.link(tempname, output)
         except FileExistsError as error:
