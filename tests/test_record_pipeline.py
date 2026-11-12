@@ -100,6 +100,52 @@ class RecordingToAsrTest(unittest.TestCase):
                                         joined_wav=self.joined)
         self.assertFalse(self.project.exists())
 
+    def test_revoked_microphone_consent_during_prepare_prevents_project_creation(self):
+        self.make_session(count=1)
+        changed = []
+        def revoke_on_tool_check(tool):
+            if not changed:
+                journal = self.recording / "recording.json"
+                data = json.loads(journal.read_text("utf-8"))
+                data["user_consented"] = False
+                save_json(journal, data)
+                changed.append(True)
+            return tool
+        with patch("videonotes.record_pipeline.executable",
+                   side_effect=revoke_on_tool_check):
+            with self.assertRaisesRegex(VideoNotesError, "zgody zmieniły się"):
+                transcribe_finished_session(
+                    self.recording, self.project, model=self.model,
+                    asr_factory=FakeASR)
+        self.assertEqual(changed, [True])
+        self.assertFalse(self.project.exists())
+        self.assertFalse(self.joined.exists())
+
+    def test_revoked_system_audio_consent_during_join_prevents_asr(self):
+        self.make_session()
+        journal = self.recording / "recording.json"
+        data = json.loads(journal.read_text("utf-8"))
+        data["system_audio_requested"] = True
+        data["system_audio_consented"] = True
+        save_json(journal, data)
+        changed = []
+        def revoke_on_join(recording, output):
+            state = json.loads(journal.read_text("utf-8"))
+            state["system_audio_consented"] = False
+            save_json(journal, state)
+            changed.append(True)
+            return output
+        with patch("videonotes.record_pipeline.executable", side_effect=lambda name: name), \
+             patch("videonotes.record_pipeline.join_finished_recording",
+                   side_effect=revoke_on_join):
+            with self.assertRaisesRegex(VideoNotesError, "zgody zmieniły się"):
+                transcribe_finished_session(
+                    self.recording, self.project, model=self.model,
+                    joined_wav=self.joined, asr_factory=FakeASR)
+        self.assertEqual(changed, [True])
+        self.assertFalse(self.project.exists())
+        self.assertFalse(self.joined.exists())
+
     def test_cli_invokes_same_pipeline_without_user_audio(self):
         with patch("videonotes.cli.transcribe_finished_session", return_value={
             "schema": "videonotes-record-to-asr-v1", "recording_parts": 1
