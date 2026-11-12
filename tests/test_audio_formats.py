@@ -18,6 +18,7 @@ FFMPEG = bool(shutil.which("ffmpeg") and shutil.which("ffprobe"))
 ENCODERS = [
     ("mp3", "libmp3lame"),
     ("m4a", "aac"),
+    ("aac", "aac"),
     ("flac", "flac"),
     ("ogg", "libvorbis"),
     ("opus", "libopus"),
