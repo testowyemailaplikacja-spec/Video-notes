@@ -49,6 +49,45 @@ def _read_source_json(folder: Path, name: str) -> bytes:
     return file.read_bytes()
 
 
+def _ensure_backup_source_unchanged(folder: Path, project: dict, transcript: dict,
+                                    edits: dict, notes_pair: tuple | None,
+                                    files: dict[str, bytes]) -> None:
+    """Refuse a portable backup if local user data changes while being copied.
+
+    The snapshot is explicitly best-effort for non-cooperating external writers:
+    the second read narrows the race; it does not impose an OS-wide file lock.
+    """
+    fresh_project, fresh_transcript, fresh_edits = read_project(folder)
+    if (fresh_project != project or fresh_transcript != transcript
+            or fresh_edits != edits):
+        raise VideoNotesError(
+            "Projekt lub poprawki transkrypcji zmieniły się podczas tworzenia kopii; spróbuj ponownie."
+        )
+    notes_present = (folder / "notes.json").exists()
+    edit_notes_present = (folder / "notes-edits.json").exists()
+    if notes_present != (notes_pair is not None) or edit_notes_present != (notes_pair is not None):
+        raise VideoNotesError("Zmieniono pliki notatek podczas tworzenia kopii; nie zapisano archiwum.")
+    if notes_pair is not None and read_basic_notes(folder) != notes_pair:
+        raise VideoNotesError("Zmieniono notatki lub ręczne poprawki podczas tworzenia kopii.")
+    history = folder / "notes-history"
+    if history.is_symlink() or (history.exists() and not history.is_dir()):
+        raise VideoNotesError("Historia notatek zmieniła się lub zawiera symlink.")
+    current_history = (
+        {"notes-history/" + entry.name for entry in history.iterdir()}
+        if history.is_dir() else set()
+    )
+    captured_history = {key for key in files if HISTORY_ENTRY.fullmatch(key)}
+    if current_history != captured_history:
+        raise VideoNotesError("Historia notatek zmieniła się podczas tworzenia kopii.")
+    # The archive keeps a sanitized project manifest and validated edits, so
+    # compare those structured objects above. All other JSON is copied raw.
+    for name, original in files.items():
+        if name in {"project.json", "edits.json"}:
+            continue
+        if _read_source_json(folder, name) != original:
+            raise VideoNotesError("Pliki projektu zmieniły się podczas tworzenia kopii.")
+
+
 def create_backup(folder: Path, output: Path) -> Path:
     """Build validated, relocatable ZIP; never include audio, executables or models."""
     folder, output = Path(folder), Path(output)
@@ -57,8 +96,7 @@ def create_backup(folder: Path, output: Path) -> Path:
     has_note_edits = (folder / OPTIONAL[1]).exists()
     if has_notes != has_note_edits:
         raise VideoNotesError("Brak części plików notatki. Kopia nie może być niekompletna.")
-    if has_notes:
-        read_basic_notes(folder)  # refuse stale or tampered citations
+    notes_pair = read_basic_notes(folder) if has_notes else None  # validate citations and capture edits
     sanitized = copy.deepcopy(project)
     sanitized["source"]["path"] = ""
     sanitized["processing"]["model_path"] = ""
@@ -90,6 +128,7 @@ def create_backup(folder: Path, output: Path) -> Path:
             files["notes-history/" + item.name] = _read_source_json(history, item.name)
     if sum(map(len, files.values())) > MAX_TOTAL_BYTES:
         raise VideoNotesError("Projekt przekracza limit przenośnej kopii.")
+    _ensure_backup_source_unchanged(folder, project, transcript, edits, notes_pair, files)
     manifest = {
         "schema": SCHEMA, "files": {
             name: {"sha256": _digest(body), "size": len(body)}
