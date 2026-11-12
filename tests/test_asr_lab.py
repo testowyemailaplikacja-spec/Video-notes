@@ -11,7 +11,7 @@ import wave
 from pathlib import Path
 from unittest.mock import patch
 
-from videonotes.asr_lab import _run_process, run_real_benchmark
+from videonotes.asr_lab import _run_process, _publish_unique_report, run_real_benchmark
 from videonotes.errors import VideoNotesError
 from videonotes.faster_worker import transcribe_local
 
@@ -35,6 +35,35 @@ class LocalASRLabTest(unittest.TestCase):
         (self.model_dir / "model.bin").write_bytes(b"fake ct2 model")
         (self.model_dir / "vocabulary.txt").write_text("fake vocabulary for CI-only model test", encoding="utf-8")
         self.report = self.root / "report.json"
+
+    def test_benchmark_report_is_exclusive_and_existing_json_is_preserved(self):
+        _publish_unique_report(self.report, b'{"first": true}\n')
+        with self.assertRaisesRegex(VideoNotesError, "już istnieje"):
+            _publish_unique_report(self.report, b'{"second": true}\n')
+        self.assertEqual(self.report.read_bytes(), b'{"first": true}\n')
+        self.assertEqual(list(self.root.glob(".vn-asr-report-*")), [])
+
+    def test_benchmark_report_racing_writer_cannot_be_overwritten(self):
+        competitor = b'{"human_review": "KEEP"}'
+        def competing_writer(staged, destination):
+            Path(destination).write_bytes(competitor)
+            raise FileExistsError("competing local run")
+        with patch("videonotes.asr_lab.os.link", side_effect=competing_writer):
+            with self.assertRaisesRegex(VideoNotesError, "równolegle"):
+                _publish_unique_report(self.report, b'{"stale": true}')
+        self.assertEqual(self.report.read_bytes(), competitor)
+        self.assertEqual(list(self.root.glob(".vn-asr-report-*")), [])
+
+    def test_dangling_symlink_is_not_replaced_by_benchmark_report(self):
+        missing = self.root / "not-created-report.json"
+        try:
+            self.report.symlink_to(missing)
+        except (OSError, NotImplementedError):
+            self.skipTest("No symlink privileges on this runner")
+        with self.assertRaisesRegex(VideoNotesError, "już istnieje"):
+            _publish_unique_report(self.report, b"PRIVATE BENCHMARK")
+        self.assertTrue(self.report.is_symlink())
+        self.assertFalse(missing.exists())
 
     def _stub(self, command):
         if "--output-file" in command:
