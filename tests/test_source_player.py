@@ -100,6 +100,49 @@ class SourcePreviewTests(unittest.TestCase):
                                 ffplay=sys.executable, runner=self.runner)
         self.assertEqual(self.calls, [])
 
+    def test_transcript_changed_while_extracting_wav_cancels_playback(self):
+        before = self.source.read_bytes()
+        original = (self.folder / "transcript.json").read_bytes()
+        invoked = []
+        def during_extract(source, stream_index, *, destination, **kwargs):
+            with wave.open(str(destination), "wb") as audio:
+                audio.setnchannels(1)
+                audio.setsampwidth(2)
+                audio.setframerate(16000)
+                audio.writeframes(b"\0\0" * 16000)
+            data = load_json(self.folder / "transcript.json")
+            data["segments"][0]["text"] = "Concurrent correction to raw transcript"
+            save_json(self.folder / "transcript.json", data)
+            invoked.append(True)
+        with patch("videonotes.source_player.executable", return_value="local-test-tool"), \
+             patch("videonotes.source_player.extract_chunk",
+                   side_effect=during_extract):
+            with self.assertRaisesRegex(VideoNotesError, "transkrypcja zmieniły"):
+                play_source_segment(self.folder, "c0000000-s00001",
+                                    runner=self.runner)
+        self.assertEqual(invoked, [True])
+        self.assertEqual(self.calls, [])
+        self.assertEqual(self.source.read_bytes(), before)
+        self.assertNotEqual((self.folder / "transcript.json").read_bytes(), original)
+
+    def test_project_mapping_changed_while_extracting_cancels_playback(self):
+        def during_extract(source, stream_index, *, destination, **kwargs):
+            with wave.open(str(destination), "wb") as audio:
+                audio.setnchannels(1)
+                audio.setsampwidth(2)
+                audio.setframerate(16000)
+                audio.writeframes(b"\0\0" * 16000)
+            data = load_json(self.folder / "project.json")
+            data["processing"]["language"] = "en"
+            save_json(self.folder / "project.json", data)
+        with patch("videonotes.source_player.executable", return_value="local-test-tool"), \
+             patch("videonotes.source_player.extract_chunk",
+                   side_effect=during_extract):
+            with self.assertRaisesRegex(VideoNotesError, "Projekt lub transkrypcja"):
+                play_source_segment(self.folder, "c0000000-s00001",
+                                    runner=self.runner)
+        self.assertEqual(self.calls, [])
+
     def test_cli_does_not_emit_transcript_or_audio_paths_in_result(self):
         with patch("videonotes.cli.play_source_segment", return_value={
             "schema": "videonotes-source-preview-v1", "segment_id": "c0000000-s00001",
