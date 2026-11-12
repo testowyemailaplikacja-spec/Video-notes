@@ -14,6 +14,7 @@ from collections import Counter
 from pathlib import Path
 
 from .errors import VideoNotesError
+from .edit_lock import _same_lock
 from .storage import atomic_write, load_json, read_project, save_json
 
 SCHEMA = "videonotes-basic-notes-v1"
@@ -108,6 +109,7 @@ def generate_basic_notes(folder: Path, *, window_minutes: int = 5, points_per_se
     except FileExistsError as error:
         raise VideoNotesError("Inna operacja na notatkach jest w toku; nie nadpisuję danych.") from error
     try:
+        owner = os.fstat(fd)
         with os.fdopen(fd, "w", encoding="ascii") as writer:
             writer.write(f"pid={os.getpid()}\n")
             writer.flush()
@@ -159,7 +161,9 @@ def generate_basic_notes(folder: Path, *, window_minutes: int = 5, points_per_se
         return notes
     
     finally:
-        lock.unlink(missing_ok=True)
+        # A replaced lock may now belong to a different process.
+        if "owner" in locals() and _same_lock(lock, owner):
+            lock.unlink(missing_ok=True)
 
 def read_basic_notes(folder: Path) -> tuple[dict, dict]:
     folder = Path(folder)
@@ -212,6 +216,7 @@ def edit_note_point(folder: Path, point_id: str, new_text: str) -> None:
     except FileExistsError as error:
         raise VideoNotesError("Inna operacja na notatkach jest w toku; nie nadpisuję edycji.") from error
     try:
+        owner = os.fstat(descriptor)
         with os.fdopen(descriptor, "w", encoding="ascii") as writer:
             writer.write(f"pid={os.getpid()}\n")
             writer.flush()
@@ -222,7 +227,9 @@ def edit_note_point(folder: Path, point_id: str, new_text: str) -> None:
         changes["edits"][point_id] = new_text
         save_json(folder / "notes-edits.json", changes)
     finally:
-        lock.unlink(missing_ok=True)
+        # A replaced lock may now belong to a different process.
+        if "owner" in locals() and _same_lock(lock, owner):
+            lock.unlink(missing_ok=True)
 
 
 def render_basic_markdown(folder: Path) -> str:
