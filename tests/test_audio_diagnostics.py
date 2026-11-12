@@ -10,6 +10,7 @@ import unittest
 import wave
 from array import array
 from pathlib import Path
+from unittest.mock import patch
 
 from videonotes.audio_diagnostics import analyze_finished_recording, SCHEMA
 from videonotes.cli import main
@@ -89,6 +90,45 @@ class WavDiagnosticsTest(unittest.TestCase):
             json.dumps(result, ensure_ascii=False).count("Dane użytkownika"), 0
         )
         self.assertEqual([p.read_bytes() for p in parts], source_bytes)
+
+    def test_silence_spanning_multiple_recording_parts_is_counted_as_one_run(self):
+        # A continuous four-second silent stretch bridges two different WAVs.
+        # The per-file silence examples remain local; the session maximum must
+        # include the boundary (2s + 2s), not just max(2s, 2s).
+        tone = array("h", [16000]) * 32000
+        silent = array("h", [0]) * 32000
+        parts = [
+            self._wav("part-00000.wav", tone + silent),
+            self._wav("part-00001.wav", silent),
+            self._wav("part-00002.wav", silent + tone),
+        ]
+        self._finish(parts)
+        report = analyze_finished_recording(self.folder)
+        self.assertEqual(report["duration_ms"], 10000)
+        self.assertEqual(report["silent_duration_ms"], 6000)
+        self.assertEqual(report["longest_silence_ms"], 6000)
+        self.assertEqual(report["parts"][0]["longest_silence_ms"], 2000)
+        self.assertEqual(report["parts"][1]["longest_silence_ms"], 2000)
+        self.assertEqual(report["parts"][2]["longest_silence_ms"], 2000)
+
+    def test_source_change_during_diagnostics_refuses_false_sha_claim(self):
+        part = self._wav("part-00000.wav", array("h", [8000]) * 32000)
+        self._finish([part])
+        from videonotes.audio_diagnostics import _inspect_part
+        changed = []
+        def mutate_after_measurement(path, *, timeline_start_ms):
+            report = _inspect_part(path, timeline_start_ms=timeline_start_ms)
+            mutated = bytearray(part.read_bytes())
+            mutated[-1] ^= 1  # Still valid PCM, but journal SHA no longer valid.
+            part.write_bytes(mutated)
+            changed.append(True)
+            return report
+        with patch("videonotes.audio_diagnostics._inspect_part", side_effect=mutate_after_measurement):
+            with self.assertRaisesRegex(VideoNotesError, "SHA-256"):
+                analyze_finished_recording(self.folder)
+        self.assertEqual(changed, [True])
+        # No computed quality report is silently saved by the application.
+        self.assertFalse((self.folder / "quality-report.json").exists())
 
     def test_all_silent_audio_cannot_be_misreported_as_good(self):
         path = self._wav("part-00000.wav", array("h", [0]) * 32000)
