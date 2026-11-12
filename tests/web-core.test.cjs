@@ -43,11 +43,15 @@ test("browser patch import refuses duplicate edit after fields before applying a
   const edited = Object.create(null);
   edited[doc.segments[0].id] = "Nowa własna poprawka";
   const patch = core.renderCorrections(doc, edited);
-  const bad = patch.replace('"after":"Nowa własna poprawka"',
+  const field = /"after"\s*:\s*"Nowa własna poprawka"/;
+  assert.match(patch, field, 'fixture must actually contain the target key');
+  const bad = patch.replace(field,
                             '"after":"Injected", "after":"Nowa własna poprawka"');
+  assert.notEqual(bad, patch);
   assert.throws(() => core.parseCorrections(doc, bad), /Zduplikowany klucz JSON/);
-  const escaped = patch.replace('"after":"Nowa własna poprawka"',
+  const escaped = patch.replace(field,
                                 '"\\u0061fter":"Injected", "after":"Nowa własna poprawka"');
+  assert.notEqual(escaped, patch);
   assert.throws(() => core.parseCorrections(doc, escaped), /Zduplikowany klucz JSON/);
   assert.equal(core.parseCorrections(doc, patch)[doc.segments[0].id], edited[doc.segments[0].id]);
 });
