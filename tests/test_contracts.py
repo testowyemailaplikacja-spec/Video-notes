@@ -4,10 +4,11 @@ import copy
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from videonotes.contracts import PROJECT_SCHEMA, TRANSCRIPT_SCHEMA, empty_transcript, validate_project, validate_transcript, validate_edits
 from videonotes.errors import VideoNotesError
-from videonotes.storage import read_project, save_json
+from videonotes.storage import load_json, read_project, save_json
 from videonotes.exports import edit_segment, render_exports, export_project
 
 
@@ -29,6 +30,57 @@ def demo_transcript():
 
 
 class ContractTest(unittest.TestCase):
+    def test_project_json_rejects_duplicate_keys_and_nonfinite(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source = Path(temp) / "tampered.json"
+            for raw in (
+                '{"schema":"v1","schema":"v2"}',
+                '{"outer":{"id":1,"id":2}}',
+                '{"value":NaN}',
+                '{"value":Infinity}',
+            ):
+                with self.subTest(raw=raw):
+                    source.write_text(raw, encoding="utf-8")
+                    with self.assertRaises(VideoNotesError):
+                        load_json(source)
+
+    def test_json_source_growth_between_stat_and_read_is_bounded(self):
+        with tempfile.TemporaryDirectory() as temp:
+            file = Path(temp) / "growing.json"
+            original = b'{"key":"ok"}'
+            file.write_bytes(original)
+            limit = len(original) + 2
+            original_open = Path.open
+            mutations = []
+            def grow_at_open(path, *args, **kwargs):
+                if path == file and not mutations:
+                    mutations.append(True)
+                    with original_open(path, "ab") as writer:
+                        writer.write(b"X" * (limit + 100))
+                return original_open(path, *args, **kwargs)
+            with patch("videonotes.storage.MAX_JSON_BYTES", limit), patch.object(
+                Path, "open", grow_at_open
+            ):
+                with self.assertRaisesRegex(VideoNotesError, "urósł"):
+                    load_json(file)
+            self.assertEqual(mutations, [True])
+            self.assertGreater(file.stat().st_size, limit)
+
+    def test_bounded_json_accepts_exact_limit_and_rejects_symlink(self):
+        with tempfile.TemporaryDirectory() as temp:
+            file = Path(temp) / "valid.json"
+            payload = b'{"key":"ok"}'
+            file.write_bytes(payload)
+            with patch("videonotes.storage.MAX_JSON_BYTES", len(payload)):
+                self.assertEqual(load_json(file), {"key": "ok"})
+            link = Path(temp) / "alias.json"
+            try:
+                link.symlink_to(file)
+            except (OSError, NotImplementedError):
+                return  # Windows without developer symlink privilege
+            with self.assertRaises(VideoNotesError):
+                load_json(link)
+
     def test_valid_project_and_silence_checkpoint(self):
         self.assertEqual(validate_project(demo_project())["id"], "test-123")
         self.assertEqual(len(validate_transcript(demo_transcript(), demo_project())["segments"]), 2)
