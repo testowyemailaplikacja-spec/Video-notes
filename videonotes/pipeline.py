@@ -156,6 +156,21 @@ def recover_stale_transcription_lock(folder: Path, *, confirm: bool = False) -> 
     return {"recovered": True, "previous_pid": status["pid"]}
 
 
+def _file_identity(path: Path) -> tuple[int, int, int, int, int]:
+    """Cheap per-chunk check for ordinary source/model replacement or mutation.
+
+    Initial source/model SHA-256 is checked separately by _check_resume_source.
+    A per-chunk full SHA of a multi-GB OBS capture would repeatedly read 2 h
+    of media; metadata identifies ordinary in-place edits and replacements
+    without that large I/O penalty. Not a cryptographic concurrent-write lock.
+    """
+    try:
+        stat = path.stat()
+    except OSError as error:
+        raise VideoNotesError("Zaginął plik źródłowy lub model podczas transkrypcji.") from error
+    return (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+
+
 def transcribe_project(folder: Path, *, ffmpeg: str = "ffmpeg", ffprobe: str = "ffprobe", asr_factory: Callable[..., object] = WhisperCpp,
                        progress: Progress | None = None, cancel: Callable[[], bool] | None = None) -> dict:
     """Re-entrant processing of uncommitted chunks, refusing concurrent writers."""
@@ -172,12 +187,25 @@ def transcribe_project(folder: Path, *, ffmpeg: str = "ffmpeg", ffprobe: str = "
         project, transcript, _edits = read_project(folder)
         source = _check_resume_source(project, ffprobe=ffprobe)
         processing = project["processing"]
+        # Catch a source/model modified between ASR chunks, rather than
+        # checkpointing text decoded from two different media/model versions.
+        model_file = Path(processing["model_path"])
+        input_identity = _file_identity(source)
+        model_identity = _file_identity(model_file)
+        def check_unchanged_inputs() -> None:
+            if (_file_identity(source) != input_identity or
+                    _file_identity(model_file) != model_identity):
+                raise VideoNotesError(
+                    "Nagranie lub model zmieniły się podczas ASR. "
+                    "Nie zapisano bieżącego checkpointu; sprawdź źródła."
+                )
         chunk_ms = processing["chunk_ms"]
         total = (project["source"]["duration_ms"] + chunk_ms - 1) // chunk_ms
         engine = asr_factory(processing["whisper_cli"], Path(processing["model_path"]))
         if progress:
             progress(len(transcript["completed_chunks"]), total)
         for chunk in range(len(transcript["completed_chunks"]), total):
+            check_unchanged_inputs()
             if cancel and cancel():
                 raise VideoNotesError("Przerwano na żądanie. Zakończone fragmenty zapisano; użyj resume.")
             start = chunk * chunk_ms
@@ -202,6 +230,9 @@ def transcribe_project(folder: Path, *, ffmpeg: str = "ffmpeg", ffprobe: str = "
                         raise
                 else:
                     recognized = engine.transcribe(wav, language=processing["language"], offset_ms=start, duration_ms=size)
+            # The input may be edited while FFmpeg or the ASR engine is
+            # running. Never commit a mixed-version source or model.
+            check_unchanged_inputs()
             if not isinstance(recognized, list):
                 raise VideoNotesError("Silnik ASR zwrócił nieprawidłowe segmenty.")
             new_segments = []
