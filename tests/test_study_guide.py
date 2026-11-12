@@ -168,6 +168,47 @@ class SourceStudyGuideTest(unittest.TestCase):
         for name, value in payloads.items():
             self.assertEqual((directory / name).read_bytes(), value)
 
+    def test_pdf_export_aborts_if_user_corrects_transcript_during_render(self):
+        export_dir = self.root / "exports"
+        export_dir.mkdir()
+        protected = {
+            "notes-study.md": b"PREVIOUS HUMAN EDITED MARKDOWN",
+            "notes-study.json": b"PREVIOUS HUMAN EDITED JSON",
+        }
+        for name, payload in protected.items():
+            (export_dir / name).write_bytes(payload)
+        edits = self.root / "edits.json"
+        original_edits = edits.read_bytes()
+        def concurrent_correction(docx_bytes, *, office):
+            save_json(edits, {"schema": "videonotes-edits-v1",
+                              "edits": {"c0000000-s00000": "Corrected during PDF rendering"}})
+            return b"%PDF-1.4\nFAKE UNIT TEST\n"
+        with patch("videonotes.pdf_export.render_pdf_from_docx",
+                   side_effect=concurrent_correction):
+            with self.assertRaisesRegex(VideoNotesError, "zmieniły się"):
+                export_study_guide(self.root, include_docx=True, include_pdf=True)
+        for name, payload in protected.items():
+            self.assertEqual((export_dir / name).read_bytes(), payload)
+        self.assertFalse((export_dir / "notes-study.docx").exists())
+        self.assertFalse((export_dir / "notes-study.pdf").exists())
+        self.assertNotEqual(edits.read_bytes(), original_edits)
+
+    def test_markdown_export_aborts_if_source_changes_during_render(self):
+        from videonotes.study_guide import render_study_guide_markdown as original_render
+        def change_after_build(document):
+            original_text = original_render(document)
+            save_json(self.root / "edits.json", {
+                "schema": "videonotes-edits-v1",
+                "edits": {"c0000000-s00000": "New correction"},
+            })
+            return original_text
+        with patch("videonotes.study_guide.render_study_guide_markdown",
+                   side_effect=change_after_build):
+            with self.assertRaisesRegex(VideoNotesError, "zmieniły się"):
+                export_study_guide(self.root)
+        self.assertFalse((self.root / "exports" / "notes-study.md").exists())
+        self.assertFalse((self.root / "exports" / "notes-study.json").exists())
+
     def test_study_provenance_verification_and_redacted_cli_report(self):
         _, file = export_study_guide(self.root, section_minutes=1, detail="full")
         before = file.read_bytes()
