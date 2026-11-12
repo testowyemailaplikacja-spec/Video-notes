@@ -50,3 +50,7 @@ Jeżeli proces zostanie gwałtownie zakończony, plik `.creating.lock` może poz
 ## Kontrola fragmentów PCM z FFmpeg (12.11.2026)
 
 Przetwarzanie VN-01 tworzy segment WAV w nowym katalogu tymczasowym. Silnik używa `ffmpeg -n` (bez nadpisywania), zamiast `-y`, a wcześniej odmawia użycia istniejącej ścieżki wyjściowej. Po zakończeniu procesu sprawdza nie tylko deklarowany w nagłówku RIFF format mono 16 kHz / 16 bit, ale również **fizycznie odczytuje w ograniczonych buforach wszystkie zadeklarowane próbki PCM**. Ucięty ogon WAV po przerwaniu FFmpeg nie zostanie błędnie zaakceptowany przez ASR mimo poprawnego nagłówka. Oryginału OBS ani istniejących plików nie nadpisuje. Test syntetyczny celowo ucina PCM przy zachowaniu niezmienionego nagłówka; pełny test na docelowym Windows i realnym 2h pliku nadal pozostaje osobną bramką.
+
+## Spójność eksportu transkrypcji TXT/SRT/VTT/JSON (12.11.2026)
+
+Eksport ponownie przygotowuje i porównuje wszystkie cztery formaty z aktualną transkrypcją oraz ręcznymi poprawkami **zanim zacznie nadpisywać istniejące pliki wynikowe**. Jeśli użytkownik wprowadzi poprawkę w trakcie pierwszego renderowania, narzędzie odmawia publikacji starych napisów i zachowuje wcześniejsze eksporty. Testy syntetyczne sprawdzają zarówno taką kolizję, jak i zwykły eksport czterech spójnych formatów. Nie oznacza to atomowej transakcji obejmującej cztery pliki po rozpoczęciu zapisu; przerwanie dysku w połowie publikacji nadal wymaga osobnego mechanizmu odzyskiwania.
