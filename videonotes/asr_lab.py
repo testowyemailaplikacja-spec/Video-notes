@@ -169,7 +169,12 @@ def run_real_benchmark(source: Path, reference: Path, *, cpp_executable: str,
         raise VideoNotesError("Model faster-whisper wymaga lokalnego katalogu z config.json, model.bin i vocabulary.txt.")
     cpp_executable = executable(cpp_executable)
     source = Path(source).expanduser().resolve()
-    reference = Path(reference).expanduser().resolve()
+    # .resolve() would conceal a reference symlink from quality._read().
+    # Preserve the original spelling for the explicit safety preflight.
+    reference = Path(reference).expanduser()
+    if reference.is_symlink():
+        raise VideoNotesError("Referencyjny TXT nie może być dowiązaniem symbolicznym.")
+    reference = reference.resolve()
     if not reference.is_file():
         raise VideoNotesError("Brakuje ręcznie sprawdzonej referencyjnej transkrypcji TXT.")
     # Validate UTF-8, file size and reference tokens in O(n) before running
@@ -193,6 +198,14 @@ def run_real_benchmark(source: Path, reference: Path, *, cpp_executable: str,
         "faster_config": faster_model_dir / "config.json",
         "faster_vocabulary": faster_model_dir / "vocabulary.txt",
     }
+    # faster-whisper may use a tokenizer.json alongside the CT2 vocabulary.
+    # It affects recognition but was absent from the report and integrity gate.
+    tokenizer = faster_model_dir / "tokenizer.json"
+    if tokenizer.is_symlink():
+        raise VideoNotesError("Tokenizer modelu nie może być dowiązaniem symbolicznym.")
+    tokenizer_present = tokenizer.is_file()
+    if tokenizer_present:
+        input_paths["faster_tokenizer"] = tokenizer
     input_hashes = {name: sha256_file(path) for name, path in input_paths.items()}
     with tempfile.TemporaryDirectory(prefix="vn-real-bench-") as directory:
         tmp = Path(directory)
@@ -231,7 +244,8 @@ def run_real_benchmark(source: Path, reference: Path, *, cpp_executable: str,
                 raise VideoNotesError("Próbka PCM zmieniła się podczas benchmarku ASR.")
             stats[label] = metrics
         comparison = compare_text_files(reference, {label: file for label, _, file in commands})
-    if (any(sha256_file(path) != input_hashes[name] for name, path in input_paths.items())
+    if (tokenizer.is_symlink() or tokenizer.is_file() != tokenizer_present
+            or any(sha256_file(path) != input_hashes[name] for name, path in input_paths.items())
             or comparison["reference_sha256"] != input_hashes["reference"]):
         raise VideoNotesError("Źródło, referencja lub model zmieniły się podczas benchmarku ASR.")
     report = {
@@ -240,6 +254,8 @@ def run_real_benchmark(source: Path, reference: Path, *, cpp_executable: str,
         "cpp_model_sha256": input_hashes["cpp_model"],
         "faster_model_sha256": input_hashes["faster_model"],
         "faster_config_sha256": input_hashes["faster_config"],
+        "faster_vocabulary_sha256": input_hashes["faster_vocabulary"],
+        "faster_tokenizer_sha256": input_hashes.get("faster_tokenizer"),
         "local_subprocesses_executed": True, "engine_binary_identity_independently_verified": False,
         "input_clip": {"start_ms": offset, "duration_ms": duration, "stream_index": track["index"],
                        "wav_sample_rate": 16000, "wav_channels": 1, "pcm_sha256": pcm_digest},
