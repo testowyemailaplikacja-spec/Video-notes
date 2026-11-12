@@ -10,7 +10,7 @@ from pathlib import Path
 
 from .errors import VideoNotesError
 
-SUPPORTED_SOURCE_SUFFIXES = {".mp4", ".mkv", ".webm", ".mov", ".wav", ".mp3", ".m4a", ".flac", ".ogg", ".opus"}
+SUPPORTED_SOURCE_SUFFIXES = {".mp4", ".mkv", ".webm", ".mov", ".wav", ".mp3", ".m4a", ".aac", ".flac", ".ogg", ".opus"}
 
 
 def executable(command: str) -> str:
