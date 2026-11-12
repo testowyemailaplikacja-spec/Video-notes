@@ -9,3 +9,7 @@ python -m videonotes play-source C:\Notatki\projekt --segment c0000000-s00001 --
 ```
 
 Odtwarzanie trwa maksymalnie 30 sekund (domyślnie 15), z maksymalnie sekundą poprzedzającą początek segmentu. FFplay jest uruchamiany z `shell=False`, bez zapisu treści do logu. Jeśli użytkownik nie ma urządzenia audio albo FFplay, pojawia się komunikat zamiast potwierdzenia sukcesu. Odsłuch wymaga osobnego działania użytkownika. Nie jest synchronizacją obrazu ze slajdami, nie potwierdza poprawności ASR i nie zastępuje odbioru jakościowego wykładu na fizycznym Windows.
+
+## Ochrona odsłuchu przed nieaktualnym timecode (12.11.2026)
+
+Przy odsłuchu fragmentu transkrypcji lokalny FFmpeg może potrzebować dłuższej chwili na pobranie próbek z dużego pliku OBS. Przed uruchomieniem FFplay aplikacja ponownie sprawdza **cały kontrakt projektu i transkrypcji**, oprócz już wykonywanego sprawdzenia SHA-256 nagrania. Jeżeli w tym czasie zmieniły się identyfikatory, czasy, segmenty lub ustawienia projektu, nie odtwarza pliku na podstawie nieaktualnego wyboru. Dwa testy syntetycznie modyfikują transkrypcję lub projekt podczas przygotowania lokalnego WAV i potwierdzają brak uruchomienia odtwarzacza. Nie zastępuje to rzeczywistego odsłuchu użytkownika ani oceny jakości rozpoznawania mowy.
