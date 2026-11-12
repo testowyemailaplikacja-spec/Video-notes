@@ -350,6 +350,44 @@ class MicrophoneTest(unittest.TestCase):
         self.assertEqual(journal_path.read_text("utf-8"), json.dumps(journal))
         self.assertGreater(len(original), 100)
 
+    def test_finished_status_rejects_untracked_or_malformed_recording_parts(self):
+        self._record()
+        first = self.folder / "part-00000.wav"
+        original = first.read_bytes()
+        for name in ("part-00001.wav.tmp", "part-100000.wav", "part-invalid.wav"):
+            extra = self.folder / name
+            extra.write_bytes(b"interrupted synthetic recording")
+            with self.subTest(name=name):
+                with self.assertRaisesRegex(VideoNotesError, "nierozpoznan"):
+                    recording_status(self.folder)
+                with self.assertRaisesRegex(VideoNotesError, "nierozpoznan"):
+                    inspect_wav_segments(self.folder)
+                self.assertEqual(first.read_bytes(), original)
+            extra.unlink()
+        self.assertTrue(recording_status(self.folder)["sha256_verified"])
+
+    def test_unfinished_status_lists_bad_names_and_pending_symlinks_without_reading_them(self):
+        self._record()
+        journal = self.folder / "recording.json"
+        state = json.loads(journal.read_text("utf-8"))
+        state["status"] = "needs_review"
+        journal.write_text(json.dumps(state), encoding="utf-8")
+        bogus = self.folder / "part-00001.wav.tmp"
+        bogus.write_bytes(b"not a valid WAV")
+        pending = self.folder / ".vn-take-invalid"
+        pending.write_bytes(b"not a directory")
+        report = recording_status(self.folder)
+        self.assertEqual(report["unreadable_parts"], [bogus.name])
+        self.assertIn(pending.name, report["pending_takes"])
+        self.assertTrue(report["requires_manual_review"])
+        state["status"] = "finished"
+        journal.write_text(json.dumps(state), encoding="utf-8")
+        bogus.unlink()
+        with self.assertRaisesRegex(VideoNotesError, "niezatwierdzone"):
+            recording_status(self.folder)
+        pending.unlink()
+        self.assertTrue(recording_status(self.folder)["sha256_verified"])
+
     def test_finished_sha256_detects_silent_pcm_changes_and_legacy_journal_is_explicit(self):
         self._record()
         journal_path = self.folder / "recording.json"
