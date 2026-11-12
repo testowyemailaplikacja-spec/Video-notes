@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -9,7 +10,7 @@ from subprocess import CompletedProcess
 from tests.test_notes import fixture
 from videonotes.contracts import sha256_file
 from videonotes.errors import VideoNotesError
-from videonotes.slide_ocr import extract_slide_ocr, verify_slide_ocr
+from videonotes.slide_ocr import _run, extract_slide_ocr, verify_slide_ocr
 from videonotes.storage import load_json, save_json
 
 
@@ -39,6 +40,21 @@ class SlideOCRTest(unittest.TestCase):
         if args[0] == "tesseract":
             return CompletedProcess(args, 0, "Slajd: Adres IP i Router".encode(), b"")
         return CompletedProcess(args, 1, b"", b"ERROR")
+
+    def test_real_local_tool_stdout_is_bounded_without_leaking_content(self):
+        huge_output = "import sys;sys.stdout.buffer.write(b'X'*100000)"
+        with self.assertRaisesRegex(VideoNotesError, "bezpieczny limit") as received:
+            _run([sys.executable, "-c", huge_output], timeout=10, output_limit=1024)
+        self.assertNotIn("XXXXX", str(received.exception))
+        self.assertEqual(_run([sys.executable, "-c", "print('OK')"],
+                              timeout=10, output_limit=16).strip(), b"OK")
+
+    def test_injected_ocr_runner_output_is_also_bounded(self):
+        def huge_result(args, **kwargs):
+            return CompletedProcess(args, 0, b"S" * 2000, b"SECRET STDERR")
+        with self.assertRaisesRegex(VideoNotesError, "bezpieczny limit") as received:
+            _run(["tesseract", "placeholder"], runner=huge_result, output_limit=64)
+        self.assertNotIn("SECRET", str(received.exception))
 
     def test_ocr_two_frames_and_read_only_verification(self):
         original = (self.folder / "transcript.json").read_bytes()
