@@ -6,6 +6,7 @@ import tempfile
 import unittest
 import wave
 from pathlib import Path
+from unittest.mock import patch
 
 from videonotes.errors import VideoNotesError
 from videonotes.media import choose_stream, extract_chunk, probe
@@ -58,6 +59,53 @@ class FFmpegMediaTest(unittest.TestCase):
                 probe(bad)
             with self.assertRaises(VideoNotesError):
                 probe(Path(tmp) / "missing.mp4")
+
+
+class OfflineWavExtractionValidationTest(unittest.TestCase):
+    def test_rejects_declared_pcm_frames_truncated_on_disk(self):
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "piece.wav"
+            def fake_ffmpeg(args, **kwargs):
+                with wave.open(str(target), "wb") as wav:
+                    wav.setnchannels(1)
+                    wav.setsampwidth(2)
+                    wav.setframerate(16000)
+                    wav.writeframes(b"\x01\x02" * 16000)
+                target.write_bytes(target.read_bytes()[:-20])
+            with patch("videonotes.media.executable", return_value="fake-ffmpeg"), \
+                 patch("videonotes.media._run", side_effect=fake_ffmpeg):
+                with self.assertRaisesRegex(VideoNotesError, "ucięte dane PCM"):
+                    extract_chunk(Path(folder) / "source.mkv", 0,
+                                  start_ms=0, duration_ms=1000, destination=target)
+
+    def test_automated_wav_extraction_does_not_overwrite_existing_target(self):
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "user.wav"
+            target.write_bytes(b"KEEP PRIVATE")
+            with patch("videonotes.media._run") as runner:
+                with self.assertRaisesRegex(VideoNotesError, "już istnieje"):
+                    extract_chunk(Path(folder) / "source.mkv", 0,
+                                  start_ms=0, duration_ms=1000, destination=target)
+                runner.assert_not_called()
+            self.assertEqual(target.read_bytes(), b"KEEP PRIVATE")
+
+    def test_ffmpeg_uses_no_overwrite_even_after_preflight(self):
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "fresh.wav"
+            captured = []
+            def fake_ffmpeg(args, **kwargs):
+                captured.extend(args)
+                with wave.open(str(target), "wb") as wav:
+                    wav.setnchannels(1)
+                    wav.setsampwidth(2)
+                    wav.setframerate(16000)
+                    wav.writeframes(b"\0\0" * 16000)
+            with patch("videonotes.media.executable", return_value="fake-ffmpeg"), \
+                 patch("videonotes.media._run", side_effect=fake_ffmpeg):
+                extract_chunk(Path(folder) / "source.mkv", 0,
+                              start_ms=0, duration_ms=1000, destination=target)
+            self.assertIn("-n", captured)
+            self.assertNotIn("-y", captured)
 
 if __name__ == "__main__":
     unittest.main()
