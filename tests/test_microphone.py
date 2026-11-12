@@ -479,6 +479,53 @@ class MicrophoneTest(unittest.TestCase):
         self.assertEqual(list(self.folder.glob(".vn-join-*")), [])
         self.assertEqual((self.folder / "part-00000.wav").read_bytes(), first_before)
 
+    def test_join_rejects_source_mutation_during_copy_without_publishing(self):
+        self._make_finished_two_part_recording()
+        first = self.folder / "part-00000.wav"
+        original = first.read_bytes()
+        output = self.folder / "not-published.wav"
+        from videonotes.microphone import _inspect_single_wav
+        touched = []
+
+        def mutate_after_merged_file_is_complete(path):
+            result = _inspect_single_wav(path)
+            if Path(path).name.startswith(".vn-join-"):
+                tampered = bytearray(original)
+                tampered[-1] ^= 1  # Unchanged WAV length/header, changed PCM.
+                first.write_bytes(tampered)
+                touched.append(True)
+            return result
+
+        with mock.patch("videonotes.microphone._inspect_single_wav",
+                        side_effect=mutate_after_merged_file_is_complete):
+            with self.assertRaisesRegex(VideoNotesError, "zmieniły się"):
+                join_finished_recording(self.folder, output)
+        self.assertEqual(touched, [True])
+        self.assertFalse(output.exists())
+        self.assertFalse(list(self.folder.glob(".vn-join-*")))
+        self.assertNotEqual(first.read_bytes(), original)  # Never silently "repair" user input.
+        with self.assertRaisesRegex(VideoNotesError, "SHA-256"):
+            recording_status(self.folder)
+
+    def test_join_rejects_recording_journal_mutation_during_copy(self):
+        journal = self._make_finished_two_part_recording()
+        original = journal.read_bytes()
+        output = self.folder / "not-published.wav"
+        from videonotes.microphone import _inspect_single_wav
+        def mutate_journal(path):
+            report = _inspect_single_wav(path)
+            if Path(path).name.startswith(".vn-join-"):
+                changed = json.loads(original)
+                changed["status"] = "needs_review"
+                journal.write_text(json.dumps(changed), encoding="utf-8")
+            return report
+        with mock.patch("videonotes.microphone._inspect_single_wav",
+                        side_effect=mutate_journal):
+            with self.assertRaisesRegex(VideoNotesError, "zmieniły się"):
+                join_finished_recording(self.folder, output)
+        self.assertFalse(output.exists())
+        self.assertFalse(list(self.folder.glob(".vn-join-*")))
+
     def test_stop_event_closes_capture_and_keeps_valid_audio(self):
         stop = threading.Event()
         stop.set()
