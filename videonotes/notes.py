@@ -266,15 +266,30 @@ def render_basic_text(folder: Path) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def _assert_notes_unchanged(folder: Path, original: tuple[dict, dict]) -> None:
+    """Never export a stale note if its manual edits changed during rendering."""
+    if read_basic_notes(folder) != original:
+        raise VideoNotesError(
+            "Notatka lub ręczne poprawki zmieniły się podczas eksportu; "
+            "poprzednie pliki pozostawiono bez zmian."
+        )
+
+
 def export_basic_notes_text(folder: Path) -> Path:
+    snapshot = read_basic_notes(folder)
+    payload = render_basic_text(folder).encode("utf-8")
+    _assert_notes_unchanged(folder, snapshot)
     target = Path(folder) / "exports" / "notes-basic.txt"
-    atomic_write(target, render_basic_text(folder).encode("utf-8"))
+    atomic_write(target, payload)
     return target
 
 
 def export_basic_notes(folder: Path) -> Path:
+    snapshot = read_basic_notes(folder)
+    payload = render_basic_markdown(folder).encode("utf-8")
+    _assert_notes_unchanged(folder, snapshot)
     target = Path(folder) / "exports" / "notes-basic.md"
-    atomic_write(target, render_basic_markdown(folder).encode("utf-8"))
+    atomic_write(target, payload)
     return target
 
 
@@ -283,6 +298,7 @@ def export_basic_notes_docx(folder: Path) -> Path:
     notes, changes = read_basic_notes(folder)
     from .docx_export import render_basic_docx
     payload = render_basic_docx(notes, changes)
+    _assert_notes_unchanged(folder, (notes, changes))
     target = Path(folder) / "exports" / "notes-basic.docx"
     atomic_write(target, payload)
     return target
