@@ -30,23 +30,36 @@ def create_project(source: Path, folder: Path, *, model: Path, whisper_cli: str,
     if not model_path.is_file() or not model_path.stat().st_size:
         raise VideoNotesError("Brakuje lokalnego modelu. Pobierz go ręcznie.")
     folder = Path(folder).expanduser().resolve()
-    if folder.exists() and any(folder.iterdir()):
-        raise VideoNotesError("Katalog projektu nie jest pusty. Aby wznowić, użyj polecenia resume.")
-    project = {
-        "schema": PROJECT_SCHEMA,
-        "id": str(uuid.uuid4()),
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "source": {"path": str(source_path), "size_bytes": source_path.stat().st_size, "sha256": sha256_file(source_path),
-                   "duration_ms": info["duration_ms"], "stream_index": audio["index"],
-                   "stream_language": audio["language"], "stream_title": audio["title"]},
-        "processing": {"engine": "whisper.cpp", "language": language, "chunk_ms": chunk_ms,
-                       "model_path": str(model_path), "model_sha256": sha256_file(model_path), "whisper_cli": whisper_cli},
-    }
+    # Reserve the target before checking whether it is empty. Two importers
+    # could previously pass that check simultaneously and overwrite each
+    # other's project.json/transcript.json without ever noticing the conflict.
     folder.mkdir(parents=True, exist_ok=True)
-    save_json(folder / "project.json", project)
-    save_json(folder / "transcript.json", empty_transcript(project["id"]))
-    save_json(folder / "edits.json", empty_edits())
-    return project
+    creation_lock = folder / ".creating.lock"
+    try:
+        fd = os.open(creation_lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError as error:
+        raise VideoNotesError("Tworzenie tego projektu już trwa lub zostało przerwane. "
+                              "Przed odzyskaniem sprawdź plik .creating.lock.") from error
+    try:
+        os.close(fd)
+        if any(item.name != creation_lock.name for item in folder.iterdir()):
+            raise VideoNotesError("Katalog projektu nie jest pusty. Aby wznowić, użyj polecenia resume.")
+            project = {
+            "schema": PROJECT_SCHEMA,
+            "id": str(uuid.uuid4()),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "source": {"path": str(source_path), "size_bytes": source_path.stat().st_size, "sha256": sha256_file(source_path),
+                       "duration_ms": info["duration_ms"], "stream_index": audio["index"],
+                       "stream_language": audio["language"], "stream_title": audio["title"]},
+            "processing": {"engine": "whisper.cpp", "language": language, "chunk_ms": chunk_ms,
+                           "model_path": str(model_path), "model_sha256": sha256_file(model_path), "whisper_cli": whisper_cli},
+    }
+        save_json(folder / "project.json", project)
+        save_json(folder / "transcript.json", empty_transcript(project["id"]))
+        save_json(folder / "edits.json", empty_edits())
+        return project
+    finally:
+        creation_lock.unlink(missing_ok=True)
 
 
 def _check_resume_source(project: dict, *, ffprobe: str) -> Path:
