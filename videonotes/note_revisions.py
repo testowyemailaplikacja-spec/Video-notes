@@ -16,6 +16,7 @@ from pathlib import Path
 
 from .contracts import MAX_TEXT_LENGTH
 from .errors import VideoNotesError
+from .edit_lock import _same_lock
 from .notes import EDITS_SCHEMA, SCHEMA, _hash, _select, _source, _section_heading
 from .pipeline import _process_state
 from .storage import load_json, read_project, save_json
@@ -29,13 +30,13 @@ TRANSACTION_FILE = ".notes-transaction.json"
 LOCK_PATTERN = re.compile(rb"pid=([1-9][0-9]{0,9})\r?\n")
 
 
-def _write_notes_lock_pid(descriptor: int) -> None:
-    """Make a newly acquired lock independently inspectable after a crash."""
+def _write_notes_lock_pid(descriptor: int) -> os.stat_result:
+    """Write PID and capture post-write identity before closing the descriptor."""
     with os.fdopen(descriptor, "w", encoding="ascii") as writer:
         writer.write(f"pid={os.getpid()}\n")
         writer.flush()
         os.fsync(writer.fileno())
-
+        return os.fstat(writer.fileno())
 
 def notes_lock_status(folder: Path) -> dict:
     """Inspect local notes lock without signalling or terminating any process."""
@@ -291,7 +292,7 @@ def recover_interrupted_note_update(folder: Path, *, confirm: bool = False) -> d
             "Blokada notatek jest aktywna lub pozostała po awarii. Sprawdź proces przed jej ręcznym usunięciem."
         ) from error
     try:
-        _write_notes_lock_pid(descriptor)
+        owner = _write_notes_lock_pid(descriptor)
         intent = load_json(path)
         required = {"schema", "project_id", "snapshot_revision",
                     "old_notes_sha256", "old_edits_sha256",
@@ -336,7 +337,8 @@ def recover_interrupted_note_update(folder: Path, *, confirm: bool = False) -> d
         return {"status": status, "changed": status == "restored_previous_version",
                 "snapshot_revision": intent["snapshot_revision"]}
     finally:
-        lock.unlink(missing_ok=True)
+        if "owner" in locals() and _same_lock(lock, owner):
+            lock.unlink(missing_ok=True)
 
 
 def regenerate_basic_notes(folder: Path, *, window_minutes: int = 5, points_per_section: int = 6) -> dict:
@@ -359,7 +361,7 @@ def regenerate_basic_notes(folder: Path, *, window_minutes: int = 5, points_per_
     except FileExistsError as error:
         raise VideoNotesError("Trwa inna operacja na notatkach.") from error
     try:
-        _write_notes_lock_pid(descriptor)
+        owner = _write_notes_lock_pid(descriptor)
         # Once the guard is held, verify files did not change since reading them.
         if load_json(folder / "notes.json") != old_notes or load_json(folder / "notes-edits.json") != old_edits:
             raise VideoNotesError("Notatki zmieniono równocześnie. Spróbuj ponownie.")
@@ -371,7 +373,8 @@ def regenerate_basic_notes(folder: Path, *, window_minutes: int = 5, points_per_
         _transaction_path(folder).unlink()
         return {"changed": True, "revision": revision, "kept_edits": len(changed["edits"]), "unmatched_edits": unmatched}
     finally:
-        lock.unlink(missing_ok=True)
+        if "owner" in locals() and _same_lock(lock, owner):
+            lock.unlink(missing_ok=True)
 
 
 def restore_note_version(folder: Path, revision: str) -> str:
@@ -398,7 +401,7 @@ def restore_note_version(folder: Path, revision: str) -> str:
     except FileExistsError as error:
         raise VideoNotesError("Trwa inna operacja na notatkach.") from error
     try:
-        _write_notes_lock_pid(descriptor)
+        owner = _write_notes_lock_pid(descriptor)
         if load_json(folder / "notes.json") != old_notes or load_json(folder / "notes-edits.json") != old_edits:
             raise VideoNotesError("Notatki zmieniono równocześnie.")
         _transaction_guard(folder)
@@ -409,4 +412,6 @@ def restore_note_version(folder: Path, revision: str) -> str:
         _transaction_path(folder).unlink()
         return saved
     finally:
-        (folder / ".notes.lock").unlink(missing_ok=True)
+        lock = folder / ".notes.lock"
+        if "owner" in locals() and _same_lock(lock, owner):
+            lock.unlink(missing_ok=True)

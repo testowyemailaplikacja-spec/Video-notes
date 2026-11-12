@@ -14,6 +14,7 @@ from collections import Counter
 from pathlib import Path
 
 from .errors import VideoNotesError
+from .edit_lock import _same_lock
 from .storage import atomic_write, load_json, read_project, save_json
 
 SCHEMA = "videonotes-basic-notes-v1"
@@ -112,6 +113,7 @@ def generate_basic_notes(folder: Path, *, window_minutes: int = 5, points_per_se
             writer.write(f"pid={os.getpid()}\n")
             writer.flush()
             os.fsync(writer.fileno())
+            owner = os.fstat(writer.fileno())
         if (folder / ".notes-transaction.json").exists() or (folder / ".notes-transaction.json").is_symlink():
             raise VideoNotesError("Przerwana aktualizacja notatki: najpierw użyj notes-recover --confirm.")
         project, transcript, corrections = read_project(folder)
@@ -159,7 +161,9 @@ def generate_basic_notes(folder: Path, *, window_minutes: int = 5, points_per_se
         return notes
     
     finally:
-        lock.unlink(missing_ok=True)
+        # A replaced lock may now belong to a different process.
+        if "owner" in locals() and _same_lock(lock, owner):
+            lock.unlink(missing_ok=True)
 
 def read_basic_notes(folder: Path) -> tuple[dict, dict]:
     folder = Path(folder)
@@ -216,13 +220,16 @@ def edit_note_point(folder: Path, point_id: str, new_text: str) -> None:
             writer.write(f"pid={os.getpid()}\n")
             writer.flush()
             os.fsync(writer.fileno())
+            owner = os.fstat(writer.fileno())
         notes, changes = read_basic_notes(folder)
         if not any(point["id"] == point_id for section in notes["sections"] for point in section["points"]):
             raise VideoNotesError("Nie znaleziono punktu do edycji.")
         changes["edits"][point_id] = new_text
         save_json(folder / "notes-edits.json", changes)
     finally:
-        lock.unlink(missing_ok=True)
+        # A replaced lock may now belong to a different process.
+        if "owner" in locals() and _same_lock(lock, owner):
+            lock.unlink(missing_ok=True)
 
 
 def render_basic_markdown(folder: Path) -> str:
