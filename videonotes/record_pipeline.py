@@ -61,8 +61,17 @@ def transcribe_finished_session(recording: Path, project: Path, *, model: Path,
     if parts > 1:
         join_finished_recording(recording, source)
     after = recording_status(recording)
-    if after["status"] != "finished" or after["segments"] != summary["segments"] or not after["sha256_verified"]:
-        raise VideoNotesError("Nagranie źródłowe zmieniło się podczas przygotowania.")
+    # A finished WAV can remain byte-identical while another process revokes
+    # consent or changes the journal's declared source hashes. The status
+    # comparison above does not carry consent fields, so guard the complete
+    # original journal snapshot before creating any new project files.
+    if (after["status"] != "finished" or after["segments"] != summary["segments"]
+            or not after["sha256_verified"]
+            or load_json(recording / "recording.json") != journal):
+        raise VideoNotesError(
+            "Nagranie, dziennik lub zgody zmieniły się podczas przygotowania; "
+            "nie rozpoczęto transkrypcji."
+        )
     create_project(source, project, model=model, whisper_cli=whisper_cli,
                    language=language, chunk_ms=chunk_seconds * 1000, ffprobe=ffprobe)
     transcript = transcribe_project(project, ffmpeg=ffmpeg, ffprobe=ffprobe,
