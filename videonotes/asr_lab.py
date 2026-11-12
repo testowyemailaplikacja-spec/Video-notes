@@ -157,6 +157,16 @@ def run_real_benchmark(source: Path, reference: Path, *, cpp_executable: str,
     duration = min(duration_seconds * 1000, total - offset)
     if duration <= 0:
         raise VideoNotesError("Wybrany przedział znajduje się poza nagraniem.")
+    # Fingerprint the actual inputs before inference: a post-run-only hash can
+    # falsely attribute changed source/model bytes to the benchmarked results.
+    input_paths = {
+        "source": source, "reference": reference,
+        "cpp_model": cpp_model,
+        "faster_model": faster_model_dir / "model.bin",
+        "faster_config": faster_model_dir / "config.json",
+        "faster_vocabulary": faster_model_dir / "vocabulary.txt",
+    }
+    input_hashes = {name: sha256_file(path) for name, path in input_paths.items()}
     with tempfile.TemporaryDirectory(prefix="vn-real-bench-") as directory:
         tmp = Path(directory)
         wav = tmp / "identical-input.wav"
@@ -188,14 +198,21 @@ def run_real_benchmark(source: Path, reference: Path, *, cpp_executable: str,
             metrics = _safe_process_metrics(measurements, label)
             if not expected.is_file():
                 raise VideoNotesError(f"Silnik {label} nie zapisał wynikowej transkrypcji TXT.")
+            # An executable must not be able to silently change the WAV used
+            # by the next engine while still producing a shareable comparison.
+            if sha256_file(wav) != pcm_digest:
+                raise VideoNotesError("Próbka PCM zmieniła się podczas benchmarku ASR.")
             stats[label] = metrics
         comparison = compare_text_files(reference, {label: file for label, _, file in commands})
+    if (any(sha256_file(path) != input_hashes[name] for name, path in input_paths.items())
+            or comparison["reference_sha256"] != input_hashes["reference"]):
+        raise VideoNotesError("Źródło, referencja lub model zmieniły się podczas benchmarku ASR.")
     report = {
-        "schema": REPORT_SCHEMA, "source_sha256": sha256_file(source),
-        "reference_sha256": comparison["reference_sha256"],
-        "cpp_model_sha256": sha256_file(cpp_model),
-        "faster_model_sha256": sha256_file(faster_model_dir / "model.bin"),
-        "faster_config_sha256": sha256_file(faster_model_dir / "config.json"),
+        "schema": REPORT_SCHEMA, "source_sha256": input_hashes["source"],
+        "reference_sha256": input_hashes["reference"],
+        "cpp_model_sha256": input_hashes["cpp_model"],
+        "faster_model_sha256": input_hashes["faster_model"],
+        "faster_config_sha256": input_hashes["faster_config"],
         "local_subprocesses_executed": True, "engine_binary_identity_independently_verified": False,
         "input_clip": {"start_ms": offset, "duration_ms": duration, "stream_index": track["index"],
                        "wav_sample_rate": 16000, "wav_channels": 1, "pcm_sha256": pcm_digest},
