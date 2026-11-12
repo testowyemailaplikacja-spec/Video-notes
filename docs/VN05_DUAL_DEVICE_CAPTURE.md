@@ -27,3 +27,7 @@ FFmpeg czyta dwa niezależne wejścia, stosuje resampling i miksowanie amix do P
 ## Granice odbioru
 
 **VN-05 pozostaje W_TRAKCIE.** Kod testowany przez atrapy FFmpeg nie dowodzi działania sprzętowego. Niezbędne są testy prawdziwych urządzeń i jakości miksowania, synchronizacji, dostępu Windows, odłączania mikrofonu, limitów miejsca i nagrań 2h. Na komputerach bez loopback potrzebny jest odrębny adapter albo konfiguracja urządzenia. Nie zmieniamy statusu na DONE bez tych dowodów.
+
+## Dokładność diagnostyki sygnału między częściami (12.11.2026)
+
+Raport `record-analyze` mierzy najdłuższą nieprzerwaną ciszę także wtedy, gdy zaczyna się w jednym pliku `part-XXXXX.wav`, a kończy w następnym. Wcześniej licznik resetował się na granicy plików, przez co np. 6 sekund ciągłej ciszy rozdzielonych na trzy części mogło wyglądać jak 2 sekundy. Poszczególne raporty części pozostają bez zmian, natomiast wynik całej sesji sumuje ciszę przechodzącą przez granicę i zawsze pozostaje tylko wskazówką o poziomie sygnału, nie dowodem, że głos został rozpoznany poprawnie. Po analizie ponownie sprawdzany jest dziennik oraz SHA-256 części WAV; jeżeli nagranie zmieniło się w trakcie pomiaru, wynik zostaje odrzucony. Próbki nagrań w testach są syntetyczne i nie stanowią odbioru dwóch fizycznych urządzeń DirectShow.
