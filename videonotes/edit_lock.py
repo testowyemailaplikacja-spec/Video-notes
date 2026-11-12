@@ -25,8 +25,14 @@ def _same_lock(path: Path, original: os.stat_result) -> bool:
         stat = path.lstat()
     except OSError:
         return False
+    # Inode numbers may be reused immediately after an unlink, especially
+    # in a temp directory. Device+inode alone can falsely identify a freshly
+    # replaced lock as ours. Compare post-write metadata too (fail closed).
     return (not path.is_symlink() and stat.st_dev == original.st_dev
-            and stat.st_ino == original.st_ino)
+            and stat.st_ino == original.st_ino and
+            stat.st_ctime_ns == original.st_ctime_ns and
+            stat.st_mtime_ns == original.st_mtime_ns and
+            stat.st_size == original.st_size)
 
 
 @contextmanager
@@ -45,12 +51,12 @@ def transcript_edit_lock(folder: Path) -> Iterator[None]:
     except OSError as error:
         raise VideoNotesError("Nie można bezpiecznie utworzyć blokady poprawek.") from error
     try:
-        own = os.fstat(fd)
         with os.fdopen(fd, "w", encoding="ascii") as writer:
             fd = -1
             writer.write(f"pid={os.getpid()}\n")
             writer.flush()
             os.fsync(writer.fileno())
+            own = os.fstat(writer.fileno())
         yield
     finally:
         if fd >= 0:
