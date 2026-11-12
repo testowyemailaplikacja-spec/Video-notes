@@ -246,5 +246,65 @@ class LocalASRLabTest(unittest.TestCase):
                                        stream=1, output=self.report, process_runner=bad_runner)
                 self.assertFalse(self.report.exists())
 
+
+    @patch("videonotes.asr_lab.executable", return_value="/tmp/stub-whisper-cli")
+    @patch("videonotes.asr_lab.probe")
+    @patch("videonotes.asr_lab.extract_chunk")
+    def test_rejects_changed_source_reference_or_models_without_publishing(
+        self, extract, probe, executable
+    ):
+        probe.return_value = {"duration_ms": 3000, "audio_streams": [
+            {"index": 1, "codec": "pcm", "language": "pl", "channels": 1}
+        ]}
+        extract.side_effect = lambda path, track, *, start_ms, duration_ms, destination, ffmpeg: destination.write_bytes(self.source.read_bytes())
+        inputs = (
+            self.source, self.reference, self.model,
+            self.model_dir / "model.bin", self.model_dir / "config.json",
+            self.model_dir / "vocabulary.txt",
+        )
+        for touched in inputs:
+            with self.subTest(path=touched.name):
+                previous = touched.read_bytes()
+                try:
+                    def tampering_runner(command):
+                        metrics = self._stub(command)
+                        touched.write_bytes(previous + b" CHANGED AFTER INPUT HASH")
+                        return metrics
+                    with self.assertRaisesRegex(VideoNotesError, "zmieniły się"):
+                        run_real_benchmark(
+                            self.source, self.reference, cpp_executable="stub",
+                            cpp_model=self.model, faster_model_dir=self.model_dir,
+                            stream=1, output=self.report, process_runner=tampering_runner,
+                        )
+                    self.assertFalse(self.report.exists())
+                finally:
+                    touched.write_bytes(previous)
+
+    @patch("videonotes.asr_lab.executable", return_value="/tmp/stub-whisper-cli")
+    @patch("videonotes.asr_lab.probe")
+    @patch("videonotes.asr_lab.extract_chunk")
+    def test_rejects_engine_modifying_shared_pcm_before_second_engine(
+        self, extract, probe, executable
+    ):
+        probe.return_value = {"duration_ms": 3000, "audio_streams": [
+            {"index": 1, "codec": "pcm", "language": "pl", "channels": 1}
+        ]}
+        extract.side_effect = lambda path, track, *, start_ms, duration_ms, destination, ffmpeg: destination.write_bytes(self.source.read_bytes())
+        commands = []
+        def tampering_runner(command):
+            commands.append(command)
+            metrics = self._stub(command)
+            wav = Path(command[command.index("--file") + 1])
+            wav.write_bytes(wav.read_bytes() + b"CHANGED")
+            return metrics
+        with self.assertRaisesRegex(VideoNotesError, "PCM zmieniła"):
+            run_real_benchmark(
+                self.source, self.reference, cpp_executable="stub",
+                cpp_model=self.model, faster_model_dir=self.model_dir,
+                stream=1, output=self.report, process_runner=tampering_runner,
+            )
+        self.assertEqual(len(commands), 1)
+        self.assertFalse(self.report.exists())
+
 if __name__ == "__main__":
     unittest.main()
