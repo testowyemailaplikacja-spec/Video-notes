@@ -20,3 +20,7 @@ W GUI wybierz **„OCR slajdów i lokalne szkice AI”**, następnie **„Powią
 Poprzedni algorytm oglądał tylko dwa sąsiadujące według **początku** segmenty. Dla długiej wypowiedzi 00:00–00:20 i późniejszych krótkich wypowiedzi potrafił przypisać klatkę z 00:15 do odległego krótkiego fragmentu, a nie do wypowiedzi obejmującej tę chwilę. To ważne zwłaszcza przy wielu mówcach i nakładających się zapisach.
 
 Teraz indeks przedziałów zawiera maksimum końca w prefiksie. Wyszukiwanie binarne wybiera najwcześniejszy czasowo segment, który **naprawdę obejmuje** czas klatki; jeżeli żaden go nie obejmuje, sprawdza najbliższą zakończoną i przyszłą wypowiedź. Koszt budowy indeksu O(n), pojedyncze wyszukanie O(log n). Weryfikator ponownie buduje taki sam wynik, więc poprzednie błędne indeksy są odrzucane jako niezgodne i trzeba je utworzyć na nowo. Odbiór semantycznej zgodności slajdu i treści nadal wymaga człowieka.
+
+## Spójność zapisywanego Markdown (12.11.2026)
+
+Przy eksportowaniu indeksu czasowego slajd–wypowiedź do Markdown aplikacja odczytuje zweryfikowany indeks, a potem sprawdza jeszcze raz SHA-256 pliku rzeczywiście użytego do renderowania. Przed zapisem porównuje również pełny, powtórnie zweryfikowany raport i źródła. Jeżeli plik został podmieniony albo tekst OCR został zmieniony w odczycie między kontrolą a renderowaniem, eksport jest odrzucany. Testy symulują obie sytuacje bez prywatnych nagrań. To kontrola pochodzenia i spójności, nie potwierdzenie, że OCR lub mowa są merytorycznie zgodne; odbiór na realnych slajdach jest nadal otwarty.
