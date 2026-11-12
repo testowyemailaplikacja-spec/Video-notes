@@ -204,6 +204,10 @@ def join_finished_recording(folder: Path, output: Path) -> Path:
     if report["status"] != "finished":
         raise VideoNotesError("Tylko ukończoną i spójną sesję można połączyć do WAV.")
     paths = _wav_paths(folder)
+    # Fingerprint every verified source BEFORE copying. A second process could
+    # change sample bytes without changing WAV duration or declared frame count.
+    # We must not publish a combined recording made from inconsistent takes.
+    original_hashes = {part.name: sha256_file(part) for part in paths}
     total_frames = 0
     for part in paths:
         with wave.open(str(part), "rb") as audio:
@@ -248,6 +252,12 @@ def join_finished_recording(folder: Path, output: Path) -> Path:
         verified = _inspect_single_wav(Path(temp_name))
         if verified["duration_ms"] != total_frames * 1000 // 16_000:
             raise VideoNotesError("Połączony WAV ma niepoprawną długość.")
+        # Refuse a race involving in-place edits or a changed recording journal.
+        # All checks happen before the atomic no-clobber hardlink publication.
+        if (any(part.is_symlink() or not part.is_file() or
+                sha256_file(part) != original_hashes[part.name] for part in paths)
+                or recording_status(folder) != report):
+            raise VideoNotesError("Części WAV lub dziennik zmieniły się podczas łączenia; wynik nie został opublikowany.")
         try:
             os.link(temp_name, output)
         except FileExistsError as error:
