@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 from subprocess import CompletedProcess
 
 from tests.test_notes import fixture
@@ -66,6 +67,51 @@ class SemanticDraftTest(unittest.TestCase):
         markdown = self.md.read_text("utf-8")
         self.assertIn("NIEZWERYFIKOWANY", markdown)
         self.assertIn("c0000000-s00000", markdown)
+
+    def test_export_refuses_draft_replaced_between_verification_and_read(self):
+        import sys
+        from videonotes import semantic_draft as semantic_module
+        create_semantic_draft(self.project, self.result, model=self.model,
+                              llama_cli=sys.executable, section_minutes=1,
+                              runner=self.fake_runner)
+        original_load = semantic_module.load_json
+        reads = []
+        def concurrent_swap(path):
+            record = original_load(path)
+            if Path(path) == self.result:
+                reads.append(True)
+                if len(reads) == 2:
+                    record["sections"][0]["claims"][0]["text"] = "Fabricated BGP 9999."
+                    save_json(path, record)
+            return record
+        with patch("videonotes.semantic_draft.load_json", side_effect=concurrent_swap):
+            with self.assertRaisesRegex(VideoNotesError, "Szkic AI zmienił się"):
+                export_semantic_markdown(self.project, self.result, self.md)
+        self.assertFalse(self.md.exists())
+        self.assertGreaterEqual(len(reads), 2)
+
+    def test_export_refuses_unverified_in_memory_draft_even_when_file_is_unchanged(self):
+        import sys
+        from videonotes import semantic_draft as semantic_module
+        create_semantic_draft(self.project, self.result, model=self.model,
+                              llama_cli=sys.executable, section_minutes=1,
+                              runner=self.fake_runner)
+        original = self.result.read_bytes()
+        original_load = semantic_module.load_json
+        reads = []
+        def corrupt_only_render_snapshot(path):
+            record = original_load(path)
+            if Path(path) == self.result:
+                reads.append(True)
+                if len(reads) == 2:
+                    record["sections"][0]["claims"][0]["text"] = "Fabricated BGP 9999."
+            return record
+        with patch("videonotes.semantic_draft.load_json", side_effect=corrupt_only_render_snapshot):
+            with self.assertRaisesRegex(VideoNotesError, "Szkic lub transkrypcja zmieniły"):
+                export_semantic_markdown(self.project, self.result, self.md)
+        self.assertFalse(self.md.exists())
+        self.assertEqual(self.result.read_bytes(), original)
+        self.assertGreaterEqual(len(reads), 3)
 
     def test_unsourced_number_or_acronym_is_not_published(self):
         import sys
