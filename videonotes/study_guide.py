@@ -202,6 +202,15 @@ def export_study_guide(folder: Path, *, section_minutes: int = 5,
         from .pdf_export import render_pdf_from_docx
         pdf_bytes = render_pdf_from_docx(docx_bytes, office=office)
 
+    # A PDF converter or concurrent manual correction may run after the first
+    # source read. Refuse publishing a study guide whose quotations describe
+    # an older transcript/edits snapshot, rather than silently overwriting an
+    # existing export with stale learning material.
+    if build_study_guide(folder, section_minutes=section_minutes, detail=detail) != guide:
+        raise VideoNotesError(
+            "Transkrypcja lub ręczne poprawki zmieniły się podczas eksportu; "
+            "nie nadpisano wcześniejszego przewodnika."
+        )
     atomic_write(markdown, md_bytes)
     atomic_write(structured, json_bytes)
     result = [markdown, structured]
