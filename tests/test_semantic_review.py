@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from unittest.mock import patch
 from subprocess import CompletedProcess
 
 from tests.test_notes import fixture
@@ -80,6 +81,62 @@ class ReviewTest(unittest.TestCase):
             self.assertEqual((self.project / name).read_bytes(), blob)
         with self.assertRaises(VideoNotesError):
             export_reviewed_semantic_markdown(self.project, self.draft, self.review, self.md)
+
+    def test_export_rejects_swapped_decisions_even_when_counts_are_unchanged(self):
+        init_semantic_review(self.project, self.draft, self.review)
+        self.decide(0, "approve")
+        self.decide(1, "reject")
+        from videonotes import semantic_review as review_module
+        original = review_module._checked_review
+        calls = []
+        def change_after_export_reads_decisions(*args):
+            result = original(*args)
+            calls.append(1)
+            if len(calls) == 2:
+                for cid in self.claims:
+                    file = self.review / "decisions" / (cid + ".json")
+                    value = load_json(file)
+                    value["decision"] = "reject" if value["decision"] == "approve" else "approve"
+                    save_json(file, value)
+            return result
+        with patch("videonotes.semantic_review._checked_review",
+                   side_effect=change_after_export_reads_decisions):
+            with self.assertRaisesRegex(VideoNotesError, "zmieniły się"):
+                export_reviewed_semantic_markdown(
+                    self.project, self.draft, self.review, self.md
+                )
+        self.assertFalse(self.md.exists())
+        status = semantic_review_status(self.project, self.draft, self.review)
+        self.assertEqual((status["approved_by_user"], status["rejected_by_user"]), (1, 1))
+        self.assertEqual(
+            load_json(self.review / "decisions" / (self.claims[0] + ".json"))["decision"],
+            "reject",
+        )
+
+    def test_export_rejects_changed_reviewer_note_without_changed_counts(self):
+        init_semantic_review(self.project, self.draft, self.review)
+        self.decide(0, "approve")
+        self.decide(1, "reject")
+        from videonotes import semantic_review as review_module
+        original = review_module._checked_review
+        calls = []
+        def change_note_after_export_read(*args):
+            result = original(*args)
+            calls.append(1)
+            if len(calls) == 2:
+                file = self.review / "decisions" / (self.claims[0] + ".json")
+                record = load_json(file)
+                record["note"] = "Changed during export"
+                save_json(file, record)
+            return result
+        with patch("videonotes.semantic_review._checked_review",
+                   side_effect=change_note_after_export_read):
+            with self.assertRaisesRegex(VideoNotesError, "zmieniły się"):
+                export_reviewed_semantic_markdown(
+                    self.project, self.draft, self.review, self.md
+                )
+        self.assertFalse(self.md.exists())
+        self.assertEqual(semantic_review_status(self.project, self.draft, self.review)["pending"], 0)
 
     def test_confirm_required_and_duplicate_decision_refused(self):
         init_semantic_review(self.project, self.draft, self.review)
