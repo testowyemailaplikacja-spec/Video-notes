@@ -73,6 +73,48 @@ class CheckpointTest(unittest.TestCase):
             transcribe_project(self.project_dir, asr_factory=StubWhisper)
         self.assertEqual(read_project(self.project_dir)[1]["completed_chunks"], [])
 
+    def test_same_size_source_pcm_mutation_during_asr_refuses_new_checkpoint(self):
+        source = self.media
+        class MutateInput(StubWhisper):
+            def transcribe(self, wav, *, language, offset_ms, duration_ms):
+                if offset_ms == 1000:
+                    with source.open("r+b") as stream:
+                        stream.seek(-1, 2)
+                        stream.write(b"\x01")
+                        stream.flush()
+                return super().transcribe(wav, language=language,
+                                           offset_ms=offset_ms, duration_ms=duration_ms)
+        with self.assertRaisesRegex(VideoNotesError, "zmieniły się"):
+            transcribe_project(self.project_dir, asr_factory=MutateInput)
+        self.assertEqual(read_project(self.project_dir)[1]["completed_chunks"], [0])
+        self.assertFalse((self.project_dir / ".processing.lock").exists())
+
+    def test_same_size_model_mutation_during_asr_refuses_new_checkpoint(self):
+        model = self.model
+        class MutateModel(StubWhisper):
+            def transcribe(self, wav, *, language, offset_ms, duration_ms):
+                if offset_ms == 1000:
+                    with model.open("r+b") as stream:
+                        stream.seek(-1, 2)
+                        stream.write(b"Z")
+                        stream.flush()
+                return super().transcribe(wav, language=language,
+                                           offset_ms=offset_ms, duration_ms=duration_ms)
+        with self.assertRaisesRegex(VideoNotesError, "zmieniły się"):
+            transcribe_project(self.project_dir, asr_factory=MutateModel)
+        self.assertEqual(read_project(self.project_dir)[1]["completed_chunks"], [0])
+
+    def test_source_change_after_checkpoint_prevents_next_extraction(self):
+        def change_after_first(done, total):
+            if done == 1:
+                with self.media.open("ab") as stream:
+                    stream.write(b"late change")
+        with self.assertRaisesRegex(VideoNotesError, "zmieniły się"):
+            transcribe_project(self.project_dir, asr_factory=StubWhisper,
+                               progress=change_after_first)
+        self.assertEqual(read_project(self.project_dir)[1]["completed_chunks"], [0])
+        self.assertEqual(StubWhisper.seen, [0])
+
     def test_cancel_preserves_completed_chunk(self):
         stop = threading.Event()
         def progress(done, total):
