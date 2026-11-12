@@ -47,3 +47,8 @@ Gotowa kopia jest publikowana atomowo z unikalnego pliku tymczasowego przy użyc
 Przenośna kopia obejmuje również do 1000 istniejących snapshotów notatek z `notes-history/`. Każdy wpis przechodzi walidację nazwy, sum SHA-256 własnej migawki, identyfikatora projektu i manifestu ZIP. Weryfikacja wykonywana jest ponownie przed zakończeniem odtwarzania. Archiwa utworzone wcześniej bez historii nadal są obsługiwane.
 
 Po przywróceniu można sprawdzić zachowane wersje i cofać je tylko wtedy, gdy ich odnośniki źródłowe pozostają zgodne z aktualną transkrypcją. Wersje historyczne mogą zawierać prywatne teksty, więc zaszyfrowane miejsce przechowywania jest nadal zalecane. Realny test uszkodzenia nośnika i odłączenia zasilania pozostaje NOT_RUN.
+
+
+## Bezpieczny wyścig podczas przywracania kopii (12.11.2026)
+
+Podczas publikacji odtworzonego katalogu projektowego usunięto \`os.replace(staging, destination)\`, ponieważ na systemach POSIX mogło ono **zastąpić pusty katalog** utworzony przez drugi proces dopiero po wcześniejszym sprawdzeniu, że miejsce docelowe nie istnieje. Teraz wykorzystujemy tę samą, atomową operację bez nadpisywania co w prywatnym pakiecie instalacyjnym: Windows \`os.rename\` (odmawia, gdy folder istnieje), Linux \`renameat2(RENAME_NOREPLACE)\`; nieobsługiwane systemy odmawiają publikacji zamiast zgadywać. Test regresji wstawia pusty folder dokładnie między przygotowaniem pełnej kopii a atomową publikacją, następnie sprawdza zachowanie folderu oraz posprzątanie katalogu tymczasowego. Nie dotyka to archiwum ani istniejących danych użytkownika. Odbiór na fizycznym Windows nadal pozostaje osobną bramką.
