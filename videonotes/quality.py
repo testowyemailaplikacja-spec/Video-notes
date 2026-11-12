@@ -81,9 +81,14 @@ def error_rates(reference: str, candidate: str) -> dict:
 def _read(path: Path) -> tuple[str, str]:
     try:
         file = Path(path)
-        if not file.is_file() or file.stat().st_size > MAX_BYTES:
-            raise VideoNotesError("Plik TXT do benchmarku jest nieobecny lub zbyt duży.")
-        content = file.read_bytes()
+        if file.is_symlink() or not file.is_file() or file.stat().st_size > MAX_BYTES:
+            raise VideoNotesError("Plik TXT do benchmarku jest nieobecny, dowiązany lub zbyt duży.")
+        # A file can grow after stat() but before read(). Never read a multi-GB
+        # recording or a changing file into memory by accident.
+        with file.open("rb") as reader:
+            content = reader.read(MAX_BYTES + 1)
+        if len(content) > MAX_BYTES or file.is_symlink():
+            raise VideoNotesError("Plik TXT zmienił rozmiar lub jest dowiązaniem; pomiar przerwany.")
         return content.decode("utf-8-sig"), hashlib.sha256(content).hexdigest()
     except (OSError, UnicodeError) as error:
         raise VideoNotesError("Nie można odczytać TXT do benchmarku.") from error

@@ -109,3 +109,7 @@ Po zakończeniu dwóch pomiarów aplikacja publikuje JSON za pomocą kompletnego
 ## Ochrona lokalnych pomiarów tekstowych WER/CER (12.11.2026)
 
 Polecenie `benchmark` (porównujące gotowe pliki TXT, niezależnie od uruchomienia rzeczywistego silnika) nie nadpisuje już istniejących raportów. Raport JSON powstaje w lokalnym pliku tymczasowym, jest synchronizowany na dysk, a następnie publikowany tylko pod **nową** nazwą bez zastępowania pliku utworzonego przez równoległy pomiar. Próba wskazania istniejącego pliku wejściowego jako wyjścia nie usuwa ręcznej transkrypcji referencyjnej. Po porównaniu narzędzie ponownie sprawdza SHA-256 wszystkich plików TXT, aby nie opublikować WER/CER dla materiałów zmienionych w trakcie obliczeń. Testy obejmują konkurencyjny raport i zmianę wzorca po wczytaniu. Funkcja wciąż nie weryfikuje pochodzenia wyników ASR ani licencji modeli i nie zastępuje benchmarku prawdziwej mowy.
+
+## Limit odczytu plików TXT także podczas zmiany pliku (12.11.2026)
+
+Porównywanie WER/CER odczytuje teraz **maksymalnie 300 001 bajtów** i odrzuca zawartość przekraczającą limit 300 000 bajtów, nawet jeśli plik był mały podczas początkowego `stat()`, ale urósł tuż przed odczytem. Unikamy w ten sposób niekontrolowanego wczytania wielogigabajtowego pliku do RAM. Wzorce i kandydaci będący dowiązaniami symbolicznymi także są odrzucani. Dwa testy sprawdzają takie dowiązania i deterministyczny wzrost pliku między kontrolą rozmiaru a odczytem. Metryki pozostają lokalne; naturalna referencja PL/EN i ręczny odsłuch nadal są bramkami VN-00.

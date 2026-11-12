@@ -102,6 +102,47 @@ class QualityHarnessTest(unittest.TestCase):
             self.assertEqual(processed, [True])
             self.assertFalse(report.exists())
 
+    def test_rejects_symlinked_reference_and_candidate_without_report(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            genuine = root / "human.txt"
+            genuine.write_text("Lokalny wzorzec polskiej mowy.", encoding="utf-8")
+            alias = root / "reference-link.txt"
+            try:
+                alias.symlink_to(genuine)
+            except (OSError, NotImplementedError):
+                self.skipTest("Symlink privileges unavailable")
+            with self.assertRaisesRegex(VideoNotesError, "dowiązan"):
+                validate_reference_file(alias)
+            report = root / "scores.json"
+            with self.assertRaisesRegex(VideoNotesError, "dowiązan"):
+                compare_text_files(genuine, {"candidate": alias}, output=report)
+            self.assertFalse(report.exists())
+            self.assertIn("wzorzec", genuine.read_text(encoding="utf-8"))
+
+    def test_file_growing_after_stat_is_bounded_and_cannot_publish_report(self):
+        from videonotes import quality
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            ref = root / "human.txt"
+            candidate = root / "candidate.txt"
+            report = root / "scores.json"
+            ref.write_text("Tylko wzorzec polskiej mowy.", encoding="utf-8")
+            candidate.write_text("Własny tekst", encoding="utf-8")
+            original_open = Path.open
+            grows = []
+            def grow_between_preflight_and_read(path, *args, **kwargs):
+                if Path(path) == candidate and args and args[0] == "rb" and not grows:
+                    with original_open(candidate, "wb") as stream:
+                        stream.write(b"Z" * (quality.MAX_BYTES + 900))
+                    grows.append(True)
+                return original_open(path, *args, **kwargs)
+            with patch("videonotes.quality.Path.open", new=grow_between_preflight_and_read):
+                with self.assertRaisesRegex(VideoNotesError, "zmienił rozmiar"):
+                    compare_text_files(ref, {"candidate": candidate}, output=report)
+            self.assertEqual(grows, [True])
+            self.assertFalse(report.exists())
+
     def test_fast_reference_preflight_rejects_invalid_before_distance(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "private-reference.txt"
