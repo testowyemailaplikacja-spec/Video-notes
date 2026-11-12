@@ -63,6 +63,9 @@ class LocalASRLabTest(unittest.TestCase):
         self.assertEqual(stats["input_clip"]["stream_index"], 1)
         self.assertEqual(stats["timing_and_memory"]["whisper_cpp"]["peak_rss_bytes"], 1234)
         self.assertIsNone(stats["timing_and_memory"]["faster_whisper"]["peak_rss_bytes"])
+        self.assertEqual(stats["input_clip"]["pcm_sha256"], __import__("hashlib").sha256(self.source.read_bytes()).hexdigest())
+        self.assertFalse(stats["timing_and_memory"]["whisper_cpp"]["cpu_measured"])
+        self.assertIsNone(stats["timing_and_memory"]["whisper_cpp"]["cpu_seconds_observed"])
         content = self.report.read_text("utf-8")
         self.assertEqual(json.loads(content), stats)
         self.assertNotIn("Wykład", content)
@@ -124,6 +127,9 @@ class LocalASRLabTest(unittest.TestCase):
         result = _run_process([sys.executable, "-c", "pass"])
         self.assertGreaterEqual(result["wall_seconds"], 0)
         self.assertEqual(result["ram_measured"], result["peak_rss_bytes"] is not None)
+        self.assertEqual(result["cpu_measured"], result["cpu_seconds_observed"] is not None)
+        if result["cpu_measured"]:
+            self.assertGreaterEqual(result["cpu_seconds_observed"], 0)
 
     def test_faster_worker_never_downloads_model_and_iterates_generator(self):
         model = self.model_dir
@@ -162,6 +168,83 @@ class LocalASRLabTest(unittest.TestCase):
             transcribe_local(self.source, self.root / "absent", self.root / "out.txt",
                              language="pl", threads=2)
         self.assertFalse((self.root / "out.txt").exists())
+
+
+    @patch("videonotes.asr_lab.executable", return_value="/tmp/stub-whisper-cli")
+    @patch("videonotes.asr_lab.probe")
+    @patch("videonotes.asr_lab.extract_chunk")
+    def test_refuse_empty_or_invalid_reference_before_expensive_inference(self, extract, probe, executable):
+        for raw in (b"", b"!!! /// ???", bytes([0xff, 0xfe, 0xff]), b"x" * 300_001):
+            with self.subTest(data_len=len(raw)):
+                self.reference.write_bytes(raw)
+                with self.assertRaises(VideoNotesError):
+                    run_real_benchmark(self.source, self.reference, cpp_executable="stub",
+                                       cpp_model=self.model, faster_model_dir=self.model_dir,
+                                       process_runner=self._stub)
+        self.assertEqual(probe.call_count, 0)
+        self.assertEqual(extract.call_count, 0)
+        self.assertFalse(self.report.exists())
+
+    @patch("videonotes.asr_lab.executable", return_value="/tmp/stub-whisper-cli")
+    @patch("videonotes.asr_lab.probe")
+    @patch("videonotes.asr_lab.extract_chunk")
+    def test_public_report_whitelists_metrics_and_never_serializes_private_runner_fields(
+        self, extract, probe, executable
+    ):
+        probe.return_value = {"duration_ms": 3000, "audio_streams": [
+            {"index": 1, "codec": "pcm", "language": "pl", "channels": 1}
+        ]}
+        extract.side_effect = lambda path, track, *, start_ms, duration_ms, destination, ffmpeg: destination.write_bytes(self.source.read_bytes())
+        def unsafe_runner(command):
+            result = self._stub(command)
+            result.update({"private_transcript": "PRIVATE SPEECH",
+                           "local_audio_path": str(self.source),
+                           "cpu_seconds_observed": 0.125, "cpu_measured": True})
+            return result
+        result = run_real_benchmark(self.source, self.reference, cpp_executable="stub",
+                                    cpp_model=self.model, faster_model_dir=self.model_dir,
+                                    stream=1, output=self.report, process_runner=unsafe_runner)
+        for label in ("whisper_cpp", "faster_whisper"):
+            self.assertEqual(result["timing_and_memory"][label]["cpu_seconds_observed"], 0.125)
+            self.assertEqual(result["timing_and_memory"][label]["cpu_measured"], True)
+            self.assertNotIn("private_transcript", result["timing_and_memory"][label])
+        text = self.report.read_text("utf-8")
+        self.assertNotIn("PRIVATE SPEECH", text)
+        self.assertNotIn(str(self.source), text)
+        self.assertNotIn("local_audio_path", text)
+        self.assertIn('"pcm_sha256"', text)
+
+    @patch("videonotes.asr_lab.executable", return_value="/tmp/stub-whisper-cli")
+    @patch("videonotes.asr_lab.probe")
+    @patch("videonotes.asr_lab.extract_chunk")
+    def test_reject_invalid_metrics_and_never_publish_nonstandard_json(self, extract, probe, executable):
+        probe.return_value = {"duration_ms": 3000, "audio_streams": [
+            {"index": 1, "codec": "pcm", "language": "pl", "channels": 1}
+        ]}
+        extract.side_effect = lambda path, track, *, start_ms, duration_ms, destination, ffmpeg: destination.write_bytes(self.source.read_bytes())
+        invalid_cases = (
+            {"wall_seconds": float("nan")},
+            {"wall_seconds": float("inf")},
+            {"wall_seconds": 10 ** 500},
+            {"wall_seconds": -1},
+            {"wall_seconds": True},
+            {"wall_seconds": 1, "peak_rss_bytes": -2, "ram_measured": True},
+            {"wall_seconds": 1, "peak_rss_bytes": 100, "ram_measured": False},
+            {"wall_seconds": 1, "cpu_seconds_observed": float("nan"), "cpu_measured": True},
+            {"wall_seconds": 1, "cpu_seconds_observed": 10 ** 500, "cpu_measured": True},
+            {"wall_seconds": 1, "cpu_seconds_observed": 2.0, "cpu_measured": False},
+            {"wall_seconds": 1, "cpu_seconds_observed": True, "cpu_measured": True},
+        )
+        for invalid in invalid_cases:
+            with self.subTest(metrics=invalid):
+                def bad_runner(command):
+                    self._stub(command)
+                    return invalid
+                with self.assertRaisesRegex(VideoNotesError, "Nieprawidłowe metryki"):
+                    run_real_benchmark(self.source, self.reference, cpp_executable="stub",
+                                       cpp_model=self.model, faster_model_dir=self.model_dir,
+                                       stream=1, output=self.report, process_runner=bad_runner)
+                self.assertFalse(self.report.exists())
 
 if __name__ == "__main__":
     unittest.main()

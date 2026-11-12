@@ -44,3 +44,7 @@ Osobny workflow `vn-real-long-media.yml` generuje lokalnie i tymczasowo **121-mi
 **Silnik ASR jest tutaj atrapą**, bo celem jest prawdziwy demultiplekser i wielogodzinne obciążenie przetwarzania plików, a nie wydajność rozpoznawania mowy przez model. Test prawdziwego `whisper.cpp` na krótkiej syntetycznej mowie PL/EN jest oddzielny; nie wolno łączyć obu dowodów w twierdzenie, że przetestowano prawdziwą 121-minutową transkrypcję rozpoznawaniem mowy. Nie przeprowadzono pomiarów pamięci rzeczywistego silnika ASR podczas 2h, testów fizycznego Windows, crash/restart zasilania i modelu ostatecznego.
 
 Nagranie testowe i transkrypcja są generowane w runnerze CI i usuwane po zakończeniu. Model, prywatne nagrania i dane użytkownika nie są pobierane ani umieszczane w repozytorium. Wynik PASS należy weryfikować z osobnego workflow, a etap VN-01 nadal pozostaje W_TRAKCIE.
+
+### 12.11.2026 — twarde kontrakty benchmarku VN-00
+
+Przed kosztownym benchmarkiem dwóch silników sprawdzany jest wzorzec TXT; raport rejestruje anonimowy hash tymczasowego wejścia PCM i nie przepisuje niezweryfikowanych pól z wykonawcy procesu. W przypadku zainstalowanego `psutil` raport zawiera próbkowane, przybliżone sekundy CPU (`cpu_seconds_observed`), a bez niego jawnie wpisuje brak pomiaru. Testy obejmują fałszywe `NaN` i ścieżki do prywatnych nagrań. Nie oznacza to ukończenia fizycznych testów VN-00 ani legalnego odbioru modelu.
