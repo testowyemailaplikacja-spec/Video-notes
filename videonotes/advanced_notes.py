@@ -256,6 +256,14 @@ def export_advanced_outline(folder: Path, *, template: str = "lecture", detail: 
     if include_pdf:
         from .pdf_export import render_pdf_from_docx
         pdf_content = render_pdf_from_docx(docx_content, office=office)
+    # Refuse old extractive citations if manual transcript edits landed during
+    # DOCX/PDF preparation; preserve all earlier exports on that failure.
+    if build_advanced_outline(folder, template=template, detail=detail,
+                              section_minutes=section_minutes) != outline:
+        raise VideoNotesError(
+            "Transkrypcja lub poprawki zmieniły się podczas tworzenia konspektu; "
+            "nie nadpisano wcześniejszych plików."
+        )
     atomic_write(markdown, markdown_content)
     atomic_write(structured, json_content)
     paths = [markdown, structured]
