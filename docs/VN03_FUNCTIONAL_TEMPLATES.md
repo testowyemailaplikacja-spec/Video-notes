@@ -44,3 +44,7 @@ W **notatce podstawowej** analogiczny przycisk **„Przejdź do źródła transk
 **Ochrona niezapisanych szkiców:** zmiana zaznaczonego segmentu lub ponowne wczytanie projektu nie może cicho skasować niezatwierdzonej poprawki. Program pyta, czy użytkownik chce odrzucić szkic; wybranie „Nie” pozostawia tekst i dotychczasowy segment. Nie pozwala również opuścić edytora notatki podstawowej z niezapisanym szkicem bez ostrzeżenia.
 
 Źródła pozostają lokalne. Przycisk wskazuje tekst i czas w transkrypcji, ale **nie odtwarza automatycznie audio**; rzeczywisty odtwarzacz zsynchronizowany z timecode wymaga osobnego wdrożenia i odbioru. Lista w popupie jest ograniczona do pierwszych 2000 unikatowych pozycji, aby nie zablokować GUI bardzo długim materiałem.
+
+## Ochrona przewodnika przed eksportem nieaktualnej transkrypcji (12.11.2026)
+
+Przy generowaniu lokalnego przewodnika do nauki (Markdown/JSON i opcjonalnie Word/PDF) aplikacja przygotowuje pełną zawartość w pamięci, a następnie **ponownie odczytuje zweryfikowaną transkrypcję i poprawki ręczne przed pierwszym zapisem wyników**. Jeśli użytkownik poprawił segment w czasie renderowania lub czasochłonnej konwersji PDF, eksport jest odrzucany, a dotychczasowe dokumenty pozostają nienaruszone. Testy celowo zmieniają poprawkę transkrypcji po zbudowaniu przewodnika i w trakcie tworzenia PDF. Mechanizm ogranicza publikowanie nieaktualnych notatek, lecz nie zapewnia wieloplikowej transakcji względem dowolnych procesów zewnętrznych, które mogą zmienić dane w chwili późniejszej.
