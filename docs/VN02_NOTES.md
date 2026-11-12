@@ -85,3 +85,8 @@ Notatka podstawowa zachowuje podział czasowy (np. `Fragment 0–1 min`), a gdy 
 Podczas regeneracji po ręcznej korekcie transkrypcji nagłówki są obliczane ponownie według tej samej reguły, w oparciu o aktualne cytaty. Poprzednia wersja notatki i ręczne poprawki zachowują dotychczasową ochronę. Weryfikację zapewniają testy zgodności wersji, źródłowych czasów, słów powtarzanych oraz tekstu potencjalnie niebezpiecznego dla Markdown.
 
 **To heurystyczne słowa kluczowe, a nie semantyczny tytuł czy podsumowanie**; nie stanowią dowodu poprawności rozpoznania mowy ani ręcznej oceny jakości wykładu. VN-02 pozostaje W_TRAKCIE.
+
+
+## Jedna operacja tworzenia notatki naraz (12.11.2026)
+
+Pierwsze tworzenie \`notes.json\` i \`notes-edits.json\` korzysta teraz z **tej samej lokalnej blokady \`.notes.lock\`**, z której korzystają ręczne poprawki i operacje historii. Zapobiega to sytuacji, w której dwa równoległe generowania przejdą weryfikację „notatka jeszcze nie istnieje” i nadpiszą swoje pliki. Druga próba jest odrzucana bez modyfikowania danych. Błąd zapisu zwalnia blokadę i zachowuje dotychczasowe dane; po przerwanym pierwszym zapisie zachowano świadome odzyskiwanie wyłącznie pustego dziennika poprawek. Zamknięcie procesu przez system może pozostawić blokadę na dysku: użyć istniejących \`notes-lock-status\` / \`notes-lock-recover --confirm\` dopiero po sprawdzeniu nieaktywności procesu, a nie usuwać blokady automatycznie. Potwierdzenie syntetycznymi testami współbieżności nie jest fizycznym odbiorem Windows.
