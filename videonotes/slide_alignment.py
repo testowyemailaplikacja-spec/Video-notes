@@ -37,7 +37,12 @@ def _time_index(rows: list[dict], raw: dict[str, dict]) -> tuple[list[int], list
     winner = -1
     for index, row in enumerate(rows):
         end = raw[row["id"]]["end_ms"]
-        if end > max_end:  # Equal ends keep the earliest start/id.
+        # Equal-end ties prefer earliest start and then lexical ID, not
+        # arbitrary transcript insertion order for same-start segments.
+        if (end > max_end or
+                (end == max_end and winner >= 0 and
+                 (row["start_ms"], row["id"]) <
+                 (rows[winner]["start_ms"], rows[winner]["id"]))):
             max_end = end
             winner = index
         prefix_end.append(max_end)
@@ -55,13 +60,27 @@ def _nearest(time_ms: int, rows: list[dict], starts: list[int], raw: dict[str, d
     left_count = bisect.bisect_right(starts, time_ms)
     if left_count and prefix_end[left_count - 1] >= time_ms:
         first_covering = bisect.bisect_left(prefix_end, time_ms, 0, left_count)
-        index = first_covering
+        first_start = rows[first_covering]["start_ms"]
+        # A transcript may have multiple segments at precisely the same
+        # timestamp. Only some of them may cover the requested OCR time.
+        # Pick the lexical ID among covering peers, regardless of file order.
+        same_start_end = bisect.bisect_right(starts, first_start,
+                                            first_covering, left_count)
+        index = min(
+            (i for i in range(first_covering, same_start_end)
+             if raw[rows[i]["id"]]["end_ms"] >= time_ms),
+            key=lambda i: rows[i]["id"],
+        )
     else:
         candidates: list[int] = []
         if left_count:
             candidates.append(best_end_index[left_count - 1])
         if left_count < len(rows):
-            candidates.append(left_count)
+            next_start = rows[left_count]["start_ms"]
+            next_group_end = bisect.bisect_right(starts, next_start, left_count)
+            # All future peers are equally distant at their start time.
+            candidates.append(min(range(left_count, next_group_end),
+                                  key=lambda i: rows[i]["id"]))
         index = min(candidates, key=lambda i: (
             _distance(time_ms, {"start_ms": rows[i]["start_ms"],
                                 "end_ms": raw[rows[i]["id"]]["end_ms"]}),
