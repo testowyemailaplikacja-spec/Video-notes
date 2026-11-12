@@ -87,6 +87,48 @@ class CrashWavRecoveryTest(unittest.TestCase):
         self.assertFalse((self.folder / "part-00001.wav").exists())
         self.assertEqual(json.loads(self.journal.read_text())["status"], "needs_review")
 
+    def test_salvage_detects_source_change_after_earlier_part_was_copied(self):
+        first, second = self.prepare()
+        before_second = second.read_bytes()
+        from videonotes.microphone import _inspect_single_wav
+        mutated = []
+        def mutate_when_temp_is_complete(path):
+            result = _inspect_single_wav(path)
+            if Path(path).name.startswith(".vn-salvage-") and not mutated:
+                value = bytearray(first.read_bytes())
+                value[-1] ^= 1  # Valid WAV size/format, but no longer journal SHA.
+                first.write_bytes(value)
+                mutated.append(True)
+            return result
+        with mock.patch("videonotes.recovery_audio._inspect_single_wav",
+                        side_effect=mutate_when_temp_is_complete):
+            with self.assertRaisesRegex(VideoNotesError, "zmieniły się"):
+                salvage_recording(self.folder, self.output, confirm_stopped=True)
+        self.assertEqual(mutated, [True])
+        self.assertFalse(self.output.exists())
+        self.assertFalse(list(self.root.glob(".vn-salvage-*")))
+        self.assertEqual(second.read_bytes(), before_second)
+
+    def test_salvage_detects_journal_finalized_during_copy(self):
+        self.prepare()
+        from videonotes.microphone import _inspect_single_wav
+        touched = []
+        def finalize_during_export(path):
+            result = _inspect_single_wav(path)
+            if Path(path).name.startswith(".vn-salvage-") and not touched:
+                journal = json.loads(self.journal.read_text("utf-8"))
+                journal["status"] = "finished"
+                save_json(self.journal, journal)
+                touched.append(True)
+            return result
+        with mock.patch("videonotes.recovery_audio._inspect_single_wav",
+                        side_effect=finalize_during_export):
+            with self.assertRaisesRegex(VideoNotesError, "zmieniły się"):
+                salvage_recording(self.folder, self.output, confirm_stopped=True)
+        self.assertEqual(touched, [True])
+        self.assertFalse(self.output.exists())
+        self.assertFalse(list(self.root.glob(".vn-salvage-*")))
+
     def test_cli_can_preview_without_writes_and_exports_explicitly(self):
         self.prepare()
         preview_out = io.StringIO()
