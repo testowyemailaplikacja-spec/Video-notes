@@ -63,9 +63,19 @@ def render_exports(folder: Path) -> dict[str, bytes]:
 
 def export_project(folder: Path) -> list[Path]:
     folder = Path(folder)
-    result = []
-    for name, payload in render_exports(folder).items():
-        dest = folder / "exports" / name
-        atomic_write(dest, payload)
-        result.append(dest)
-    return result
+    # Serialize this entire export with cooperating transcript-edit writers.
+    # An outside program can still bypass the lock, so retain the second
+    # source snapshot check before publishing any file.
+    with transcript_edit_lock(folder):
+        rendered = render_exports(folder)
+        if rendered != render_exports(folder):
+            raise VideoNotesError(
+                "Transkrypcja lub poprawki zmieniły się podczas przygotowania eksportu; "
+                "poprzednie pliki pozostawiono bez zmian."
+            )
+        result = []
+        for name, payload in rendered.items():
+            dest = folder / "exports" / name
+            atomic_write(dest, payload)
+            result.append(dest)
+        return result
