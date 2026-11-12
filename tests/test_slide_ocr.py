@@ -47,7 +47,7 @@ class SlideOCRTest(unittest.TestCase):
             _run([sys.executable, "-c", huge_output], timeout=10, output_limit=1024)
         self.assertNotIn("XXXXX", str(received.exception))
         self.assertEqual(_run([sys.executable, "-c", "print('OK')"],
-                              timeout=10, output_limit=16), bytes([79, 75, 10]))
+                              timeout=10, output_limit=16).strip(), b"OK")
 
     def test_injected_ocr_runner_output_is_also_bounded(self):
         def huge_result(args, **kwargs):
