@@ -6,6 +6,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from tests.test_contracts import demo_project, demo_transcript
 from videonotes.cli import main
@@ -87,6 +88,59 @@ class WebCorrectionsTest(unittest.TestCase):
                 with self.assertRaises(VideoNotesError):
                     import_web_corrections(self.project, self.patchfile, apply=True)
                 self.assertFalse((self.project / "edits.json").exists())
+
+    def test_duplicate_json_fields_are_rejected_before_any_edit(self):
+        duplicated = ('{"schema":"videonotes-web-corrections-v1",'
+                      '"project_id":"test-123",'
+                      '"changes":[{"id":"c0000000-s00000","start_ms":0,"end_ms":500,'
+                      '"before":"Zażółć gęślą","after":"Dobra", "after":"Zła"}]}')
+        self.patchfile.write_text(duplicated, encoding="utf-8")
+        for apply in (False, True):
+            with self.subTest(apply=apply):
+                with self.assertRaisesRegex(VideoNotesError, "powielone"):
+                    import_web_corrections(self.project, self.patchfile, apply=apply)
+        self.assertFalse((self.project / "edits.json").exists())
+
+    def test_patch_changed_after_validation_aborts_apply(self):
+        self.patch()
+        from videonotes import web_corrections as module
+        orig = module.read_project
+        calls = []
+        def mutation_before_commit(folder):
+            result = orig(folder)
+            calls.append(True)
+            if len(calls) == 2:
+                changed = json.loads(self.patchfile.read_text("utf-8"))
+                changed["changes"][0]["after"] = "Niepotwierdzona równoległa poprawka"
+                self.patchfile.write_text(json.dumps(changed, ensure_ascii=False), encoding="utf-8")
+            return result
+        with patch("videonotes.web_corrections.read_project",
+                   side_effect=mutation_before_commit):
+            with self.assertRaisesRegex(VideoNotesError, "zmienił się podczas importu"):
+                import_web_corrections(self.project, self.patchfile, apply=True)
+        self.assertEqual(calls, [True, True])
+        self.assertFalse((self.project / "edits.json").exists())
+
+    def test_concurrent_project_language_change_aborts_apply(self):
+        self.patch()
+        from videonotes import web_corrections as module
+        orig = module.read_project
+        calls = []
+        def concurrent_setting_change(folder):
+            result = orig(folder)
+            calls.append(True)
+            if len(calls) == 2:
+                current = json.loads((self.project / "project.json").read_text("utf-8"))
+                current["processing"]["language"] = "en"
+                save_json(self.project / "project.json", current)
+                return orig(folder)
+            return result
+        with patch("videonotes.web_corrections.read_project",
+                   side_effect=concurrent_setting_change):
+            with self.assertRaisesRegex(VideoNotesError, "Projekt zmieniono"):
+                import_web_corrections(self.project, self.patchfile, apply=True)
+        self.assertFalse((self.project / "edits.json").exists())
+        self.assertEqual(read_project(self.project)[0]["processing"]["language"], "en")
 
     def test_cli_preview_requires_explicit_apply(self):
         self.patch()

@@ -27,3 +27,7 @@ Testy Node i Python potwierdzają strukturę paczki, poprawki Unicode, brak zapi
 ## Odzyskanie pliku poprawek przez przeglądarkę — 11.11.2026
 
 Można teraz wczytać poprzednio pobraną paczkę `web-corrections.json` bezpośrednio w offline edytorze. Najpierw otwórz ten sam `exports/transcript.json`, a następnie wybierz plik w sekcji importu poprawek. Przywrócenie wymaga zgodności projektu, identyfikatorów, tekstu źródłowego i znaczników czasu; obce pola, powielone ID, uszkodzone i za duże pliki są odrzucane bez częściowego zastosowania. Poprawki pozostają w pamięci strony do świadomego eksportu. To nie jest synchronizacja kont, automatyczny backup ani weryfikacja fizycznego Windows.
+
+## Spójność importu poprawek z przeglądarki (12.11.2026)
+
+Import poprawek WWW odrzuca niejednoznaczny JSON z powielonymi nazwami pól, w tym zduplikowanymi `before` lub `after` w pojedynczej edycji. Odczyt jest ograniczony do 20 MB **także wtedy, gdy plik zwiększy rozmiar po pierwszym sprawdzeniu**. Przed zatwierdzeniem zmian aplikacja ponownie sprawdza pełny projekt (nie tylko ID), transkrypcję, poprzednie poprawki i SHA-256 pliku importu. Jeśli użytkownik lub inny proces zmienił plik przeglądarkowy albo ustawienia projektu między kontrolami, operacja nie zapisuje żadnej poprawki. Testy syntetycznie wymuszają duplikat klucza JSON, podmianę zawartości importu i zmianę języka projektu. Nie jest to globalna blokada zapisu dla zewnętrznych procesów, ale importer respektuje wspólną blokadę edycji aplikacji.
