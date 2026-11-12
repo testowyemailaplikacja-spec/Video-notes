@@ -63,7 +63,7 @@ class SnapshotConsistencyTest(unittest.TestCase):
 
     def test_deleted_history_snapshot_during_copy_rejects_backup(self):
         generate_basic_notes(self.project)
-        result = regenerate_basic_notes(self.project, points_per_section=2)
+        result = regenerate_basic_notes(self.project, window_minutes=1)
         self.assertTrue(result["changed"])
         entries = list((self.project / "notes-history").glob("*.json"))
         self.assertEqual(len(entries), 1)
