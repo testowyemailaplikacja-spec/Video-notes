@@ -34,14 +34,36 @@ def save_json(path: Path, payload: dict) -> None:
     atomic_write(Path(path), (json.dumps(payload, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
 
 
+MAX_JSON_BYTES = 64 * 1024 * 1024
+
+
+def _unique_json_keys(pairs: list[tuple[str, Any]]) -> dict:
+    """Refuse ambiguous duplicate properties in project and user-edit JSON."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise VideoNotesError("Plik JSON projektu zawiera powielone klucze.")
+        result[key] = value
+    return result
+
+
+def _invalid_json_constant(value: str) -> None:
+    raise VideoNotesError("Plik JSON projektu zawiera niedozwoloną liczbę.")
+
+
 def load_json(path: Path) -> Any:
+    """Bound bytes even when the file grows after stat, and refuse symlinks."""
     try:
         file = Path(path)
-        if file.stat().st_size > 64 * 1024 * 1024:
-            raise VideoNotesError("Plik projektu jest za duży.")
-        with file.open("r", encoding="utf-8") as stream:
-            return json.load(stream)
-    except (FileNotFoundError, IsADirectoryError, json.JSONDecodeError, UnicodeError, OSError) as error:
+        if file.is_symlink() or not file.is_file() or file.stat().st_size > MAX_JSON_BYTES:
+            raise VideoNotesError("Plik projektu nie istnieje, jest dowiązaniem lub jest zbyt duży.")
+        with file.open("rb") as stream:
+            content = stream.read(MAX_JSON_BYTES + 1)
+        if len(content) > MAX_JSON_BYTES or file.is_symlink():
+            raise VideoNotesError("Plik projektu zmienił się lub urósł podczas odczytu.")
+        return json.loads(content.decode("utf-8"), object_pairs_hook=_unique_json_keys,
+                          parse_constant=_invalid_json_constant)
+    except (UnicodeError, json.JSONDecodeError, OSError) as error:
         raise VideoNotesError("Nie można odczytać pliku projektu lub plik jest uszkodzony.") from error
 
 
