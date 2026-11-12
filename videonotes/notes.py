@@ -99,52 +99,67 @@ def generate_basic_notes(folder: Path, *, window_minutes: int = 5, points_per_se
     if not (1 <= window_minutes <= 60 and 2 <= points_per_section <= 20):
         raise VideoNotesError("Nieprawidłowy zakres sekcji lub liczba punktów.")
     folder = Path(folder)
-    if (folder / ".notes-transaction.json").exists() or (folder / ".notes-transaction.json").is_symlink():
-        raise VideoNotesError("Przerwana aktualizacja notatki: najpierw użyj notes-recover --confirm.")
-    project, transcript, corrections = read_project(folder)
-    chunk = project["processing"]["chunk_ms"]
-    expected = (project["source"]["duration_ms"] + chunk - 1) // chunk
-    if len(transcript["completed_chunks"]) != expected:
-        raise VideoNotesError("Ukończ transkrypcję przed tworzeniem notatki.")
-    notes_file = folder / "notes.json"
-    edits_file = folder / "notes-edits.json"
-    if notes_file.exists():
-        raise VideoNotesError("Notatka już istnieje; nie nadpisuję wcześniejszych poprawek.")
-    if edits_file.exists():
-        # An interrupted first creation may leave only a pristine empty edit journal.
-        # Never overwrite a non-empty or malformed journal: it might contain user work.
-        if load_json(edits_file) != {"schema": EDITS_SCHEMA, "edits": {}}:
-            raise VideoNotesError("Odnaleziono poprzednie poprawki bez notatki; nie nadpisuję danych.")
-    source = _source(transcript, corrections)
-    if not source:
-        raise VideoNotesError("Transkrypcja jest pusta. Nie można utworzyć notatki.")
-    duration = window_minutes * 60_000
-    groups: dict[int, list[dict]] = {}
-    for row in source:
-        groups.setdefault(row["start_ms"] // duration, []).append(row)
-    sections = []
-    for index, rows in sorted(groups.items()):
-        selected = _select(rows, points_per_section)
-        sections.append({
-            "id": f"time-{index:06d}",
-            "heading": _section_heading(index, window_minutes, selected),
-            "points": [
-                {"id": f"quote-{row['id']}", "segment_id": row["id"],
-                 "start_ms": row["start_ms"], "text": row["text"]}
-                for row in selected
-            ],
-        })
-    notes = {"schema": SCHEMA, "project_id": project["id"],
-             "source_sha256": _hash(source), "method": "extractive-verbatim-v1",
-             "complete": True, "title": "Notatka podstawowa — fragmenty wypowiedzi",
-             "sections": sections}
-    # Write the empty journal before the note; a crash may be safely retried only
-    # when that journal is pristine. Existing non-empty edits are never clobbered.
-    if not edits_file.exists():
-        save_json(edits_file, {"schema": EDITS_SCHEMA, "edits": {}})
-    save_json(notes_file, notes)
-    return notes
-
+    # Notes creation must use the same lock as manual edits and regenerations.
+    # Otherwise two creators may both observe an absent notes.json and one
+    # silently replace the other's output after the first user edits it.
+    lock = folder / ".notes.lock"
+    try:
+        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError as error:
+        raise VideoNotesError("Inna operacja na notatkach jest w toku; nie nadpisuję danych.") from error
+    try:
+        with os.fdopen(fd, "w", encoding="ascii") as writer:
+            writer.write(f"pid={os.getpid()}\n")
+            writer.flush()
+            os.fsync(writer.fileno())
+        if (folder / ".notes-transaction.json").exists() or (folder / ".notes-transaction.json").is_symlink():
+            raise VideoNotesError("Przerwana aktualizacja notatki: najpierw użyj notes-recover --confirm.")
+        project, transcript, corrections = read_project(folder)
+        chunk = project["processing"]["chunk_ms"]
+        expected = (project["source"]["duration_ms"] + chunk - 1) // chunk
+        if len(transcript["completed_chunks"]) != expected:
+            raise VideoNotesError("Ukończ transkrypcję przed tworzeniem notatki.")
+        notes_file = folder / "notes.json"
+        edits_file = folder / "notes-edits.json"
+        if notes_file.exists():
+            raise VideoNotesError("Notatka już istnieje; nie nadpisuję wcześniejszych poprawek.")
+        if edits_file.exists():
+            # An interrupted first creation may leave only a pristine empty edit journal.
+            # Never overwrite a non-empty or malformed journal: it might contain user work.
+            if load_json(edits_file) != {"schema": EDITS_SCHEMA, "edits": {}}:
+                raise VideoNotesError("Odnaleziono poprzednie poprawki bez notatki; nie nadpisuję danych.")
+        source = _source(transcript, corrections)
+        if not source:
+            raise VideoNotesError("Transkrypcja jest pusta. Nie można utworzyć notatki.")
+        duration = window_minutes * 60_000
+        groups: dict[int, list[dict]] = {}
+        for row in source:
+            groups.setdefault(row["start_ms"] // duration, []).append(row)
+        sections = []
+        for index, rows in sorted(groups.items()):
+            selected = _select(rows, points_per_section)
+            sections.append({
+                "id": f"time-{index:06d}",
+                "heading": _section_heading(index, window_minutes, selected),
+                "points": [
+                    {"id": f"quote-{row['id']}", "segment_id": row["id"],
+                     "start_ms": row["start_ms"], "text": row["text"]}
+                    for row in selected
+                ],
+            })
+        notes = {"schema": SCHEMA, "project_id": project["id"],
+                 "source_sha256": _hash(source), "method": "extractive-verbatim-v1",
+                 "complete": True, "title": "Notatka podstawowa — fragmenty wypowiedzi",
+                 "sections": sections}
+        # Write the empty journal before the note; a crash may be safely retried only
+        # when that journal is pristine. Existing non-empty edits are never clobbered.
+        if not edits_file.exists():
+            save_json(edits_file, {"schema": EDITS_SCHEMA, "edits": {}})
+        save_json(notes_file, notes)
+        return notes
+    
+    finally:
+        lock.unlink(missing_ok=True)
 
 def read_basic_notes(folder: Path) -> tuple[dict, dict]:
     folder = Path(folder)
