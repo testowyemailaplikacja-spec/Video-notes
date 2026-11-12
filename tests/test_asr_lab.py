@@ -3,6 +3,8 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
+import time
 import sys
 import tempfile
 import types
@@ -159,6 +161,52 @@ class LocalASRLabTest(unittest.TestCase):
         self.assertEqual(result["cpu_measured"], result["cpu_seconds_observed"] is not None)
         if result["cpu_measured"]:
             self.assertGreaterEqual(result["cpu_seconds_observed"], 0)
+
+    @unittest.skipIf(os.name == "nt", "POSIX process-group lifecycle regression")
+    def test_timed_out_benchmark_kills_spawned_worker_process(self):
+        # The subprocess spawns a worker which would write a private marker
+        # after the parent is killed. That marker must never appear.
+        ready = self.root / "worker-ready"
+        leaked = self.root / "orphaned-worker"
+        worker = (
+            "import pathlib,sys,time;"
+            "pathlib.Path(sys.argv[1]).touch();"
+            "time.sleep(1.5);"
+            "pathlib.Path(sys.argv[2]).touch()"
+        )
+        launcher = (
+            "import subprocess,sys,time;"
+            "subprocess.Popen([sys.executable,'-c',sys.argv[1],sys.argv[2],sys.argv[3]]);"
+            "time.sleep(30)"
+        )
+        with self.assertRaisesRegex(VideoNotesError, "limit czasu"):
+            _run_process([sys.executable, "-c", launcher, worker,
+                          str(ready), str(leaked)], timeout_seconds=1)
+        self.assertTrue(ready.exists(), "worker did not start; regression test is inconclusive")
+        time.sleep(1.65)
+        self.assertFalse(leaked.exists(), "benchmark left a live worker behind")
+
+    @unittest.skipIf(os.name == "nt", "POSIX process-group lifecycle regression")
+    def test_failed_benchmark_kills_spawned_worker_process(self):
+        ready = self.root / "error-worker-ready"
+        leaked = self.root / "error-orphaned-worker"
+        worker = (
+            "import pathlib,sys,time;"
+            "pathlib.Path(sys.argv[1]).touch();"
+            "time.sleep(1.5);"
+            "pathlib.Path(sys.argv[2]).touch()"
+        )
+        launcher = (
+            "import subprocess,sys,time;"
+            "subprocess.Popen([sys.executable,'-c',sys.argv[1],sys.argv[2],sys.argv[3]]);"
+            "time.sleep(0.3);sys.exit(3)"
+        )
+        with self.assertRaisesRegex(VideoNotesError, "błędem"):
+            _run_process([sys.executable, "-c", launcher, worker,
+                          str(ready), str(leaked)])
+        self.assertTrue(ready.exists(), "worker did not start; regression test is inconclusive")
+        time.sleep(1.65)
+        self.assertFalse(leaked.exists(), "failed benchmark left a live worker behind")
 
     def test_faster_worker_never_downloads_model_and_iterates_generator(self):
         model = self.model_dir

@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import signal
 import subprocess
 import sys
 import tempfile
@@ -27,6 +28,36 @@ MAX_SECONDS = 600
 RunProcess = Callable[[list[str]], dict]
 
 
+def _stop_process_tree(proc: subprocess.Popen) -> None:
+    """Stop benchmark children as well as the launcher on timeout/abort.
+
+    Each benchmark starts in a dedicated POSIX session or Windows process
+    group. Killing only the Python/whisper parent can leave model workers
+    running after the private temporary WAV has been removed.
+    """
+    if os.name == "nt":
+        try:
+            # /T kills descendants even if the launching Python process exited.
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                           stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL, check=False, timeout=10)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    else:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        except OSError:
+            pass
+    try:
+        if proc.poll() is None:
+            proc.kill()
+    except ProcessLookupError:
+        pass
+    proc.wait()
+
+
 def _run_process(command: list[str], *, timeout_seconds: int = 3600) -> dict:
     """Run the local executable without shell; keep logs and transcripts private."""
     start = time.perf_counter()
@@ -39,17 +70,18 @@ def _run_process(command: list[str], *, timeout_seconds: int = 3600) -> dict:
                 "TRANSFORMERS_OFFLINE": "1", "OMP_NUM_THREADS": env.get("OMP_NUM_THREADS", "4")})
     peak: int | None = None
     cpu_observed: float | None = None
+    launch = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+              if os.name == "nt" else {"start_new_session": True})
     try:
         proc = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                stderr=subprocess.DEVNULL, shell=False, env=env)
+                                stderr=subprocess.DEVNULL, shell=False, env=env, **launch)
     except (FileNotFoundError, PermissionError, OSError) as error:
         raise VideoNotesError("Nie udało się uruchomić lokalnego silnika ASR.") from error
     try:
         watcher = psutil.Process(proc.pid) if psutil else None
         while proc.poll() is None:
             if time.perf_counter() - start > timeout_seconds:
-                proc.kill()
-                proc.wait()
+                _stop_process_tree(proc)
                 raise VideoNotesError("Silnik ASR przekroczył limit czasu.")
             if watcher:
                 try:
@@ -72,11 +104,11 @@ def _run_process(command: list[str], *, timeout_seconds: int = 3600) -> dict:
                     pass
             time.sleep(0.05)
         if proc.returncode != 0:
+            _stop_process_tree(proc)
             raise VideoNotesError("Lokalny silnik ASR zakończył się błędem. Sprawdź zgodność modelu z instalacją.")
     finally:
         if proc.poll() is None:
-            proc.kill()
-            proc.wait()
+            _stop_process_tree(proc)
     return {"wall_seconds": round(time.perf_counter() - start, 3),
             "peak_rss_bytes": peak, "ram_measured": peak is not None,
             "cpu_seconds_observed": round(cpu_observed, 3) if cpu_observed is not None else None,
