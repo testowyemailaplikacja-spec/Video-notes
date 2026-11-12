@@ -12,7 +12,7 @@ from videonotes.contracts import sha256_file
 from videonotes.errors import VideoNotesError
 from videonotes.slide_alignment import (
     align_slides_to_speech, verify_slide_speech_alignment,
-    export_slide_speech_markdown,
+    export_slide_speech_markdown, _nearest, _time_index,
 )
 from videonotes.slide_ocr import extract_slide_ocr
 from videonotes.storage import load_json, save_json
@@ -117,6 +117,66 @@ class SlideToSpeechTest(unittest.TestCase):
         with self.assertRaises(VideoNotesError):
             align_slides_to_speech(self.project, self.ocr, self.index)
         self.assertFalse(self.index.exists())
+
+
+
+class SpeechIntervalIndexTest(unittest.TestCase):
+    @staticmethod
+    def find(rows, moment, gap=60_000):
+        raw = {x["id"]: x for x in rows}
+        starts = [x["start_ms"] for x in rows]
+        prefix_end, best = _time_index(rows, raw)
+        return _nearest(moment, rows, starts, raw, gap, prefix_end, best)
+
+    def test_overlapping_long_earlier_segment_is_not_lost(self):
+        rows = [
+            {"id": "long", "start_ms": 0, "end_ms": 20_000, "text": "Długi wykład"},
+            {"id": "short", "start_ms": 3_000, "end_ms": 4_000, "text": "Krótki"},
+            {"id": "short2", "start_ms": 6_000, "end_ms": 7_000, "text": "Dalszy"},
+        ]
+        chosen, delay = self.find(rows, 15_000, gap=1)
+        self.assertEqual(chosen["segment_id"], "long")
+        self.assertEqual(delay, 0)
+        chosen, delay = self.find(rows, 21_000)
+        self.assertEqual(chosen["segment_id"], "long")
+        self.assertEqual(delay, 1000)
+
+    def test_same_start_and_gaps_are_deterministic(self):
+        rows = [
+            {"id": "a", "start_ms": 100, "end_ms": 200, "text": "A"},
+            {"id": "b", "start_ms": 100, "end_ms": 500, "text": "B"},
+            {"id": "c", "start_ms": 700, "end_ms": 1000, "text": "C"},
+        ]
+        self.assertEqual(self.find(rows, 150)[0]["segment_id"], "a")
+        self.assertEqual(self.find(rows, 350)[0]["segment_id"], "b")
+        self.assertEqual(self.find(rows, 600)[0]["segment_id"], "b")
+        self.assertEqual(self.find(rows, 601)[0]["segment_id"], "c")
+        self.assertIsNone(self.find(rows, 600, gap=99)[0])
+
+    def test_index_matches_exhaustive_reference_for_nested_intervals(self):
+        import random
+        randomizer = random.Random(72)
+        rows = []
+        for i in range(2000):
+            start = (i // 3) * 24
+            duration = randomizer.randrange(1, 1500)
+            rows.append({"id": f"s{i:05d}", "start_ms": start,
+                         "end_ms": start + duration, "text": "synthetic"})
+        raw = {x["id"]: x for x in rows}
+        starts = [x["start_ms"] for x in rows]
+        prefix_end, best = _time_index(rows, raw)
+        for moment in [0, 1, 60, 800, 1_500, 24_000, 48_000] + [
+            randomizer.randrange(0, 55_000) for _ in range(120)
+        ]:
+            expected = min(rows, key=lambda x: (
+                max(x["start_ms"] - moment, moment - x["end_ms"], 0),
+                x["start_ms"], x["id"]
+            ))
+            chosen, delay = _nearest(moment, rows, starts, raw, 60_000, prefix_end, best)
+            self.assertIsNotNone(chosen)
+            self.assertEqual(chosen["segment_id"], expected["id"])
+            self.assertEqual(delay, max(expected["start_ms"] - moment,
+                                        moment - expected["end_ms"], 0))
 
 
 if __name__ == "__main__":

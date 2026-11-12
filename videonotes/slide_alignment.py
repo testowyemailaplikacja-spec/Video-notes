@@ -25,28 +25,57 @@ def _distance(time_ms: int, row: dict) -> int:
     return max(row["start_ms"] - time_ms, time_ms - row["end_ms"], 0)
 
 
+def _time_index(rows: list[dict], raw: dict[str, dict]) -> tuple[list[int], list[int]]:
+    """Prefix maxima permit exact interval proximity queries in logarithmic time.
+
+    The transcript is already ordered by start time. Segment end times need
+    not be ordered: one long overlapping utterance can span many later ones.
+    """
+    prefix_end: list[int] = []
+    best_end_index: list[int] = []
+    max_end = -1
+    winner = -1
+    for index, row in enumerate(rows):
+        end = raw[row["id"]]["end_ms"]
+        if end > max_end:  # Equal ends keep the earliest start/id.
+            max_end = end
+            winner = index
+        prefix_end.append(max_end)
+        best_end_index.append(winner)
+    return prefix_end, best_end_index
+
+
 def _nearest(time_ms: int, rows: list[dict], starts: list[int], raw: dict[str, dict],
-             gap_ms: int) -> tuple[dict | None, int | None]:
+             gap_ms: int, prefix_end: list[int], best_end_index: list[int]) -> tuple[dict | None, int | None]:
     if not rows:
         return None, None
-    idx = bisect.bisect_left(starts, time_ms)
-    candidates = []
-    for i in (idx - 1, idx):
-        if 0 <= i < len(rows):
-            candidates.append(rows[i])
-    if not candidates:
-        return None, None
-    closest = min(candidates, key=lambda r: (_distance(time_ms, {
-        **r, "end_ms": raw[r["id"]]["end_ms"]
-    }), r["start_ms"], r["id"]))
-    delay = _distance(time_ms, {**closest, "end_ms": raw[closest["id"]]["end_ms"]})
+    # All segments whose start <= frame time are on the left. If one covers
+    # this frame, select the EARLIEST covering start (stable lexical tie-break);
+    # the last-started segment is not necessarily the best match.
+    left_count = bisect.bisect_right(starts, time_ms)
+    if left_count and prefix_end[left_count - 1] >= time_ms:
+        first_covering = bisect.bisect_left(prefix_end, time_ms, 0, left_count)
+        index = first_covering
+    else:
+        candidates: list[int] = []
+        if left_count:
+            candidates.append(best_end_index[left_count - 1])
+        if left_count < len(rows):
+            candidates.append(left_count)
+        index = min(candidates, key=lambda i: (
+            _distance(time_ms, {"start_ms": rows[i]["start_ms"],
+                                "end_ms": raw[rows[i]["id"]]["end_ms"]}),
+            rows[i]["start_ms"], rows[i]["id"]
+        ))
+    closest = rows[index]
+    delay = _distance(time_ms, {"start_ms": closest["start_ms"],
+                                "end_ms": raw[closest["id"]]["end_ms"]})
     if delay > gap_ms:
         return None, None
     return {
         "segment_id": closest["id"], "start_ms": closest["start_ms"],
         "end_ms": raw[closest["id"]]["end_ms"], "text": closest["text"],
     }, delay
-
 
 def _build(folder: Path, ocr: Path, *, max_gap_seconds: int) -> dict:
     if type(max_gap_seconds) is not int or not 1 <= max_gap_seconds <= 600:
@@ -59,10 +88,11 @@ def _build(folder: Path, ocr: Path, *, max_gap_seconds: int) -> dict:
     # timestamps live in raw ASR; user corrections replace only the text.
     raw = {x["id"]: x for x in transcript["segments"]}
     starts = [x["start_ms"] for x in rows]
+    prefix_end, best_end_index = _time_index(rows, raw)
     result_frames = []
     for frame in ocr_data["frames"]:
         chosen, delay = _nearest(frame["requested_time_ms"], rows, starts,
-                                 raw, max_gap_seconds * 1000)
+                                 raw, max_gap_seconds * 1000, prefix_end, best_end_index)
         result_frames.append({
             "frame_id": frame["id"],
             "requested_time_ms": frame["requested_time_ms"],
