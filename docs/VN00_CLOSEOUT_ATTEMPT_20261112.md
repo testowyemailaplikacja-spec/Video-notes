@@ -9,7 +9,7 @@
 - W `videonotes/asr_lab.py` raport benchmarku rzeczywistych dwóch silników zawiera teraz SHA-256 `vocabulary.txt` i opcjonalnego `tokenizer.json`, oprócz istniejących SHA-256 modeli, konfiguracji, źródła i wspólnego PCM.
 - Jeżeli obecny na starcie `tokenizer.json` zostanie zmieniony/usunięty podczas inferencji albo zostanie dodany podczas pomiaru, wyniki nie zostaną opublikowane. Dowiązania do tokenizera nie są przyjmowane.
 - Referencja TXT przekazana jako symlink jest odrzucana **przed** normalizacją ścieżki i uruchomieniem FFprobe/ASR. Poprzednie `Path.resolve()` ukrywało taki symlink przed `quality._read()`.
-- Dodano testy automatyczne w `tests/test_asr_lab.py` obejmujące kompletność fingerprintów, modyfikację/pojawienie się tokenizera i referencję będącą symlinkiem. Wynik CI musi być potwierdzony na ostatnim SHA, zanim pojawi się oznaczenie PASS.
+- Dodano testy automatyczne w `tests/test_asr_lab.py` obejmujące kompletność fingerprintów, modyfikację/pojawienie się tokenizera i referencję będącą symlinkiem. **Odbiór kodu: PR #158 scalony do `develop`, commit `b17f4002e4e6db08130661c251a03bc498760de8`. Ostatni head `8c0de8807585a1952ddf35eafa2101e0e6183201`: 6/6 zadań [source/FFmpeg/browser Linux+Windows](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/43291372977) PASS i 1/1 [Windows DEV EXE](https://github.com/testowyemailaplikacja-spec/Video-notes/actions/runs/43291373048) PASS, razem **7/7**. Nie wykonano fizycznego Windows ani naturalnego ASR.**
 
 ### Licencje — wstępna, sprawdzalna analiza źródeł
 
