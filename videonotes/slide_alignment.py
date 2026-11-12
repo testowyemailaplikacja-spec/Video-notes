@@ -186,6 +186,10 @@ def export_slide_speech_markdown(folder: Path, ocr: Path, index: Path,
     """Markdown is a literal evidence notebook, not an AI lesson summary."""
     verified = verify_slide_speech_alignment(folder, ocr, index)
     report = load_json(index)
+    # Verification and rendering are separate reads. A replaced index could
+    # inject different unreviewed quotations after the first validation.
+    if sha256_file(Path(index)) != verified["index_sha256"]:
+        raise VideoNotesError("Indeks slajdów zmienił się podczas eksportu; nie zapisano Markdown.")
     lines = [
         "# Slajdy i wypowiedzi w pobliżu czasu — do sprawdzenia", "",
         "> Tekst OCR i przypisanie wypowiedzi są NIEZWERYFIKOWANE.",
@@ -212,5 +216,10 @@ def export_slide_speech_markdown(folder: Path, ocr: Path, index: Path,
                 lines.append("    " + line)
             lines.append("")
     payload = ("\n".join(lines).rstrip() + "\n").encode("utf-8")
+    # The entire source transcript, OCR report and exact index contents must
+    # still describe the material used to render this Markdown.
+    if (verify_slide_speech_alignment(folder, ocr, index) != verified
+            or load_json(index) != report):
+        raise VideoNotesError("OCR, transkrypcja lub indeks zmieniły się podczas eksportu.")
     path = _publish_new(Path(output), payload, ".md")
     return {"output": str(path), "frames": verified["frames"], "human_reviewed": False}
