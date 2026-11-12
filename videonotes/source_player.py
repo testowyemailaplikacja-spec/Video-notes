@@ -56,6 +56,14 @@ def play_source_segment(folder: Path, segment_id: str, *, ffmpeg: str = "ffmpeg"
                 source.stat().st_size != project["source"]["size_bytes"] or
                 sha256_file(source) != project["source"]["sha256"]):
             raise VideoNotesError("Nagranie zmieniło się w trakcie przygotowania. Odsłuch anulowano.")
+        # On long OBS files extracting a short snippet may take time. If a
+        # different application changed the selected transcript mapping while
+        # FFmpeg was preparing playback, do not play a stale timecode.
+        updated_project, updated_transcript, _ = read_project(Path(folder))
+        if updated_project != project or updated_transcript != transcript:
+            raise VideoNotesError(
+                "Projekt lub transkrypcja zmieniły się podczas przygotowania odsłuchu."
+            )
         command = [
             ffplay_tool, "-nodisp", "-autoexit", "-loglevel", "error",
             "-i", str(output)
