@@ -12,3 +12,7 @@ Każdą klatkę zapisujemy tymczasowo jako obraz z ograniczonymi wymiarami, wyko
 `slide-verify` sprawdza strukturę raportu, kompletność interwałów, integralność źródłowego nagrania, ID i znaczniki czasu. **Nie** uruchamia ponownie OCR, nie ocenia poprawności tekstu na slajdzie ani nie tworzy automatycznie faktów w notatkach. Weryfikacja SHA-256 samego raportu nie oznacza podpisu, a SHA zapisanej klatki nie zapewnia możliwości jej odtworzenia po usunięciu. Wyniki OCR mogą zawierać dane poufne; nie commitujemy raportów ani nagrań do GitHub.
 
 Testy syntetyczne sprawdzają wybór klatek, kompletność danych, niezmienność transkrypcji, odmowę nadpisania, uszkodzony film i podmianę czasu. Nie zastępują prawdziwych slajdów CCNA, oceny człowieka i realnego OCR na fizycznym Windows. Etap VN-03 pozostaje W TRAKCIE.
+
+## Kontrola integralności obrazu podczas OCR (12.11.2026)
+
+Silnik OCR liczy SHA-256 obrazu klatki po wyodrębnieniu jej lokalnym FFmpeg, a teraz sprawdza ten sam SHA-256 ponownie po zakończeniu odczytu przez Tesseract. Gdy obraz zostanie zmieniony, zastąpiony symlinkiem lub usunięty w trakcie OCR, aplikacja odrzuca cały raport i nie zapisuje niespójnego powiązania tekstu z klatką. Test syntetyczny zmienia obraz już po pierwszym hashowaniu. Nadal nie oznacza to, że tekst rozpoznany ze slajdu jest poprawny merytorycznie; odbiór na rzeczywistych slajdach i kontrola człowieka pozostają otwarte.
