@@ -335,5 +335,83 @@ class LocalASRLabTest(unittest.TestCase):
         self.assertEqual(len(commands), 1)
         self.assertFalse(self.report.exists())
 
+
+    @patch("videonotes.asr_lab.executable", return_value="/tmp/stub-whisper-cli")
+    @patch("videonotes.asr_lab.probe")
+    @patch("videonotes.asr_lab.extract_chunk")
+    def test_report_includes_vocabulary_and_optional_tokenizer_hashes(
+        self, extract, probe, executable
+    ):
+        import hashlib
+        tokenizer = self.model_dir / "tokenizer.json"
+        tokenizer.write_bytes(b'{"known": "offline test tokenizer"}')
+        probe.return_value = {"duration_ms": 3000, "audio_streams": [
+            {"index": 1, "codec": "pcm", "language": "pl", "channels": 1}
+        ]}
+        extract.side_effect = lambda path, track, *, start_ms, duration_ms, destination, ffmpeg: destination.write_bytes(self.source.read_bytes())
+        result = run_real_benchmark(
+            self.source, self.reference, cpp_executable="stub",
+            cpp_model=self.model, faster_model_dir=self.model_dir,
+            stream=1, output=self.report, process_runner=self._stub,
+        )
+        self.assertEqual(
+            result["faster_vocabulary_sha256"],
+            hashlib.sha256((self.model_dir / "vocabulary.txt").read_bytes()).hexdigest(),
+        )
+        self.assertEqual(
+            result["faster_tokenizer_sha256"],
+            hashlib.sha256(tokenizer.read_bytes()).hexdigest(),
+        )
+        self.assertEqual(json.loads(self.report.read_text("utf-8")), result)
+
+    @patch("videonotes.asr_lab.executable", return_value="/tmp/stub-whisper-cli")
+    @patch("videonotes.asr_lab.probe")
+    @patch("videonotes.asr_lab.extract_chunk")
+    def test_refuse_tokenizer_mutation_or_late_creation_without_report(
+        self, extract, probe, executable
+    ):
+        tokenizer = self.model_dir / "tokenizer.json"
+        probe.return_value = {"duration_ms": 3000, "audio_streams": [
+            {"index": 1, "codec": "pcm", "language": "pl", "channels": 1}
+        ]}
+        extract.side_effect = lambda path, track, *, start_ms, duration_ms, destination, ffmpeg: destination.write_bytes(self.source.read_bytes())
+        for originally_present in (False, True):
+            with self.subTest(originally_present=originally_present):
+                tokenizer.unlink(missing_ok=True)
+                if originally_present:
+                    tokenizer.write_bytes(b"original tokenizer data")
+                def mutating_runner(command):
+                    result = self._stub(command)
+                    tokenizer.write_bytes(b"changed tokenizer data")
+                    return result
+                with self.assertRaisesRegex(VideoNotesError, "zmieniły się"):
+                    run_real_benchmark(
+                        self.source, self.reference, cpp_executable="stub",
+                        cpp_model=self.model, faster_model_dir=self.model_dir,
+                        stream=1, output=self.report, process_runner=mutating_runner,
+                    )
+                self.assertFalse(self.report.exists())
+        tokenizer.unlink(missing_ok=True)
+
+    @patch("videonotes.asr_lab.executable", return_value="/tmp/stub-whisper-cli")
+    @patch("videonotes.asr_lab.probe")
+    def test_reject_symlink_reference_before_media_or_model_launch(
+        self, probe, executable
+    ):
+        alias = self.root / "reference-alias.txt"
+        try:
+            alias.symlink_to(self.reference)
+        except (OSError, NotImplementedError):
+            self.skipTest("Symlink privileges unavailable")
+        with self.assertRaisesRegex(VideoNotesError, "dowiązaniem"):
+            run_real_benchmark(
+                self.source, alias, cpp_executable="stub",
+                cpp_model=self.model, faster_model_dir=self.model_dir,
+                process_runner=self._stub,
+            )
+        probe.assert_not_called()
+        self.assertFalse(self.report.exists())
+
+
 if __name__ == "__main__":
     unittest.main()
