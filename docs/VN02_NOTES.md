@@ -102,3 +102,7 @@ Podczas eksportowania zatwierdzonych twierdzeń szkicu aplikacja ponownie sprawd
 ## Eksport podstawowego PDF ze spójną notatką (12.11.2026)
 
 Podczas opcjonalnej konwersji notatki podstawowej do PDF w lokalnym LibreOffice użytkownik może równolegle poprawić notatkę. Po wygenerowaniu PDF i przed nadpisaniem istniejącego dokumentu aplikacja **ponownie odczytuje zweryfikowaną notatkę oraz ręczne poprawki**. Jeśli choćby jedna zmiana nastąpiła podczas przetwarzania, stary PDF zostaje nienaruszony, a operacja odmawia publikacji. Test syntetycznie wprowadza edycję podczas konwersji. Nie jest to zamiennik weryfikacji wyglądu PDF w Word/LibreOffice na fizycznym Windows.
+
+## Niezmienność notatek podczas eksportu TXT/Markdown/DOCX (12.11.2026)
+
+Podstawowe notatki mają trzy dodatkowo chronione wyjścia: TXT, Markdown i DOCX. Przed renderowaniem aplikacja odczytuje i weryfikuje pełną notatkę z ręcznymi poprawkami, a tuż po wygenerowaniu formatu **ponownie porównuje ten sam stan notatki**. Równoległa edycja powoduje odmowę zapisania przestarzałego dokumentu i zachowuje poprzedni plik. Trzy testy symulują zmianę punktu notatki podczas renderowania każdego z formatów, czwarty potwierdza zwykły eksport. Jest to dodatkowa kontrola spójności, a nie globalna blokada plików przed dowolnymi zewnętrznymi procesami; formalny odbiór Windows Word pozostaje osobnym warunkiem.
