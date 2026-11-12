@@ -8,6 +8,18 @@ from pathlib import Path
 from .errors import VideoNotesError
 from .media import _run, executable
 
+MAX_ASR_JSON_BYTES = 32 * 1024 * 1024
+
+
+def _unique_json_object(pairs: list[tuple[str, object]]) -> dict:
+    """Do not let duplicate JSON keys silently replace Whisper results."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise VideoNotesError("Silnik ASR zwrócił powielone pola JSON.")
+        result[key] = value
+    return result
+
 
 def parse_whisper_output(payload: object, *, offset_ms: int, duration_ms: int) -> list[dict]:
     if not isinstance(payload, dict) or not isinstance(payload.get("transcription"), list):
@@ -15,6 +27,7 @@ def parse_whisper_output(payload: object, *, offset_ms: int, duration_ms: int) -
     if len(payload["transcription"]) > 100_000:
         raise VideoNotesError("Silnik ASR zwrócił za dużo segmentów.")
     segments = []
+    seen: set[tuple[int, int, str]] = set()
     for entry in payload["transcription"]:
         if not isinstance(entry, dict):
             raise VideoNotesError("Nieprawidłowy segment ASR.")
@@ -31,7 +44,13 @@ def parse_whisper_output(payload: object, *, offset_ms: int, duration_ms: int) -
         absolute_end = offset_ms + min(end, duration_ms)
         if absolute_start >= absolute_end:
             raise VideoNotesError("Segment ASR wychodzi poza granice nagrania.")
-        segments.append({"start_ms": absolute_start, "end_ms": absolute_end, "text": raw.strip()})
+        # Only exact same text AND time is a duplicate. Repeated speech at
+        # distinct timestamps is legitimate and must not disappear.
+        key = (absolute_start, absolute_end, raw.strip())
+        if key in seen:
+            continue
+        seen.add(key)
+        segments.append({"start_ms": key[0], "end_ms": key[1], "text": key[2]})
     segments.sort(key=lambda s: (s["start_ms"], s["end_ms"]))
     return segments
 
@@ -52,9 +71,15 @@ class WhisperCpp:
                   "--output-json", "--output-file", output, "--no-prints", "--no-gpu"], timeout=7200)
             try:
                 file = Path(output + ".json")
-                if file.stat().st_size > 32 * 1024 * 1024:
+                if file.is_symlink() or not file.is_file():
+                    raise VideoNotesError("Silnik ASR zwrócił niedozwolony plik JSON.")
+                # A growing file can bypass a stat-size check. Bound the
+                # actual read and reject ambiguous duplicate JSON keys.
+                with file.open("rb") as reader:
+                    raw = reader.read(MAX_ASR_JSON_BYTES + 1)
+                if len(raw) > MAX_ASR_JSON_BYTES or file.is_symlink():
                     raise VideoNotesError("Silnik ASR zwrócił zbyt duży JSON.")
-                payload = json.loads(file.read_text(encoding="utf-8"))
+                payload = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_json_object)
             except (FileNotFoundError, OSError, UnicodeError, ValueError) as error:
                 raise VideoNotesError("Nie można odczytać wynikowego JSON silnika ASR.") from error
         return parse_whisper_output(payload, offset_ms=offset_ms, duration_ms=duration_ms)
