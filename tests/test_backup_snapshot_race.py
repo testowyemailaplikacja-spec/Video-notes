@@ -23,6 +23,31 @@ class SnapshotConsistencyTest(unittest.TestCase):
         fixture(self.project)
         self.output = self.root / "portable.vnproj"
 
+    def test_backup_source_accepts_exact_size_limit(self):
+        original = (self.project / "transcript.json").read_bytes()
+        with patch("videonotes.backup.MAX_ITEM_BYTES", len(original)):
+            self.assertEqual(_read_source_json(self.project, "transcript.json"), original)
+
+    def test_growing_transcript_json_after_stat_is_bounded(self):
+        target = self.project / "transcript.json"
+        original = target.read_bytes()
+        bound = len(original) + 3
+        real_open = Path.open
+        grew = []
+        def grow_just_before_open(path, *args, **kwargs):
+            if path == target and not grew:
+                grew.append(True)
+                with real_open(path, "ab") as writer:
+                    writer.write(b"X" * (bound + 64))
+            return real_open(path, *args, **kwargs)
+        with patch("videonotes.backup.MAX_ITEM_BYTES", bound), patch.object(
+            Path, "open", grow_just_before_open
+        ):
+            with self.assertRaisesRegex(VideoNotesError, "przekroczył limit"):
+                _read_source_json(self.project, "transcript.json")
+        self.assertEqual(grew, [True])
+        self.assertGreater(target.stat().st_size, bound)
+
     def test_transcript_edit_during_copy_rejects_backup_without_losing_user_edit(self):
         touched = []
         def concurrent_edit(folder, filename):
