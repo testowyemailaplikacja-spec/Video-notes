@@ -115,6 +115,14 @@ def extract_slide_ocr(folder: Path, output: Path, *, ffmpeg: str = "ffmpeg",
             sha = sha256_file(frame)
             raw = _run([tesseract, str(frame), "stdout", "-l", language,
                         "--psm", "6"], runner=runner, timeout=90)
+            # A frame must not change between hashing it and reading it by
+            # Tesseract. Otherwise the stored image digest describes another
+            # image than the text extracted from it.
+            if (frame.is_symlink() or not frame.is_file()
+                    or sha256_file(frame) != sha):
+                raise VideoNotesError(
+                    "Klatka obrazu zmieniła się podczas OCR; raportu nie zapisano."
+                )
             if len(raw) > MAX_OCR_TEXT * 4:
                 raise VideoNotesError("Wynik OCR przekracza limit tekstu klatki.")
             try:

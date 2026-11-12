@@ -78,6 +78,24 @@ class SlideOCRTest(unittest.TestCase):
             extract_slide_ocr(self.folder, self.output, runner=no_video)
         self.assertFalse(self.output.exists())
 
+    def test_rejects_frame_changed_during_tesseract_inference(self):
+        before_video = self.source.read_bytes()
+        original_transcript = (self.folder / "transcript.json").read_bytes()
+        changed = []
+        def mutate_frame_during_ocr(args, **kwargs):
+            if args[0] == "tesseract" and not changed:
+                frame = Path(args[1])
+                original = frame.read_bytes()
+                frame.write_bytes(original + b" changed during OCR")
+                changed.append(True)
+            return self.mock_runner(args, **kwargs)
+        with self.assertRaisesRegex(VideoNotesError, "Klatka obrazu zmieniła"):
+            extract_slide_ocr(self.folder, self.output, runner=mutate_frame_during_ocr)
+        self.assertEqual(changed, [True])
+        self.assertFalse(self.output.exists())
+        self.assertEqual(self.source.read_bytes(), before_video)
+        self.assertEqual((self.folder / "transcript.json").read_bytes(), original_transcript)
+
     def test_invalid_input_and_forged_report_rejected(self):
         for options in ({"interval_seconds": 0}, {"max_frames": 501},
                         {"language": "../pol"}, {"interval_seconds": True}):
