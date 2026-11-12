@@ -25,12 +25,20 @@ def _same_lock(path: Path, original: os.stat_result) -> bool:
         stat = path.lstat()
     except OSError:
         return False
-    # Inode numbers may be reused immediately after an unlink, especially
-    # in a temp directory. Device+inode alone can falsely identify a freshly
-    # replaced lock as ours. Compare post-write metadata too (fail closed).
-    return (not path.is_symlink() and stat.st_dev == original.st_dev
-            and stat.st_ino == original.st_ino and
-            stat.st_ctime_ns == original.st_ctime_ns and
+    if path.is_symlink() or stat.st_dev != original.st_dev or stat.st_ino != original.st_ino:
+        return False
+    if os.name == "nt":
+        # Windows updates mtime/ctime lazily when the writing handle is
+        # closed. Comparing those to fstat() while the handle was open would
+        # leak every normal lock on NTFS. File birth time is stable; Python
+        # exposes st_birthtime_ns on supported Windows runtimes.
+        original_birth = getattr(original, "st_birthtime_ns", None)
+        current_birth = getattr(stat, "st_birthtime_ns", None)
+        return (original_birth is None or current_birth is None or
+                original_birth == current_birth)
+    # On POSIX, freed inode numbers can be recycled immediately. Detect this
+    # with metadata captured after writing the lock's contents.
+    return (stat.st_ctime_ns == original.st_ctime_ns and
             stat.st_mtime_ns == original.st_mtime_ns and
             stat.st_size == original.st_size)
 
