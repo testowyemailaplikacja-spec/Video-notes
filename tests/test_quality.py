@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from videonotes.errors import VideoNotesError
 from videonotes.quality import compare_text_files, error_rates, validate_reference_file
@@ -45,6 +46,61 @@ class QualityHarnessTest(unittest.TestCase):
             self.assertEqual(json.loads(raw), report)
             self.assertNotIn("Sekretne", raw)
             self.assertNotIn("routera", raw)
+
+    def test_report_never_overwrites_existing_results_or_private_input(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            reference = root / "private-reference.txt"
+            reference.write_text("Unikatowe słowa do benchmarku", encoding="utf-8")
+            candidate = root / "output.txt"
+            candidate.write_text("Unikatowe słowa do benchmarku", encoding="utf-8")
+            saved = root / "report.json"
+            saved.write_bytes(b"PREVIOUSLY REVIEWED REPORT")
+            with self.assertRaisesRegex(VideoNotesError, "nieistniejącego"):
+                compare_text_files(reference, {"engine": candidate}, output=saved)
+            self.assertEqual(saved.read_bytes(), b"PREVIOUSLY REVIEWED REPORT")
+            with self.assertRaises(VideoNotesError):
+                compare_text_files(reference, {"engine": candidate}, output=reference)
+            self.assertIn("Unikatowe", reference.read_text("utf-8"))
+
+    def test_two_parallel_benchmarks_do_not_replace_report(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            reference = root / "ref.txt"
+            reference.write_text("Pierwszy drugi trzeci", encoding="utf-8")
+            destination = root / "wer.json"
+            competing = b'{"user_reviewed":true}'
+            def rival_run(source, output):
+                destination.write_bytes(competing)
+                raise FileExistsError("another writer published first")
+            with patch("videonotes.quality.os.link", side_effect=rival_run):
+                with self.assertRaisesRegex(VideoNotesError, "równolegle"):
+                    compare_text_files(reference, {"cpu": reference}, output=destination)
+            self.assertEqual(destination.read_bytes(), competing)
+            self.assertFalse(list(root.glob(".vn-accuracy-*")))
+
+    def test_changed_reference_during_candidate_scoring_refuses_stale_wer(self):
+        from videonotes import quality as quality_module
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            reference = root / "original.txt"
+            candidate = root / "candidate.txt"
+            report = root / "result.json"
+            reference.write_text("Protokół sieciowy DHCP", encoding="utf-8")
+            candidate.write_text("Protokół sieciowy DHCP", encoding="utf-8")
+            orig = quality_module._read
+            processed = []
+            def replace_after_first_candidate(path):
+                value = orig(path)
+                if Path(path) == candidate and not processed:
+                    reference.write_text("Protokół sieciowy BGP", encoding="utf-8")
+                    processed.append(True)
+                return value
+            with patch("videonotes.quality._read", side_effect=replace_after_first_candidate):
+                with self.assertRaisesRegex(VideoNotesError, "zmieniły się"):
+                    compare_text_files(reference, {"cpu": candidate}, output=report)
+            self.assertEqual(processed, [True])
+            self.assertFalse(report.exists())
 
     def test_fast_reference_preflight_rejects_invalid_before_distance(self):
         with tempfile.TemporaryDirectory() as folder:
