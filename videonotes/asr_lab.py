@@ -20,7 +20,7 @@ from typing import Callable
 from .contracts import sha256_file
 from .errors import VideoNotesError
 from .media import choose_stream, executable, extract_chunk, probe
-from .quality import compare_text_files
+from .quality import compare_text_files, validate_reference_file
 from .storage import atomic_write
 
 REPORT_SCHEMA = "videonotes-real-asr-benchmark-v1"
@@ -94,7 +94,7 @@ def _safe_process_metrics(measurements: dict, label: str) -> dict:
     if not isinstance(measurements, dict):
         raise error
     wall = measurements.get("wall_seconds")
-    if type(wall) not in (int, float) or not math.isfinite(wall) or not 0 <= wall <= 86400:
+    if type(wall) not in (int, float) or not 0 <= wall <= 86400 or not math.isfinite(wall):
         raise error
     peak = measurements.get("peak_rss_bytes")
     if peak is not None and (type(peak) is not int or not 0 <= peak <= (1 << 63) - 1):
@@ -103,8 +103,8 @@ def _safe_process_metrics(measurements: dict, label: str) -> dict:
     if type(ram_flag) is not bool or ram_flag != (peak is not None):
         raise error
     cpu = measurements.get("cpu_seconds_observed")
-    if cpu is not None and (type(cpu) not in (int, float) or not math.isfinite(cpu) or
-                            not 0 <= cpu <= 86400 * 64):
+    if cpu is not None and (type(cpu) not in (int, float) or
+                            not 0 <= cpu <= 86400 * 64 or not math.isfinite(cpu)):
         raise error
     cpu_flag = measurements.get("cpu_measured", cpu is not None)
     if type(cpu_flag) is not bool or cpu_flag != (cpu is not None):
@@ -145,10 +145,9 @@ def run_real_benchmark(source: Path, reference: Path, *, cpp_executable: str,
     reference = Path(reference).expanduser().resolve()
     if not reference.is_file():
         raise VideoNotesError("Brakuje ręcznie sprawdzonej referencyjnej transkrypcji TXT.")
-    # A bogus/oversized reference must fail before running expensive ASR,
-    # not after two full inference passes. This is an offline self-comparison:
-    # it validates UTF-8, size and a non-empty normalized spoken-word sample.
-    compare_text_files(reference, {"reference_preflight": reference})
+    # Validate UTF-8, file size and reference tokens in O(n) before running
+    # expensive FFmpeg/ASR. This does NOT establish alignment with the clip.
+    validate_reference_file(reference)
     if output is not None and Path(output).exists():
         raise VideoNotesError("Raport już istnieje; nie nadpisuję poprzednich wyników.")
     meta = probe(source, ffprobe)

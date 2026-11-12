@@ -88,6 +88,20 @@ def _read(path: Path) -> tuple[str, str]:
         raise VideoNotesError("Nie można odczytać TXT do benchmarku.") from error
 
 
+def validate_reference_file(reference: Path) -> None:
+    """O(n) preflight before inference; never compare a reference to itself.
+
+    Do not return private text or include it in errors/logs. A reference is a
+    human-supplied claim and validating it does not verify its alignment.
+    """
+    text, _hash = _read(reference)
+    tokens = _tokens(text)
+    if not tokens:
+        raise VideoNotesError("Pusta transkrypcja wzorcowa: WER jest nieokreślony.")
+    if len(tokens) > MAX_WORDS:
+        raise VideoNotesError("Próbka benchmarku przekracza limit 6000 słów.")
+
+
 def compare_text_files(reference: Path, candidates: dict[str, Path], *, output: Path | None = None) -> dict:
     if not 1 <= len(candidates) <= 8:
         raise VideoNotesError("Podaj 1–8 kandydatów do porównania.")

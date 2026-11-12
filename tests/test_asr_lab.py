@@ -225,11 +225,13 @@ class LocalASRLabTest(unittest.TestCase):
         invalid_cases = (
             {"wall_seconds": float("nan")},
             {"wall_seconds": float("inf")},
+            {"wall_seconds": 10 ** 500},
             {"wall_seconds": -1},
             {"wall_seconds": True},
             {"wall_seconds": 1, "peak_rss_bytes": -2, "ram_measured": True},
             {"wall_seconds": 1, "peak_rss_bytes": 100, "ram_measured": False},
             {"wall_seconds": 1, "cpu_seconds_observed": float("nan"), "cpu_measured": True},
+            {"wall_seconds": 1, "cpu_seconds_observed": 10 ** 500, "cpu_measured": True},
             {"wall_seconds": 1, "cpu_seconds_observed": 2.0, "cpu_measured": False},
             {"wall_seconds": 1, "cpu_seconds_observed": True, "cpu_measured": True},
         )

@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from videonotes.errors import VideoNotesError
-from videonotes.quality import compare_text_files, error_rates
+from videonotes.quality import compare_text_files, error_rates, validate_reference_file
 
 
 class QualityHarnessTest(unittest.TestCase):
@@ -45,6 +45,19 @@ class QualityHarnessTest(unittest.TestCase):
             self.assertEqual(json.loads(raw), report)
             self.assertNotIn("Sekretne", raw)
             self.assertNotIn("routera", raw)
+
+    def test_fast_reference_preflight_rejects_invalid_before_distance(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "private-reference.txt"
+            path.write_text("Dzień dobry, to własny test sieci.", encoding="utf-8")
+            self.assertIsNone(validate_reference_file(path))
+            for raw in (b"", b"! ??? .", bytes([0xff, 0xfe, 0xff]),
+                        ("słowo " * 6001).encode("utf-8"),
+                        b"A" * 300_001):
+                with self.subTest(bytes=len(raw)):
+                    path.write_bytes(raw)
+                    with self.assertRaises(VideoNotesError):
+                        validate_reference_file(path)
 
     def test_malformed_inputs_fail_without_writing_report(self):
         with tempfile.TemporaryDirectory() as folder:
