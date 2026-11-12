@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from tests.test_notes import fixture
 from videonotes.errors import VideoNotesError
+from videonotes.edit_lock import transcript_edit_lock
 from videonotes.exports import export_project, render_exports
 from videonotes.storage import save_json
 
@@ -44,6 +45,13 @@ class ExportSnapshotTest(unittest.TestCase):
         for name, old_bytes in protected.items():
             self.assertEqual((self.outputs / name).read_bytes(), old_bytes)
         self.assertIn("Ręcznie poprawiono", (self.root / "edits.json").read_text("utf-8"))
+
+    def test_export_does_not_publish_while_manual_edit_lock_is_held(self):
+        with transcript_edit_lock(self.root):
+            with self.assertRaisesRegex(VideoNotesError, "blokadę poprawek"):
+                export_project(self.root)
+        self.assertFalse((self.root / ".transcript-edits.lock").exists())
+        self.assertFalse(self.outputs.exists())
 
     def test_export_stable_source_preserves_four_consistent_formats(self):
         produced = export_project(self.root)
