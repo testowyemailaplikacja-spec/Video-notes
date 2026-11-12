@@ -74,10 +74,25 @@ def extract_chunk(source: Path, stream_index: int, *, start_ms: int, duration_ms
     if start_ms < 0 or duration_ms < 1 or stream_index < 0:
         raise VideoNotesError("Nieprawidłowy zakres fragmentu audio.")
     target = Path(destination)
-    _run([executable(ffmpeg), "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{start_ms / 1000:.3f}", "-i", str(source), "-map", f"0:{stream_index}", "-vn", "-sn", "-dn", "-t", f"{duration_ms / 1000:.3f}", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", str(target)], timeout=1800)
+    if target.exists() or target.is_symlink():
+        raise VideoNotesError("Plik tymczasowego fragmentu WAV już istnieje; nie nadpisuję go.")
+    # '-n' also refuses a destination created AFTER the earlier existence check.
+    # In normal processing the caller supplies a fresh private temp directory.
+    _run([executable(ffmpeg), "-nostdin", "-hide_banner", "-loglevel", "error", "-n", "-ss", f"{start_ms / 1000:.3f}", "-i", str(source), "-map", f"0:{stream_index}", "-vn", "-sn", "-dn", "-t", f"{duration_ms / 1000:.3f}", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", str(target)], timeout=1800)
     try:
+        if target.is_symlink() or not target.is_file():
+            raise VideoNotesError("FFmpeg nie zwrócił zwykłego pliku WAV.")
         with wave.open(str(target), "rb") as wav:
             if wav.getnframes() == 0 or wav.getframerate() != 16000 or wav.getnchannels() != 1 or wav.getsampwidth() != 2:
                 raise VideoNotesError("Fragment audio jest pusty albo ma niewłaściwy format PCM.")
+            # The RIFF header can advertise more PCM than actually survived an
+            # interrupted FFmpeg process. Checking only getnframes() accepted
+            # such files and passed truncated audio to local speech recognition.
+            remaining = wav.getnframes()
+            while remaining:
+                count = min(remaining, 65536)
+                if len(wav.readframes(count)) != count * 2:
+                    raise VideoNotesError("Fragment WAV ma ucięte dane PCM; nie używam go do ASR.")
+                remaining -= count
     except (OSError, EOFError, wave.Error) as error:
         raise VideoNotesError("FFmpeg nie zwrócił poprawnego pliku WAV.") from error
