@@ -16,6 +16,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 
+from .bundle import _publish_bundle_no_replace
 from .contracts import sha256_file, validate_edits, validate_project, validate_transcript
 from .errors import VideoNotesError
 from .media import probe
@@ -201,7 +202,11 @@ def restore_backup(archive: Path, destination: Path) -> Path:
             if HISTORY_ENTRY.fullmatch(name):
                 previous, changes = _load_snapshot(temp, Path(name).stem)
                 _valid_pair(previous, changes, project["id"])
-        os.replace(temp, folder)
+        # Atomic no-clobber publish: os.replace() on Linux can silently
+        # replace an EMPTY directory created by another restore process after
+        # the early destination.exists() check. Reuse the verified platform
+        # primitive already exercised by private bundle publication.
+        _publish_bundle_no_replace(temp, folder)
     finally:
         if temp.exists():
             import shutil
