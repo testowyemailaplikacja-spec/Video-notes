@@ -6,6 +6,8 @@ model produced the output. The caller must run real engines separately.
 from __future__ import annotations
 
 import hashlib
+import os
+import tempfile
 import json
 import re
 import unicodedata
@@ -13,7 +15,6 @@ from pathlib import Path
 from typing import Sequence
 
 from .errors import VideoNotesError
-from .storage import atomic_write
 
 MAX_WORDS = 6000
 MAX_BYTES = 300_000
@@ -102,15 +103,46 @@ def validate_reference_file(reference: Path) -> None:
         raise VideoNotesError("Próbka benchmarku przekracza limit 6000 słów.")
 
 
+def _publish_private_report(output: Path, payload: bytes) -> None:
+    """Publish a verified report without overwriting an earlier local run.
+
+    Benchmark input text and model results may be privately curated; an
+    output path accidentally pointing at a reference file must never erase it.
+    """
+    target = Path(output).expanduser().absolute()
+    if target.suffix.lower() != ".json" or target.exists() or target.is_symlink():
+        raise VideoNotesError("Raport benchmarku wymaga nowego, nieistniejącego pliku .json.")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".vn-accuracy-", dir=target.parent) as tmp:
+        temporary = Path(tmp) / "report.json"
+        with temporary.open("wb") as writer:
+            writer.write(payload)
+            writer.flush()
+            os.fsync(writer.fileno())
+        try:
+            os.link(temporary, target)
+        except FileExistsError as error:
+            raise VideoNotesError("Raport powstał równolegle; nie nadpisano istniejących danych.") from error
+        except OSError as error:
+            raise VideoNotesError("Nie można bezpiecznie opublikować raportu benchmarku.") from error
+
+
 def compare_text_files(reference: Path, candidates: dict[str, Path], *, output: Path | None = None) -> dict:
     if not 1 <= len(candidates) <= 8:
         raise VideoNotesError("Podaj 1–8 kandydatów do porównania.")
+    if output is not None:
+        report_path = Path(output).expanduser().absolute()
+        if (report_path.suffix.lower() != ".json" or
+                report_path.exists() or report_path.is_symlink()):
+            raise VideoNotesError("Raport benchmarku wymaga nowego, nieistniejącego pliku .json.")
     truth, h = _read(reference)
     metrics = []
+    recorded_inputs = [(Path(reference), h)]
     for label, location in sorted(candidates.items()):
         if not isinstance(label, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,32}", label):
             raise VideoNotesError("Etykieta musi zawierać 1–32 znaki ASCII.")
         candidate, digest = _read(location)
+        recorded_inputs.append((Path(location), digest))
         metrics.append({"label_supplied_by_user": label, "candidate_sha256": digest, **error_rates(truth, candidate)})
     report = {
         "schema": "videonotes-asr-accuracy-v1", "reference_sha256": h,
@@ -118,6 +150,12 @@ def compare_text_files(reference: Path, candidates: dict[str, Path], *, output: 
         "input_kind": "precomputed_text_only", "engine_provenance_verified": False,
         "speed_measured": False, "peak_ram_measured": False, "results": metrics,
     }
+    # Reject results for a reference or candidate changed while scoring
+    # another file; published hashes must describe the compared contents.
+    for location, digest in recorded_inputs:
+        if _read(location)[1] != digest:
+            raise VideoNotesError("Pliki wejściowe zmieniły się podczas pomiaru WER/CER.")
     if output is not None:
-        atomic_write(Path(output), (json.dumps(report, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
+        payload = (json.dumps(report, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+        _publish_private_report(output, payload)
     return report
