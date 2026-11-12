@@ -44,7 +44,7 @@ def create_project(source: Path, folder: Path, *, model: Path, whisper_cli: str,
         os.close(fd)
         if any(item.name != creation_lock.name for item in folder.iterdir()):
             raise VideoNotesError("Katalog projektu nie jest pusty. Aby wznowić, użyj polecenia resume.")
-            project = {
+        project = {
             "schema": PROJECT_SCHEMA,
             "id": str(uuid.uuid4()),
             "created_at": datetime.now(timezone.utc).isoformat(),
@@ -53,7 +53,7 @@ def create_project(source: Path, folder: Path, *, model: Path, whisper_cli: str,
                        "stream_language": audio["language"], "stream_title": audio["title"]},
             "processing": {"engine": "whisper.cpp", "language": language, "chunk_ms": chunk_ms,
                            "model_path": str(model_path), "model_sha256": sha256_file(model_path), "whisper_cli": whisper_cli},
-    }
+        }
         save_json(folder / "project.json", project)
         save_json(folder / "transcript.json", empty_transcript(project["id"]))
         save_json(folder / "edits.json", empty_edits())
