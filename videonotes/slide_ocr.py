@@ -25,16 +25,29 @@ SHA256 = re.compile(r"[a-f0-9]{64}\Z", re.ASCII)
 VIDEO_SUFFIXES = frozenset((".mp4", ".mkv", ".webm", ".mov"))
 
 
-def _run(argv: list[str], *, runner=subprocess.run, timeout: int = 90):
+def _run(argv: list[str], *, runner=subprocess.run, timeout: int = 90,
+         output_limit: int = MAX_OCR_TEXT * 4):
+    """Spool real subprocess stdout to disk and read only bounded bytes."""
     try:
-        result = runner(argv, capture_output=True, stdin=subprocess.DEVNULL,
-                        timeout=timeout, check=False)
+        if runner is subprocess.run:
+            with tempfile.TemporaryFile(mode="w+b") as stream:
+                result = runner(argv, stdout=stream, stderr=subprocess.DEVNULL,
+                                stdin=subprocess.DEVNULL, timeout=timeout, check=False)
+                if result.returncode:
+                    raise VideoNotesError("Lokalny FFmpeg/FFprobe/Tesseract zgłosił błąd; pliki źródłowe pozostają bez zmian.")
+                stream.seek(0)
+                stdout = stream.read(output_limit + 1)
+        else:
+            result = runner(argv, capture_output=True, stdin=subprocess.DEVNULL,
+                            timeout=timeout, check=False)
+            if result.returncode:
+                raise VideoNotesError("Lokalny FFmpeg/FFprobe/Tesseract zgłosił błąd; pliki źródłowe pozostają bez zmian.")
+            stdout = result.stdout
     except (OSError, subprocess.TimeoutExpired) as error:
         raise VideoNotesError("Lokalne narzędzie klatek/OCR nie uruchomiło się lub przekroczyło limit.") from error
-    if result.returncode:
-        # Never expose tool stderr: FFmpeg and OCR may echo private paths/text.
-        raise VideoNotesError("Lokalny FFmpeg/FFprobe/Tesseract zgłosił błąd; pliki źródłowe pozostają bez zmian.")
-    return result.stdout
+    if not isinstance(stdout, bytes) or len(stdout) > output_limit:
+        raise VideoNotesError("Wynik lokalnego narzędzia OCR/FFprobe przekroczył bezpieczny limit.")
+    return stdout
 
 
 def _validate_media(folder: Path) -> tuple[dict, Path]:
@@ -90,7 +103,7 @@ def extract_slide_ocr(folder: Path, output: Path, *, ffmpeg: str = "ffmpeg",
     project, source = _validate_media(folder)
     probe_stdout = _run([ffprobe, "-v", "error", "-select_streams", "v",
                          "-show_entries", "stream=index", "-of", "json", str(source)],
-                        runner=runner)
+                        runner=runner, output_limit=512 * 1024)
     try:
         tracks = json.loads(probe_stdout)["streams"]
     except (KeyError, TypeError, UnicodeError, json.JSONDecodeError) as error:
