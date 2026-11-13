@@ -15,7 +15,7 @@ from .advanced_notes import _category, _clock
 from .contracts import sha256_file
 from .errors import VideoNotesError
 from .notes import _hash, _select, _source, _tokens
-from .storage import atomic_write, checked_export_paths, read_project, load_json
+from .storage import publish_export_bundle, read_project, load_json
 
 SCHEMA = "videonotes-study-guide-v1"
 DETAIL_LIMITS = {"brief": 3, "standard": 6, "full": 12}
@@ -211,22 +211,17 @@ def export_study_guide(folder: Path, *, section_minutes: int = 5,
             "Transkrypcja lub ręczne poprawki zmieniły się podczas eksportu; "
             "nie nadpisano wcześniejszego przewodnika."
         )
-    required = ["notes-study.md", "notes-study.json"]
+    contents = {"notes-study.md": md_bytes,
+                "notes-study.json": json_bytes}
     if include_docx:
-        required.append("notes-study.docx")
+        contents["notes-study.docx"] = docx_bytes
     if include_pdf:
-        required.append("notes-study.pdf")
-    checked_export_paths(folder, required)
-    atomic_write(markdown, md_bytes)
-    atomic_write(structured, json_bytes)
-    result = [markdown, structured]
-    if include_docx:
-        atomic_write(docx, docx_bytes)
-        result.append(docx)
-    if include_pdf:
-        atomic_write(pdf, pdf_bytes)
-        result.append(pdf)
-    return tuple(result)
+        contents["notes-study.pdf"] = pdf_bytes
+    return publish_export_bundle(
+        folder, contents,
+        verify=lambda: build_study_guide(
+            folder, section_minutes=section_minutes, detail=detail) == guide,
+    )
 
 
 def verify_study_guide(folder: Path, *, document: Path | None = None) -> dict:

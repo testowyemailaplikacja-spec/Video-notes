@@ -26,6 +26,57 @@ class AdvancedNotesTest(unittest.TestCase):
         self.folder = Path(self.temp.name)
         fixture(self.folder)
 
+    def test_multiformat_export_rollback_after_late_replace_failure(self):
+        import os
+        from videonotes import storage
+        names = ("notes-advanced.md", "notes-advanced.json", "notes-advanced.docx")
+        directory = self.folder / "exports"
+        directory.mkdir(exist_ok=True)
+        protected = {name: ("OLD " + name).encode() for name in names}
+        for name, value in protected.items():
+            (directory / name).write_bytes(value)
+        real_replace = os.replace
+        calls = []
+        def fail_late(source, destination):
+            calls.append(Path(destination).name)
+            if Path(destination).name == "notes-advanced.docx":
+                raise OSError("disk full / locked output")
+            return real_replace(source, destination)
+        with patch("videonotes.storage.os.replace", side_effect=fail_late):
+            with self.assertRaisesRegex(VideoNotesError, "wcześniejsze pliki zostały przywrócone"):
+                export_advanced_outline(self.folder, include_docx=True)
+        self.assertIn("notes-advanced.docx", calls)
+        self.assertEqual(
+            {p.name: p.read_bytes() for p in directory.iterdir()}, protected
+        )
+        produced = export_advanced_outline(self.folder, include_docx=True)
+        self.assertEqual(tuple(p.name for p in produced), names)
+        self.assertNotEqual((directory / "notes-advanced.md").read_bytes(),
+                            protected["notes-advanced.md"])
+
+    def test_export_rechecks_source_after_staging_before_any_publication(self):
+        from videonotes import storage
+        directory = self.folder / "exports"
+        directory.mkdir(exist_ok=True)
+        earlier = {name: b"REVIEWED" for name in
+                   ("notes-advanced.md", "notes-advanced.json")}
+        for name, data in earlier.items():
+            (directory / name).write_bytes(data)
+        original_fsync = storage.os.fsync
+        changed = []
+        def change_during_stage(fd):
+            original_fsync(fd)
+            if not changed:
+                changed.append(True)
+                transcript = read_project(self.folder)[1]
+                transcript["segments"][0]["text"] = "Zmiana źródła w trakcie eksportu"
+                save_json(self.folder / "transcript.json", transcript)
+        with patch("videonotes.storage.os.fsync", side_effect=change_during_stage):
+            with self.assertRaisesRegex(VideoNotesError, "Źródło lub poprawki zmieniły się"):
+                export_advanced_outline(self.folder)
+        self.assertEqual({(directory / n).read_bytes() for n in earlier}, {b"REVIEWED"})
+        self.assertFalse(list(directory.glob(".vn-export-bundle-*")))
+
     def test_source_linkage_and_hierarchical_structure(self):
         result = build_advanced_outline(self.folder, template="study", detail="full", section_minutes=1)
         self.assertEqual(result["schema"], "videonotes-source-outline-v1")

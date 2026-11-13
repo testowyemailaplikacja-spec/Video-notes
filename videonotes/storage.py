@@ -3,10 +3,11 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import tempfile
 from pathlib import Path
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, Callable
 
 from .contracts import validate_project, validate_transcript, validate_edits, empty_edits
 from .errors import VideoNotesError
@@ -33,6 +34,82 @@ def checked_export_paths(folder: Path, names: Iterable[str]) -> dict[str, Path]:
             raise VideoNotesError("Docelowy plik eksportu jest dowiązaniem lub katalogiem.")
         targets[name] = target
     return targets
+
+
+def publish_export_bundle(folder: Path, contents: dict[str, bytes], *,
+                          verify: Callable[[], bool] | None = None) -> tuple[Path, ...]:
+    """Stage every export then replace as a group, rolling back failed writes.
+
+    This protects against ordinary disk-full / locked-file errors, not an
+    abrupt power loss. No uploaded material, network, or external dependencies.
+    Callers may provide verify() to reject edits made while files were staged.
+    """
+    if not contents or any(not isinstance(body, bytes) for body in contents.values()):
+        raise VideoNotesError("Pakiet eksportu musi zawierać pliki binarne.")
+    output_paths = checked_export_paths(folder, contents)
+    directory = Path(folder) / "exports"
+    directory.mkdir(parents=True, exist_ok=True)
+    try:
+        with tempfile.TemporaryDirectory(prefix=".vn-export-bundle-", dir=directory) as workspace:
+            staging = Path(workspace)
+            originals: dict[str, Path] = {}
+            for name, payload in contents.items():
+                stage = staging / name
+                with stage.open("xb") as stream:
+                    stream.write(payload)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                target = output_paths[name]
+                if target.is_symlink() or (target.exists() and not target.is_file()):
+                    raise VideoNotesError("Cel eksportu zmienił się; wcześniejsze pliki zachowano.")
+                if target.is_file():
+                    previous = staging / ("previous-" + name)
+                    try:
+                        os.link(target, previous)
+                    except OSError:
+                        # FAT and some Windows filesystems do not support hard
+                        # links; the bounded-buffer copy avoids loading an
+                        # existing multi-hour transcript into memory.
+                        with target.open("rb") as source, previous.open("xb") as backup:
+                            shutil.copyfileobj(source, backup, length=1024 * 1024)
+                            backup.flush()
+                            os.fsync(backup.fileno())
+                    originals[name] = previous
+            if verify is not None and not verify():
+                raise VideoNotesError(
+                    "Źródło lub poprawki zmieniły się podczas eksportu; "
+                    "poprzednie pliki pozostawiono bez zmian."
+                )
+            published: list[str] = []
+            try:
+                for name, target in output_paths.items():
+                    if target.is_symlink() or (target.exists() and not target.is_file()):
+                        raise OSError("export destination changed")
+                    os.replace(staging / name, target)
+                    published.append(name)
+            except OSError as error:
+                failed = False
+                for name in reversed(published):
+                    try:
+                        if name in originals:
+                            os.replace(originals[name], output_paths[name])
+                        else:
+                            output_paths[name].unlink(missing_ok=True)
+                    except OSError:
+                        failed = True
+                if failed:
+                    raise VideoNotesError(
+                        "Przerwano eksport i nie przywrócono wszystkich plików. "
+                        "Sprawdź lokalny katalog exports."
+                    ) from error
+                raise VideoNotesError(
+                    "Przerwano eksport; wcześniejsze pliki zostały przywrócone."
+                ) from error
+    except OSError as error:
+        raise VideoNotesError(
+            "Nie można przygotować plików eksportu; sprawdź miejsce na dysku i uprawnienia."
+        ) from error
+    return tuple(output_paths.values())
 
 
 def atomic_write(path: Path, data: bytes) -> None:
