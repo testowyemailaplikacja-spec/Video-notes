@@ -56,6 +56,25 @@ class MicrophoneTest(unittest.TestCase):
             return record_microphone("Mic (USB)", self.folder, consent=True,
                                      process_factory=factory, **kwargs)
 
+    def test_gui_state_callback_failure_stops_recorder_and_preserves_recovery_take(self):
+        stopped = []
+        class TrackedRecorder(FakeFFmpeg):
+            def wait(self, timeout=None):
+                stopped.append(timeout)
+                return super().wait(timeout)
+        def destroyed_gui(_state):
+            raise RuntimeError("GUI callback failed")
+        with self.assertRaisesRegex(RuntimeError, "GUI callback failed"):
+            self._record(stop=threading.Event(), pause=threading.Event(),
+                         resume=threading.Event(), process_factory=TrackedRecorder,
+                         on_state=destroyed_gui)
+        self.assertTrue(stopped, "recorder was not finalized after GUI callback failure")
+        self.assertEqual(recording_status(self.folder)["status"], "needs_review")
+        self.assertEqual(recording_status(self.folder)["segments"], [])
+        staged = list(self.folder.glob(".vn-take-*/part-00000.wav"))
+        self.assertEqual(len(staged), 1)
+        self.assertGreater(staged[0].stat().st_size, 44)
+
     def test_pause_resume_preserves_prior_wav_and_contiguous_part_numbering(self):
         stop, pause, resume = threading.Event(), threading.Event(), threading.Event()
         states = []
