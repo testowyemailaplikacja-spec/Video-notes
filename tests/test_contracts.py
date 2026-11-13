@@ -162,8 +162,8 @@ class ContractTest(unittest.TestCase):
             for subtitle in (srt, vtt):
                 self.assertIn("Poprawka", subtitle)
                 self.assertIn("z wcięciem i spacją", subtitle)
-                # A multiline correction must not become an extra subtitle cue.
-                self.assertNotIn("  z wcięciem i spacją\\n\\n", subtitle)
+                # Exactly two SRT cues despite the multiline manual correction.
+                self.assertEqual(srt.count("\n\n"), 1)
             self.assertEqual(read_project(root)[1], demo_transcript())
 
     def test_wrong_edits_cannot_override_unknown_segments(self):
