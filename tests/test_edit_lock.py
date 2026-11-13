@@ -80,11 +80,11 @@ class TranscriptEditLockTest(unittest.TestCase):
         self.assertFalse(self.path.exists())
 
     def test_oversized_or_growing_edit_lock_fails_closed(self):
-        self.path.write_bytes(b"pid=12345\\n" + b"Z" * 1024)
+        self.path.write_bytes(b"pid=12345\n" + b"Z" * 1024)
         self.assertEqual(transcript_edit_lock_status(self.project)["state"], "invalid")
         with self.assertRaises(VideoNotesError):
             recover_stale_transcript_edit_lock(self.project, confirm=True)
-        self.path.write_bytes(b"pid=12345\\n")
+        self.path.write_bytes(b"pid=12345\n")
         original_open = Path.open
         changed = []
         def grow_on_read(path, *args, **kwargs):
