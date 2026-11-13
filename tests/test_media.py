@@ -119,6 +119,9 @@ class FFprobeMetadataSafetyTest(unittest.TestCase):
             data["streams"][1]["channels"] = -1
             bad.append(json.dumps(data))
             data = json.loads(json.dumps(valid))
+            data["streams"][1]["channels"] = False
+            bad.append(json.dumps(data))
+            data = json.loads(json.dumps(valid))
             data["streams"][1]["tags"] = []
             bad.append(json.dumps(data))
             data = json.loads(json.dumps(valid))
