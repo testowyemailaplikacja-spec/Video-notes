@@ -12,7 +12,8 @@ from unittest.mock import patch
 from tests.test_notes import fixture
 from videonotes.cli import main
 from videonotes.errors import VideoNotesError
-from videonotes.pipeline import transcription_lock_status, recover_stale_transcription_lock
+from videonotes.pipeline import (create_project, transcribe_project,
+                                 transcription_lock_status, recover_stale_transcription_lock)
 
 
 class StaleLockTest(unittest.TestCase):
@@ -22,6 +23,57 @@ class StaleLockTest(unittest.TestCase):
         self.project = Path(self.temp.name) / "project"
         fixture(self.project, complete=False)
         self.lock = self.project / ".processing.lock"
+
+    def test_replaced_creation_lock_is_not_removed_or_continued(self):
+        with tempfile.TemporaryDirectory() as root_name:
+            root = Path(root_name)
+            source = root / "test.wav"
+            model = root / "model.bin"
+            source.write_bytes(b"synthetic media marker")
+            model.write_bytes(b"synthetic ASR marker")
+            target = root / "project-new"
+            metadata = {"source": str(source), "duration_ms": 1000,
+                        "audio_streams": [{"index": 0, "language": "", "title": ""}]}
+            from videonotes.pipeline import save_json as real_save
+            swapped = []
+            def simulate_replacement(path, payload):
+                real_save(path, payload)
+                if path.name == "project.json" and not swapped:
+                    lock = target / ".creating.lock"
+                    lock.unlink()
+                    lock.write_text("pid=987654321\n", encoding="ascii")
+                    swapped.append(True)
+            with patch("videonotes.pipeline.probe", return_value=metadata), patch(
+                "videonotes.pipeline.save_json", side_effect=simulate_replacement
+            ):
+                with self.assertRaisesRegex(VideoNotesError, "zastąpiona"):
+                    create_project(source, target, model=model, whisper_cli="mock")
+            self.assertEqual(swapped, [True])
+            self.assertEqual((target / ".creating.lock").read_text("ascii"), "pid=987654321\n")
+            self.assertFalse((target / "transcript.json").exists())
+            self.assertEqual(source.read_bytes(), b"synthetic media marker")
+            self.assertEqual(model.read_bytes(), b"synthetic ASR marker")
+
+    def test_replaced_processing_lock_aborts_checkpoint_and_preserves_rival(self):
+        before = (self.project / "transcript.json").read_bytes()
+        folder = self.project
+        class ReplacingEngine:
+            def __init__(self, cli, model):
+                pass
+            def transcribe(self, *args, **kwargs):
+                lock = folder / ".processing.lock"
+                lock.unlink()
+                lock.write_text("pid=987654321\n", encoding="ascii")
+                return [{"start_ms": 60_000, "end_ms": 61_000, "text": "test source"}]
+        with patch("videonotes.pipeline._check_resume_source",
+                   return_value=Path("/synthetic/input.wav")), patch(
+            "videonotes.pipeline._file_identity", return_value=(0, 0, 0, 0, 0)
+        ), patch("videonotes.pipeline.extract_chunk",
+                  side_effect=lambda *args, **kw: kw["destination"].write_bytes(b"mock")):
+            with self.assertRaisesRegex(VideoNotesError, "zastąpiona"):
+                transcribe_project(folder, asr_factory=ReplacingEngine)
+        self.assertEqual((folder / ".processing.lock").read_text("ascii"), "pid=987654321\n")
+        self.assertEqual((folder / "transcript.json").read_bytes(), before)
 
     def test_missing_and_active_pid_are_never_removed(self):
         self.assertEqual(transcription_lock_status(self.project)["state"], "missing")

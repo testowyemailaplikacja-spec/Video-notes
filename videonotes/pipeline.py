@@ -19,6 +19,24 @@ from .storage import read_project, save_json
 Progress = Callable[[int, int], None]
 
 
+def _same_owned_lock(path: Path, owner: os.stat_result) -> bool:
+    """Never remove a lock replaced by another process or a symlink."""
+    try:
+        current = path.lstat()
+    except OSError:
+        return False
+    if (path.is_symlink() or current.st_dev != owner.st_dev
+            or current.st_ino != owner.st_ino):
+        return False
+    if os.name == "nt":
+        birth = getattr(owner, "st_birthtime_ns", None)
+        current_birth = getattr(current, "st_birthtime_ns", None)
+        return birth is None or current_birth is None or birth == current_birth
+    return (current.st_ctime_ns == owner.st_ctime_ns
+            and current.st_mtime_ns == owner.st_mtime_ns
+            and current.st_size == owner.st_size)
+
+
 def create_project(source: Path, folder: Path, *, model: Path, whisper_cli: str, language: str = "pl", stream: int | None = None, chunk_ms: int = 30_000, ffprobe: str = "ffprobe") -> dict:
     """Start a new project with a unique local manifest; never overwrite one."""
     if language not in {"pl", "en", "auto"} or not 1000 <= chunk_ms <= 120_000:
@@ -41,7 +59,15 @@ def create_project(source: Path, folder: Path, *, model: Path, whisper_cli: str,
         raise VideoNotesError("Tworzenie tego projektu już trwa lub zostało przerwane. "
                               "Przed odzyskaniem sprawdź plik .creating.lock.") from error
     try:
-        os.close(fd)
+        with os.fdopen(fd, "w", encoding="ascii") as writer:
+            writer.write(f"pid={os.getpid()}\n")
+            writer.flush()
+            os.fsync(writer.fileno())
+            creation_owner = os.fstat(writer.fileno())
+        def ensure_creation_lock() -> None:
+            if not _same_owned_lock(creation_lock, creation_owner):
+                raise VideoNotesError("Blokada tworzenia została zastąpiona; nie zapisuję dalej projektu.")
+        ensure_creation_lock()
         if any(item.name != creation_lock.name for item in folder.iterdir()):
             raise VideoNotesError("Katalog projektu nie jest pusty. Aby wznowić, użyj polecenia resume.")
         project = {
@@ -54,12 +80,17 @@ def create_project(source: Path, folder: Path, *, model: Path, whisper_cli: str,
             "processing": {"engine": "whisper.cpp", "language": language, "chunk_ms": chunk_ms,
                            "model_path": str(model_path), "model_sha256": sha256_file(model_path), "whisper_cli": whisper_cli},
         }
+        ensure_creation_lock()
         save_json(folder / "project.json", project)
+        ensure_creation_lock()
         save_json(folder / "transcript.json", empty_transcript(project["id"]))
+        ensure_creation_lock()
         save_json(folder / "edits.json", empty_edits())
+        ensure_creation_lock()
         return project
     finally:
-        creation_lock.unlink(missing_ok=True)
+        if "creation_owner" in locals() and _same_owned_lock(creation_lock, creation_owner):
+            creation_lock.unlink(missing_ok=True)
 
 
 def _check_resume_source(project: dict, *, ffprobe: str) -> Path:
@@ -184,6 +215,11 @@ def transcribe_project(folder: Path, *, ffmpeg: str = "ffmpeg", ffprobe: str = "
         with os.fdopen(fd, "w", encoding="ascii") as writer:
             writer.write(f"pid={os.getpid()}\n")
             writer.flush()
+            os.fsync(writer.fileno())
+            processing_owner = os.fstat(writer.fileno())
+        def ensure_processing_lock() -> None:
+            if not _same_owned_lock(lock, processing_owner):
+                raise VideoNotesError("Blokada transkrypcji została zastąpiona; nie zapisano checkpointu.")
         project, transcript, _edits = read_project(folder)
         source = _check_resume_source(project, ffprobe=ffprobe)
         processing = project["processing"]
@@ -251,10 +287,12 @@ def transcribe_project(folder: Path, *, ffmpeg: str = "ffmpeg", ffprobe: str = "
             if warnings:
                 candidate["warnings"] = warnings
             validate_transcript(candidate, project)
+            ensure_processing_lock()
             save_json(folder / "transcript.json", candidate)
             transcript = candidate
             if progress:
                 progress(chunk + 1, total)
         return transcript
     finally:
-        lock.unlink(missing_ok=True)
+        if "processing_owner" in locals() and _same_owned_lock(lock, processing_owner):
+            lock.unlink(missing_ok=True)
