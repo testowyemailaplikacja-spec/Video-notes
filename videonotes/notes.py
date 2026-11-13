@@ -15,7 +15,7 @@ from pathlib import Path
 
 from .errors import VideoNotesError
 from .edit_lock import _same_lock
-from .storage import atomic_write, load_json, read_project, save_json
+from .storage import atomic_write, checked_export_paths, load_json, read_project, save_json
 
 SCHEMA = "videonotes-basic-notes-v1"
 EDITS_SCHEMA = "videonotes-note-edits-v1"
@@ -279,7 +279,7 @@ def export_basic_notes_text(folder: Path) -> Path:
     snapshot = read_basic_notes(folder)
     payload = render_basic_text(folder).encode("utf-8")
     _assert_notes_unchanged(folder, snapshot)
-    target = Path(folder) / "exports" / "notes-basic.txt"
+    target = checked_export_paths(folder, ["notes-basic.txt"])["notes-basic.txt"]
     atomic_write(target, payload)
     return target
 
@@ -288,7 +288,7 @@ def export_basic_notes(folder: Path) -> Path:
     snapshot = read_basic_notes(folder)
     payload = render_basic_markdown(folder).encode("utf-8")
     _assert_notes_unchanged(folder, snapshot)
-    target = Path(folder) / "exports" / "notes-basic.md"
+    target = checked_export_paths(folder, ["notes-basic.md"])["notes-basic.md"]
     atomic_write(target, payload)
     return target
 
@@ -299,6 +299,6 @@ def export_basic_notes_docx(folder: Path) -> Path:
     from .docx_export import render_basic_docx
     payload = render_basic_docx(notes, changes)
     _assert_notes_unchanged(folder, (notes, changes))
-    target = Path(folder) / "exports" / "notes-basic.docx"
+    target = checked_export_paths(folder, ["notes-basic.docx"])["notes-basic.docx"]
     atomic_write(target, payload)
     return target
