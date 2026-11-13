@@ -113,6 +113,21 @@ class SemanticDraftTest(unittest.TestCase):
         self.assertEqual(self.result.read_bytes(), original)
         self.assertGreaterEqual(len(reads), 3)
 
+    def test_semantic_model_rejects_ambiguous_json_and_nonfinite_numbers(self):
+        from videonotes.semantic_draft import _parse_response
+        allowed = {"c0000000-s00000": "Opis protokołu DHCP."}
+        valid = b'{"heading":"Opis DHCP","claims":[{"text":"Opisano DHCP.","source_ids":["c0000000-s00000"]}]}'
+        self.assertEqual(len(_parse_response(valid, allowed, 4)[1]), 1)
+        bad = [
+            b'{"heading":"Opis DHCP","heading":"Injected","claims":[]}',
+            b'{"heading":"Opis DHCP","claims":[{"text":"Opisano DHCP.","text":"Injected","source_ids":["c0000000-s00000"]}]}',
+            b'{"heading":"Opis DHCP","claims":[{"text":"Opisano DHCP.","source_ids":["c0000000-s00000"]}],"other":NaN}',
+            b'{"heading":"Opis DHCP","claims":[{"text":"Opisano DHCP.","source_ids":["c0000000-s00000"]}],"other":Infinity}',
+        ]
+        for payload in bad:
+            with self.subTest(payload=payload[:80]), self.assertRaises(VideoNotesError):
+                _parse_response(payload, allowed, 4)
+
     def test_unsourced_number_or_acronym_is_not_published(self):
         import sys
         for statement, expected in (
