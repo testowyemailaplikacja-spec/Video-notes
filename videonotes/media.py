@@ -102,7 +102,9 @@ def probe(source: Path, ffprobe: str = "ffprobe") -> dict:
             channels = item.get("channels") or 0
             if type(channels) is not int or not 0 <= channels <= 64:
                 raise ValueError("invalid channel count")
-            tags = item.get("tags") or {}
+            tags = item.get("tags", {})
+            if tags is None:
+                tags = {}
             if not isinstance(tags, dict):
                 raise ValueError("invalid stream tags")
             labels = (item.get("codec_name") or "unknown",
