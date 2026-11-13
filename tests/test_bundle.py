@@ -31,6 +31,23 @@ class InternalBundleTest(unittest.TestCase):
     def _build(self, **extra):
         return create_internal_bundle(**self.sources, output=self.output, internal_only=True, **extra)
 
+    def test_manifest_growth_between_stat_and_read_is_bounded(self):
+        self._build()
+        target = self.output / "bundle-manifest.json"
+        original_open = Path.open
+        touched = []
+        def grow_before_open(path, *args, **kwargs):
+            if path == target and not touched:
+                touched.append(True)
+                with original_open(path, "ab") as writer:
+                    writer.write(b"X" * 70000)
+            return original_open(path, *args, **kwargs)
+        with patch.object(Path, "open", grow_before_open):
+            with self.assertRaisesRegex(VideoNotesError, "przekroczył limit"):
+                verify_internal_bundle(self.output)
+        self.assertEqual(touched, [True])
+        self.assertGreater(target.stat().st_size, 65536)
+
     def test_assembly_integrity_launcher_and_private_manifest(self):
         result = self._build()
         self.assertEqual(result["schema"], SCHEMA)
