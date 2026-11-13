@@ -14,7 +14,7 @@ from .media import probe
 from .microphone import record_microphone, recording_status, list_microphone_devices, join_finished_recording
 from .audio_diagnostics import analyze_finished_recording
 from .recovery_audio import inspect_recoverable_recording, salvage_recording
-from .notes import generate_basic_notes, edit_note_point, export_basic_notes, export_basic_notes_text, export_basic_notes_docx
+from .notes import generate_basic_notes, edit_note_point, export_basic_notes, export_basic_notes_text, export_basic_notes_docx, export_basic_notes_bundle
 from .advanced_notes import export_advanced_outline, verify_advanced_outline
 from .study_guide import export_study_guide, verify_study_guide
 from .pdf_export import export_basic_notes_pdf
@@ -381,15 +381,13 @@ def main(argv: list[str] | None = None) -> int:
         elif args.action == "notes-lock-recover":
             print(json.dumps(recover_stale_notes_lock(args.project, confirm=args.confirm), ensure_ascii=False))
         elif args.action == "notes-export":
-            # PDF is pre-rendered in a private temporary folder; missing optional
-            # LibreOffice leaves all other existing exports unchanged.
-            if args.pdf:
-                print(export_basic_notes_pdf(args.project, office=args.office))
-            if args.docx:
-                print(export_basic_notes_docx(args.project))
-            if args.txt:
-                print(export_basic_notes_text(args.project))
-            print(export_basic_notes(args.project))
+            # Render one consistent version into a staged bundle, so a
+            # failed later PDF/DOCX does not leave mixed document revisions.
+            for target in export_basic_notes_bundle(
+                args.project, include_txt=args.txt, include_docx=args.docx,
+                include_pdf=args.pdf, office=args.office
+            ):
+                print(target)
         elif args.action == "advanced-notes":
             for path in export_advanced_outline(args.project, template=args.template, detail=args.detail, section_minutes=args.section_minutes,
                                                 include_docx=args.docx, include_pdf=args.pdf, office=args.office):
