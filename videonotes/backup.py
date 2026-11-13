@@ -173,9 +173,24 @@ def create_backup(folder: Path, output: Path) -> Path:
     return output
 
 
+def _archive_unique_keys(pairs: list[tuple[str, object]]) -> dict:
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise VideoNotesError("Archiwum zawiera powielony klucz JSON.")
+        result[key] = value
+    return result
+
+
+def _archive_invalid_number(_value: str) -> None:
+    raise VideoNotesError("Archiwum zawiera liczbę spoza standardu JSON.")
+
+
 def _decode_json(body: bytes, name: str) -> dict:
     try:
-        value = json.loads(body.decode("utf-8"))
+        value = json.loads(body.decode("utf-8"),
+                           object_pairs_hook=_archive_unique_keys,
+                           parse_constant=_archive_invalid_number)
     except (UnicodeError, ValueError) as err:
         raise VideoNotesError(f"Uszkodzony JSON w archiwum: {name}.") from err
     if not isinstance(value, dict):
@@ -224,7 +239,10 @@ def _verified_entries(archive: Path) -> dict[str, bytes]:
         raise VideoNotesError("Lista plików w manifeście nie zgadza się z zawartością.")
     for name, data in payloads.items():
         info = checks[name]
-        if not isinstance(info, dict) or info.get("sha256") != _digest(data) or info.get("size") != len(data):
+        if (not isinstance(info, dict) or set(info) != {"sha256", "size"}
+                or type(info["size"]) is not int or not isinstance(info["sha256"], str)
+                or not re.fullmatch(r"[a-f0-9]{64}", info["sha256"])
+                or info["sha256"] != _digest(data) or info["size"] != len(data)):
             raise VideoNotesError("Kontrola integralności SHA-256 archiwum nie powiodła się.")
     return payloads
 
