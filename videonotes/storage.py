@@ -5,10 +5,34 @@ import json
 import os
 import tempfile
 from pathlib import Path
+from collections.abc import Iterable
 from typing import Any
 
 from .contracts import validate_project, validate_transcript, validate_edits, empty_edits
 from .errors import VideoNotesError
+
+
+def checked_export_paths(folder: Path, names: Iterable[str]) -> dict[str, Path]:
+    """Preflight all selected local export targets before overwriting any.
+
+    Reject accidental symlinks and Windows junctions outside the project.
+    This is a same-process safety check, not a security guarantee against a
+    hostile actor replacing directories during filesystem operations.
+    """
+    root = Path(folder) / "exports"
+    if (root.is_symlink() or getattr(root, "is_junction", lambda: False)()
+            or (root.exists() and not root.is_dir())):
+        raise VideoNotesError("Katalog eksportu nie może być dowiązaniem ani innym plikiem.")
+    targets: dict[str, Path] = {}
+    for name in names:
+        if (not isinstance(name, str) or not name or name in {".", ".."}
+                or Path(name).name != name or "/" in name or "\\" in name):
+            raise VideoNotesError("Nieprawidłowa nazwa pliku eksportu.")
+        target = root / name
+        if target.is_symlink() or (target.exists() and not target.is_file()):
+            raise VideoNotesError("Docelowy plik eksportu jest dowiązaniem lub katalogiem.")
+        targets[name] = target
+    return targets
 
 
 def atomic_write(path: Path, data: bytes) -> None:

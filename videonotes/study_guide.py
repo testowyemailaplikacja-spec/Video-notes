@@ -15,7 +15,7 @@ from .advanced_notes import _category, _clock
 from .contracts import sha256_file
 from .errors import VideoNotesError
 from .notes import _hash, _select, _source, _tokens
-from .storage import atomic_write, read_project, load_json
+from .storage import atomic_write, checked_export_paths, read_project, load_json
 
 SCHEMA = "videonotes-study-guide-v1"
 DETAIL_LIMITS = {"brief": 3, "standard": 6, "full": 12}
@@ -211,6 +211,12 @@ def export_study_guide(folder: Path, *, section_minutes: int = 5,
             "Transkrypcja lub ręczne poprawki zmieniły się podczas eksportu; "
             "nie nadpisano wcześniejszego przewodnika."
         )
+    required = ["notes-study.md", "notes-study.json"]
+    if include_docx:
+        required.append("notes-study.docx")
+    if include_pdf:
+        required.append("notes-study.pdf")
+    checked_export_paths(folder, required)
     atomic_write(markdown, md_bytes)
     atomic_write(structured, json_bytes)
     result = [markdown, structured]

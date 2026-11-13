@@ -9,7 +9,7 @@ from pathlib import Path
 from .errors import VideoNotesError
 from .contracts import sha256_file
 from .notes import STOPWORDS, _hash, _select, _source
-from .storage import atomic_write, read_project, load_json
+from .storage import atomic_write, checked_export_paths, read_project, load_json
 
 SCHEMA = "videonotes-source-outline-v1"
 TEMPLATES = {
@@ -240,6 +240,7 @@ def export_advanced_outline(folder: Path, *, template: str = "lecture", detail: 
                             include_pdf: bool = False, office: str = "libreoffice") -> tuple[Path, ...]:
     folder = Path(folder)
     outline = build_advanced_outline(folder, template=template, detail=detail, section_minutes=section_minutes)
+    # Paths are checked again after rendering, before the first write.
     markdown = folder / "exports" / "notes-advanced.md"
     structured = folder / "exports" / "notes-advanced.json"
     # Pre-render/validate every requested format before replacing ANY older
@@ -264,6 +265,12 @@ def export_advanced_outline(folder: Path, *, template: str = "lecture", detail: 
             "Transkrypcja lub poprawki zmieniły się podczas tworzenia konspektu; "
             "nie nadpisano wcześniejszych plików."
         )
+    required = ["notes-advanced.md", "notes-advanced.json"]
+    if include_docx:
+        required.append("notes-advanced.docx")
+    if pdf_content is not None:
+        required.append("notes-advanced.pdf")
+    checked_export_paths(folder, required)
     atomic_write(markdown, markdown_content)
     atomic_write(structured, json_content)
     paths = [markdown, structured]

@@ -13,7 +13,7 @@ from pathlib import Path
 
 from .errors import VideoNotesError
 from .media import executable
-from .storage import atomic_write
+from .storage import atomic_write, checked_export_paths
 
 MAX_DOCX_BYTES = 64 * 1024 * 1024
 MAX_PDF_BYTES = 64 * 1024 * 1024
@@ -68,6 +68,6 @@ def export_basic_notes_pdf(folder: Path, *, office: str = "libreoffice") -> Path
             "Notatki lub ręczne poprawki zmieniły się podczas tworzenia PDF; "
             "nie nadpisano poprzedniego dokumentu."
         )
-    target = Path(folder) / "exports" / "notes-basic.pdf"
+    target = checked_export_paths(folder, ["notes-basic.pdf"])["notes-basic.pdf"]
     atomic_write(target, content)
     return target
