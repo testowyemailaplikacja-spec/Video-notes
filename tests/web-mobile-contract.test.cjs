@@ -73,6 +73,14 @@ test("desktop, mobile and browser reject the same malformed source fields", () =
   }
 });
 
+test("BOM-prefixed local UTF-8 export has identical Python and browser meaning", () => {
+  const raw = String.fromCharCode(0xFEFF) + JSON.stringify(documentFixture());
+  const browser = core.parseExport(raw);
+  const python = pythonParse(raw);
+  assert.equal(python.status, 0, python.stderr);
+  assert.deepEqual(JSON.parse(python.stdout), browser);
+});
+
 test("both parsers accept extra metadata but strip it from canonical result", () => {
   const model = documentFixture();
   model.segments[0].debug = "PRIVATE_UNUSED";
