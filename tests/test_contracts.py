@@ -157,8 +157,13 @@ class ContractTest(unittest.TestCase):
             json_data = json.loads(exported["transcript.json"])["segments"]
             self.assertTrue(txt.startswith(corrected + "\n"))
             self.assertEqual(json_data[0]["text"], corrected)
-            self.assertIn("Poprawka z wcięciem i spacją", exported["transcript.srt"].decode("utf-8"))
-            self.assertIn("Poprawka z wcięciem i spacją", exported["transcript.vtt"].decode("utf-8"))
+            srt = exported["transcript.srt"].decode("utf-8")
+            vtt = exported["transcript.vtt"].decode("utf-8")
+            for subtitle in (srt, vtt):
+                self.assertIn("Poprawka", subtitle)
+                self.assertIn("z wcięciem i spacją", subtitle)
+                # A multiline correction must not become an extra subtitle cue.
+                self.assertNotIn("  z wcięciem i spacją\\n\\n", subtitle)
             self.assertEqual(read_project(root)[1], demo_transcript())
 
     def test_wrong_edits_cannot_override_unknown_segments(self):
