@@ -144,6 +144,24 @@ class ContractTest(unittest.TestCase):
             self.assertEqual(len(export_project(root)), 4)
             self.assertEqual(read_project(root)[1], raw)
 
+    def test_txt_json_preserve_manual_whitespace_and_subtitles_remain_safe(self):
+        import json
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            save_json(root / "project.json", demo_project())
+            save_json(root / "transcript.json", demo_transcript())
+            corrected = "  Poprawka\\n\\n  z wcięciem i spacją  "
+            corrected = corrected.replace("\\n", "\n")
+            edit_segment(root, "c0000000-s00000", corrected)
+            export = render_exports(root)
+            txt = export["transcript.txt"].decode("utf-8")
+            json_data = json.loads(export["transcript.json"])["segments"]
+            self.assertTrue(txt.startswith(corrected + "\n"))
+            self.assertEqual(json_data[0]["text"], corrected)
+            self.assertIn("Poprawka z wcięciem i spacją", export["transcript.srt"].decode("utf-8"))
+            self.assertIn("Poprawka z wcięciem i spacją", export["transcript.vtt"].decode("utf-8"))
+            self.assertEqual(read_project(root)[1], demo_transcript())
+
     def test_wrong_edits_cannot_override_unknown_segments(self):
         with self.assertRaises(VideoNotesError):
             validate_edits({"schema": "videonotes-edits-v1", "edits": {"phantom": "fake"}}, demo_transcript())
