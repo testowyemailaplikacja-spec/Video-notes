@@ -12,9 +12,33 @@ from io import StringIO
 
 from videonotes.cli import main
 from videonotes.diagnostics import diagnose_local_install
+from videonotes.errors import VideoNotesError
 
 
 class DiagnosticsTest(unittest.TestCase):
+    def test_real_process_large_stdout_stderr_do_not_enter_memory_report(self):
+        import subprocess
+        import sys
+        from videonotes.diagnostics import _bounded_tool_response, MAX_TOOL_REPORT_BYTES
+        secret = "PRIVATE_AUDIO_PATH"
+        for output in ("stdout", "stderr"):
+            code = ("import sys; sys." + output +
+                    ".write(" + repr(secret) + " * " +
+                    str(MAX_TOOL_REPORT_BYTES // len(secret) + 10) + ")")
+            with self.subTest(output=output), self.assertRaisesRegex(VideoNotesError, "nadmierny raport") as raised:
+                _bounded_tool_response([sys.executable, "-c", code],
+                                       runner=subprocess.run, timeout=15)
+            self.assertNotIn(secret, str(raised.exception))
+
+    def test_diagnostic_fails_closed_on_injected_overlong_version_or_malformed_version(self):
+        from videonotes.diagnostics import _tool_status, MAX_TOOL_REPORT_BYTES
+        with patch("videonotes.diagnostics.executable", return_value="ffmpeg"):
+            malicious = lambda args, **kw: CompletedProcess(args, 0, "ffmpeg version " + "x" * (MAX_TOOL_REPORT_BYTES + 1), "")
+            result = _tool_status("ffmpeg", "ffmpeg", runner=malicious)
+            self.assertEqual(result, {"state": "missing_or_failed", "version": None})
+            injected = lambda args, **kw: CompletedProcess(args, 0, "ffmpeg version /private/path\\n", "")
+            self.assertEqual(_tool_status("ffmpeg", "ffmpeg", runner=injected)["state"], "unverified")
+
     def test_no_inputs_report_uncertainty_without_claiming_a_release(self):
         def absent(*args, **kwargs):
             return CompletedProcess(args[0], 1, "", "unknown")
