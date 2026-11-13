@@ -92,7 +92,7 @@ class WebCorrectionsTest(unittest.TestCase):
     def test_utf8_bom_patch_import_keeps_raw_transcript_unchanged(self):
         self.patch()
         raw = (self.project / "transcript.json").read_bytes()
-        self.patchfile.write_bytes(b"\\xef\\xbb\\xbf" + self.patchfile.read_bytes())
+        self.patchfile.write_bytes(b"\xef\xbb\xbf" + self.patchfile.read_bytes())
         preview = import_web_corrections(self.project, self.patchfile)
         self.assertEqual(preview["changed"], 1)
         applied = import_web_corrections(self.project, self.patchfile, apply=True)
