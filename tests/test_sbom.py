@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from videonotes.bundle import create_internal_bundle
 from videonotes.cli import main
@@ -31,6 +32,22 @@ class InternalSbomTest(unittest.TestCase):
         self.bundle = self.root / "private-bundle"
         create_internal_bundle(**self.inputs, output=self.bundle, internal_only=True)
         self.output = self.root / "internal-sbom.json"
+
+    def test_changed_manifest_during_sbom_creation_is_rejected(self):
+        from videonotes.sbom import _read_bundle_manifest as normal_read
+        calls = []
+        def changing_report(root):
+            data = normal_read(root)
+            calls.append(True)
+            if len(calls) == 2:
+                changed = json.loads(json.dumps(data))
+                changed["distribution"] = "tampered"
+                return changed
+            return data
+        with patch("videonotes.sbom._read_bundle_manifest", side_effect=changing_report):
+            with self.assertRaisesRegex(VideoNotesError, "Manifest pakietu zmienił"):
+                create_internal_sbom(self.bundle, self.output)
+        self.assertFalse(self.output.exists())
 
     def test_spdx_manifest_lists_only_verified_components_with_unknown_licenses(self):
         result = create_internal_sbom(self.bundle, self.output)

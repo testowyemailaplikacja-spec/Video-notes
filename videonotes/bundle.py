@@ -70,18 +70,28 @@ def _unique_object(pairs: list[tuple[str, object]]) -> dict:
     return result
 
 
+def _read_bundle_manifest(root: Path) -> dict:
+    """Bound the actual read of a potentially changing manifest; reject ambiguity."""
+    manifest_path = root / "bundle-manifest.json"
+    try:
+        if (manifest_path.is_symlink() or not manifest_path.is_file()
+                or manifest_path.stat().st_size > 65536):
+            raise VideoNotesError("Brak poprawnego manifestu integralności pakietu.")
+        with manifest_path.open("rb") as source:
+            raw = source.read(65537)
+        if len(raw) > 65536 or manifest_path.is_symlink():
+            raise VideoNotesError("Manifest pakietu przekroczył limit podczas odczytu.")
+        return json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_object)
+    except (OSError, UnicodeError, ValueError) as error:
+        raise VideoNotesError("Manifest pakietu ma uszkodzony format JSON.") from error
+
+
 def verify_internal_bundle(folder: Path) -> dict:
     """Verify every local component before GUI start. This is NOT a signature check."""
     root = Path(folder).expanduser()
     if root.is_symlink() or not root.is_dir():
         raise VideoNotesError("Nie znaleziono zwykłego katalogu pakietu.")
-    manifest_path = root / "bundle-manifest.json"
-    if manifest_path.is_symlink() or not manifest_path.is_file() or manifest_path.stat().st_size > 65536:
-        raise VideoNotesError("Brak poprawnego manifestu integralności pakietu.")
-    try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"), object_pairs_hook=_unique_object)
-    except (OSError, UnicodeError, ValueError) as error:
-        raise VideoNotesError("Manifest pakietu ma uszkodzony format JSON.") from error
+    manifest = _read_bundle_manifest(root)
 
     expected_keys = {"schema", "distribution", "license_verified", "hardware_tested",
                      "signature_verified", "dependencies_auto_downloaded", "files"}

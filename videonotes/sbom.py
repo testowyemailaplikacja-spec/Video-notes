@@ -12,7 +12,7 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .bundle import BUNDLE_FILES, verify_internal_bundle
+from .bundle import BUNDLE_FILES, _read_bundle_manifest, verify_internal_bundle
 from .errors import VideoNotesError
 
 
@@ -32,7 +32,7 @@ def create_internal_sbom(bundle: Path, output: Path) -> dict:
     else:
         raise VideoNotesError("Raport SBOM trzeba zapisać poza chronionym katalogiem pakietu.")
 
-    manifest = json.loads((root / "bundle-manifest.json").read_text(encoding="utf-8"))
+    manifest = _read_bundle_manifest(root)
     files = []
     relations = []
     for index, name in enumerate(sorted(BUNDLE_FILES), 1):
@@ -72,6 +72,8 @@ def create_internal_sbom(bundle: Path, output: Path) -> dict:
     payload = (json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
     # Reject changed or corrupted binaries immediately before publication.
     verify_internal_bundle(root)
+    if _read_bundle_manifest(root) != manifest:
+        raise VideoNotesError("Manifest pakietu zmienił się podczas tworzenia SBOM.")
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = None
     try:
