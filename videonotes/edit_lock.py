@@ -13,6 +13,7 @@ from typing import Iterator
 
 from .errors import VideoNotesError
 from .pipeline import _process_state
+from .lock_content import read_bounded_lock
 from .storage import read_project
 
 LOCK_NAME = ".transcript-edits.lock"
@@ -85,7 +86,9 @@ def transcript_edit_lock_status(folder: Path) -> dict:
     try:
         if path.stat().st_size > 80:
             return {"state": "invalid"}
-        payload = path.read_bytes()
+        payload = read_bounded_lock(path)
+    except VideoNotesError:
+        return {"state": "invalid"}
     except OSError:
         return {"state": "unknown"}
     found = PID_BYTES.fullmatch(payload)
@@ -104,7 +107,7 @@ def recover_stale_transcript_edit_lock(folder: Path, *, confirm: bool = False) -
     path = root / LOCK_NAME
     try:
         before = path.lstat()
-        payload = path.read_bytes()
+        payload = read_bounded_lock(path)
     except OSError as error:
         raise VideoNotesError("Nie znaleziono blokady poprawek.") from error
     status = transcript_edit_lock_status(root)
@@ -114,7 +117,7 @@ def recover_stale_transcript_edit_lock(folder: Path, *, confirm: bool = False) -
         after = path.lstat()
         if (not _same_lock(path, before) or
                 before.st_mtime_ns != after.st_mtime_ns or
-                before.st_size != after.st_size or payload != path.read_bytes()):
+                before.st_size != after.st_size or payload != read_bounded_lock(path)):
             raise VideoNotesError("Blokada poprawek zmieniła się podczas kontroli.")
     except OSError as error:
         raise VideoNotesError("Nie można bezpiecznie sprawdzić blokady poprawek.") from error
