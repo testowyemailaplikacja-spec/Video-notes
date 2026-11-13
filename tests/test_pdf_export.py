@@ -29,6 +29,38 @@ class PDFOfflineTest(unittest.TestCase):
         fixture(self.root)
         generate_basic_notes(self.root)
 
+    def test_cli_basic_multi_format_pdf_failure_after_render_never_publishes_any_file(self):
+        from videonotes.notes import export_basic_notes_bundle
+        exports = self.root / "exports"
+        exports.mkdir()
+        names = ("notes-basic.md", "notes-basic.txt", "notes-basic.docx", "notes-basic.pdf")
+        previous = {name: b"OLDER" for name in names}
+        for name, value in previous.items():
+            (exports / name).write_bytes(value)
+        notes, _ = read_basic_notes(self.root)
+        point = notes["sections"][0]["points"][0]["id"]
+        def change_while_converting(docx, *, office):
+            edit_note_point(self.root, point, "Nowa uwaga w trakcie konwersji")
+            return PDF
+        with patch("videonotes.pdf_export.render_pdf_from_docx",
+                   side_effect=change_while_converting):
+            with self.assertRaisesRegex(VideoNotesError, "zmieniły się"):
+                export_basic_notes_bundle(self.root, include_txt=True,
+                                          include_docx=True, include_pdf=True)
+        self.assertEqual({p.name: p.read_bytes() for p in exports.iterdir()},
+                         previous)
+
+    def test_cli_basic_multi_format_pdf_success_emits_consistent_selected_files(self):
+        from videonotes.notes import export_basic_notes_bundle
+        with patch("videonotes.pdf_export.render_pdf_from_docx", return_value=PDF):
+            results = export_basic_notes_bundle(self.root, include_txt=True,
+                                                include_docx=True, include_pdf=True)
+        self.assertEqual([p.name for p in results],
+                         ["notes-basic.md", "notes-basic.txt",
+                          "notes-basic.docx", "notes-basic.pdf"])
+        self.assertEqual((self.root / "exports/notes-basic.pdf").read_bytes(), PDF)
+        self.assertIn("Źródło", (self.root / "exports/notes-basic.md").read_text("utf-8"))
+
     def test_basic_pdf_failure_never_overwrites_reviewed_files_or_creates_partial_output(self):
         exports = self.root / "exports"
         exports.mkdir()
