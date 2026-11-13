@@ -150,16 +150,15 @@ class ContractTest(unittest.TestCase):
             root = Path(folder)
             save_json(root / "project.json", demo_project())
             save_json(root / "transcript.json", demo_transcript())
-            corrected = "  Poprawka\\n\\n  z wcięciem i spacją  "
-            corrected = corrected.replace("\\n", "\n")
+            corrected = "  Poprawka\n\n  z wcięciem i spacją  "
             edit_segment(root, "c0000000-s00000", corrected)
-            export = render_exports(root)
-            txt = export["transcript.txt"].decode("utf-8")
-            json_data = json.loads(export["transcript.json"])["segments"]
+            exported = render_exports(root)
+            txt = exported["transcript.txt"].decode("utf-8")
+            json_data = json.loads(exported["transcript.json"])["segments"]
             self.assertTrue(txt.startswith(corrected + "\n"))
             self.assertEqual(json_data[0]["text"], corrected)
-            self.assertIn("Poprawka z wcięciem i spacją", export["transcript.srt"].decode("utf-8"))
-            self.assertIn("Poprawka z wcięciem i spacją", export["transcript.vtt"].decode("utf-8"))
+            self.assertIn("Poprawka z wcięciem i spacją", exported["transcript.srt"].decode("utf-8"))
+            self.assertIn("Poprawka z wcięciem i spacją", exported["transcript.vtt"].decode("utf-8"))
             self.assertEqual(read_project(root)[1], demo_transcript())
 
     def test_wrong_edits_cannot_override_unknown_segments(self):
