@@ -61,6 +61,62 @@ class BasicNotesExportSnapshotTest(unittest.TestCase):
                 export_basic_notes_docx(self.folder)
         self.assertEqual(destination.read_bytes(), b"PREVIOUS APPROVED DOCX")
 
+    def test_basic_exports_refuse_directory_symlink_or_target_symlink(self):
+        from videonotes.pdf_export import export_basic_notes_pdf
+        self.exports.rmdir()
+        with tempfile.TemporaryDirectory() as outside:
+            destination = Path(outside)
+            unrelated = destination / "notes-basic.md"
+            unrelated.write_bytes(b"PRIVATE OTHER PROJECT")
+            try:
+                self.exports.symlink_to(destination, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest("Symlinks unavailable on filesystem")
+            with self.assertRaisesRegex(VideoNotesError, "Katalog eksportu"):
+                export_basic_notes(self.folder)
+            with self.assertRaisesRegex(VideoNotesError, "Katalog eksportu"):
+                export_basic_notes_text(self.folder)
+            with self.assertRaisesRegex(VideoNotesError, "Katalog eksportu"):
+                export_basic_notes_docx(self.folder)
+            with patch("videonotes.pdf_export.render_pdf_from_docx", return_value=b"%PDF-1.5\\n%%EOF"):
+                with self.assertRaisesRegex(VideoNotesError, "Katalog eksportu"):
+                    export_basic_notes_pdf(self.folder)
+            self.assertEqual(unrelated.read_bytes(), b"PRIVATE OTHER PROJECT")
+        self.exports.unlink()
+        self.exports.mkdir()
+        protected = self.folder / "other-notes.txt"
+        protected.write_bytes(b"ORIGINAL OTHER FILE")
+        alias = self.exports / "notes-basic.md"
+        alias.symlink_to(protected)
+        with self.assertRaisesRegex(VideoNotesError, "Docelowy plik eksportu"):
+            export_basic_notes(self.folder)
+        self.assertEqual(protected.read_bytes(), b"ORIGINAL OTHER FILE")
+
+    def test_multi_format_export_checks_all_targets_before_first_write(self):
+        from videonotes.advanced_notes import export_advanced_outline
+        from videonotes.study_guide import export_study_guide
+        protected = self.folder / "do-not-change.txt"
+        protected.write_bytes(b"SECRET")
+        for second_target, first_target, action in (
+            ("notes-advanced.json", "notes-advanced.md",
+             lambda: export_advanced_outline(self.folder)),
+            ("notes-study.json", "notes-study.md",
+             lambda: export_study_guide(self.folder)),
+        ):
+            with self.subTest(target=second_target):
+                existing = self.exports / first_target
+                existing.write_bytes(b"PREVIOUS REVIEWED")
+                link = self.exports / second_target
+                try:
+                    link.symlink_to(protected)
+                except (OSError, NotImplementedError):
+                    self.skipTest("Symlinks unavailable on filesystem")
+                with self.assertRaisesRegex(VideoNotesError, "Docelowy plik eksportu"):
+                    action()
+                self.assertEqual(existing.read_bytes(), b"PREVIOUS REVIEWED")
+                self.assertEqual(protected.read_bytes(), b"SECRET")
+                link.unlink()
+
     def test_stable_exports_still_work_without_manual_edit(self):
         paths = [export_basic_notes(self.folder),
                  export_basic_notes_text(self.folder),
