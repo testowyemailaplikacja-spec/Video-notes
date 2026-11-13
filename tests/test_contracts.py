@@ -109,6 +109,23 @@ class ContractTest(unittest.TestCase):
             with self.subTest(change=change), self.assertRaises(VideoNotesError):
                 validate_transcript(t, demo_project())
 
+    def test_raw_segment_duplicates_only_rejected_at_identical_time(self):
+        project = demo_project()
+        transcript = demo_transcript()
+        repeated = dict(transcript["segments"][0])
+        repeated.update(id="c0000000-s00099")
+        transcript["segments"].insert(1, repeated)
+        with self.assertRaisesRegex(VideoNotesError, "zdublowaną wypowiedź"):
+            validate_transcript(transcript, project)
+        transcript["segments"][1]["text"] = "To oddzielna wypowiedź w tym samym czasie"
+        self.assertEqual(len(validate_transcript(transcript, project)["segments"]), 3)
+        transcript["segments"][1].update(start_ms=501, end_ms=900,
+                                         text=transcript["segments"][0]["text"])
+        self.assertEqual(len(validate_transcript(transcript, project)["segments"]), 3)
+        # Text that repeats later in a lecture is not a duplicate.
+        transcript["segments"][1]["text"] = transcript["segments"][0]["text"]
+        self.assertEqual(transcript["segments"][1]["start_ms"], 501)
+
     def test_edits_are_separate_and_exports_support_unicode(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
