@@ -153,20 +153,16 @@ class PDFOfflineTest(unittest.TestCase):
             self.assertEqual(unrelated.read_bytes(), PDF)
 
     def test_local_converter_growing_pdf_rejected_by_actual_bounded_read(self):
-        from videonotes import pdf_export
         source = b"PK\x03\x04" + b"x" * 200
-        real_stat = Path.stat
-        checked = []
-        def grow_after_stat(path, *args, **kwargs):
-            result = real_stat(path, *args, **kwargs)
-            if Path(path).name == "document.pdf":
-                checked.append(True)
-                if len(checked) == 2:
-                    # stat() returned the old, apparently safe length.
-                    # Simulate a child process appending AFTER the check.
-                    with Path(path).open("r+b") as stream:
-                        stream.seek(1500)
-                        stream.write(b"MORE CONTENT")
+        original_open = Path.open
+        changed = []
+        def grow_when_pdf_is_opened(path, mode="r", *args, **kwargs):
+            result = original_open(path, mode, *args, **kwargs)
+            if Path(path).name == "document.pdf" and mode == "rb":
+                # PDF was short at stat(), now exceeds the configured limit.
+                with original_open(path, "ab") as writer:
+                    writer.write(b"G" * 1100)
+                changed.append(True)
             return result
         def original_result(args, **kw):
             target = Path(args[args.index("--outdir") + 1]) / "document.pdf"
@@ -175,11 +171,11 @@ class PDFOfflineTest(unittest.TestCase):
         with patch("videonotes.pdf_export.MAX_PDF_BYTES", 1024), patch(
             "videonotes.pdf_export.executable", return_value="office"
         ), patch("videonotes.pdf_export.subprocess.run", side_effect=original_result), patch(
-            "pathlib.Path.stat", new=grow_after_stat
+            "pathlib.Path.open", new=grow_when_pdf_is_opened
         ):
             with self.assertRaisesRegex(VideoNotesError, "przekroczył limit"):
                 render_pdf_from_docx(source)
-        self.assertGreaterEqual(len(checked), 2)
+        self.assertEqual(changed, [True])
 
     def test_broken_or_missing_pdf_result_fails_closed(self):
         data = b"PK\x03\x04" + b"x" * 500
@@ -194,7 +190,7 @@ class PDFOfflineTest(unittest.TestCase):
         with patch("videonotes.pdf_export.executable", return_value="/tmp/office"), \
              patch("videonotes.pdf_export.subprocess.run",
                    return_value=subprocess.CompletedProcess(["/tmp/office"], 0)):
-            with self.assertRaisesRegex(VideoNotesError, "Nie udało"):
+            with self.assertRaisesRegex(VideoNotesError, "nie utworzył"):
                 render_pdf_from_docx(data)
 
     def test_cli_pdf_options_and_default_unchanged_with_simulated_conversion(self):
