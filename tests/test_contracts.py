@@ -126,6 +126,41 @@ class ContractTest(unittest.TestCase):
         transcript["segments"][1]["text"] = transcript["segments"][0]["text"]
         self.assertEqual(transcript["segments"][1]["start_ms"], 501)
 
+    def test_edit_conflict_does_not_overwrite_another_editor(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            save_json(root / "project.json", demo_project())
+            save_json(root / "transcript.json", demo_transcript())
+            sid = "c0000000-s00000"
+            raw_text = "Zażółć gęślą"
+            edit_segment(root, sid, "Pierwsza poprawka", expected_text=raw_text)
+            previous = (root / "edits.json").read_bytes()
+            with self.assertRaisesRegex(VideoNotesError, "Konflikt edycji"):
+                edit_segment(root, sid, "Nadpisanie z nieaktualnego okna",
+                             expected_text=raw_text)
+            self.assertEqual((root / "edits.json").read_bytes(), previous)
+            self.assertEqual(read_project(root)[2]["edits"][sid], "Pierwsza poprawka")
+            edit_segment(root, sid, "Pierwsza poprawka",
+                         expected_text="Pierwsza poprawka")
+            self.assertEqual((root / "edits.json").read_bytes(), previous)
+            edit_segment(root, sid, raw_text, expected_text="Pierwsza poprawka")
+            self.assertEqual(read_project(root)[2]["edits"], {})
+            self.assertEqual(read_project(root)[1], demo_transcript())
+
+    def test_edit_conflict_does_not_mutate_unrelated_web_corrections(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            save_json(root / "project.json", demo_project())
+            save_json(root / "transcript.json", demo_transcript())
+            a = "c0000000-s00000"
+            b = "c0000002-s00000"
+            edit_segment(root, b, "Poprawka WWW", expected_text="jaźń.")
+            edit_segment(root, a, "Nowy tekst", expected_text="Zażółć gęślą")
+            self.assertEqual(read_project(root)[2]["edits"][b], "Poprawka WWW")
+            with self.assertRaisesRegex(VideoNotesError, "Konflikt edycji"):
+                edit_segment(root, b, "Przestarzały tekst", expected_text="jaźń.")
+            self.assertEqual(read_project(root)[2]["edits"][b], "Poprawka WWW")
+
     def test_edits_are_separate_and_exports_support_unicode(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

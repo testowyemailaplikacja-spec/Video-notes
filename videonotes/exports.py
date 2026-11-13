@@ -28,15 +28,38 @@ def _cue_text(text: str, *, vtt: bool = False) -> str:
     return line
 
 
-def edit_segment(folder: Path, segment_id: str, updated: str) -> None:
+def edit_segment(folder: Path, segment_id: str, updated: str, *,
+                 expected_text: str | None = None) -> None:
+    """Edit a segment with optional optimistic conflict detection.
+
+    A GUI passes the exact text originally loaded into its editor. Without
+    this check another editor or browser import could update the same segment
+    while the user is typing, and an older GUI window would overwrite it.
+    Existing CLI callers may omit expected_text for an explicit unconditional edit.
+    """
     if not isinstance(updated, str) or len(updated) > 10000 or "\x00" in updated:
         raise VideoNotesError("Nieprawidłowa poprawka transkrypcji.")
+    if expected_text is not None and (not isinstance(expected_text, str)
+                                     or len(expected_text) > 10000 or "\x00" in expected_text):
+        raise VideoNotesError("Nieprawidłowy warunek poprzedniej wersji poprawki.")
     # Both GUI/manual changes and browser patch imports serialize reads+writes.
     with transcript_edit_lock(folder):
         project, transcript, edits = read_project(folder)
-        if segment_id not in {segment["id"] for segment in transcript["segments"]}:
+        segments = {segment["id"]: segment for segment in transcript["segments"]}
+        if segment_id not in segments:
             raise VideoNotesError("Nie znaleziono segmentu do poprawienia.")
-        edits["edits"][segment_id] = updated
+        current = edits["edits"].get(segment_id, segments[segment_id]["text"])
+        if expected_text is not None and current != expected_text:
+            raise VideoNotesError(
+                "Konflikt edycji: ten fragment został zmieniony w innym oknie lub przez import WWW. "
+                "Skopiuj niezapisany tekst i odśwież projekt; niczego nie nadpisano."
+            )
+        if updated == current:
+            return  # Do not touch edits.json for a no-op save.
+        if updated == segments[segment_id]["text"]:
+            edits["edits"].pop(segment_id, None)
+        else:
+            edits["edits"][segment_id] = updated
         save_json(Path(folder) / "edits.json", edits)
 
 

@@ -52,6 +52,7 @@ class VideoNotesWindow:
         self.mic_controls: dict = {}
         self._rows: dict[str, dict] = {}
         self._current_segment_id: str | None = None
+        self._selected_original_text: str | None = None
         self._loaded_project_path: Path | None = None
         self._build()
         self.root.protocol("WM_DELETE_WINDOW", self._on_app_close)
@@ -737,7 +738,12 @@ class VideoNotesWindow:
         except VideoNotesError:
             # If the project changed on disk, refuse to silently destroy draft.
             return True
-        original = edits["edits"].get(key, self._rows[key]["text"])
+        # A separate process may already have changed this segment. Draft
+        # detection must compare the editor to what was originally displayed,
+        # not to the newer disk value: otherwise _load silently drops work.
+        original = self._selected_original_text
+        if original is None:
+            return True
         return self.edit_text.get("1.0", "end-1c") != original
 
     def _load(self, silent: bool = False, *, force: bool = False) -> bool:
@@ -754,6 +760,7 @@ class VideoNotesWindow:
             folder = Path(self.project.get()).resolve()
             _project, transcript, edits = read_project(folder)
             self._current_segment_id = None
+            self._selected_original_text = None
             self._loaded_project_path = folder
             self.segments.delete(*self.segments.get_children())
             self._rows.clear()
@@ -797,6 +804,7 @@ class VideoNotesWindow:
             messagebox.showwarning("Transkrypcja", "Nie można otworzyć wybranego źródła; sprawdź projekt.")
             return
         self._current_segment_id = key
+        self._selected_original_text = value
         self.edit_text.delete("1.0", "end")
         self.edit_text.insert("1.0", value)
 
@@ -916,9 +924,18 @@ class VideoNotesWindow:
             messagebox.showinfo("Video Notes", "Zaznacz segment.")
             return
         try:
-            edit_segment(Path(self.project.get()), selection[0], self.edit_text.get("1.0", "end-1c"))
+            if (selection[0] != self._current_segment_id
+                    or self._loaded_project_path != Path(self.project.get()).resolve()
+                    or self._selected_original_text is None):
+                raise VideoNotesError("Edytor nie odpowiada otwartemu segmentowi. Otwórz go ponownie.")
+            edit_segment(Path(self.project.get()), selection[0],
+                         self.edit_text.get("1.0", "end-1c"),
+                         expected_text=self._selected_original_text)
             export_project(Path(self.project.get()))
-            self._load(silent=True)
+            # The pending editor draft has just been committed. A regular
+            # reload would still compare it to the old baseline and refuse
+            # to update the view, leaving a stale CAS token for the next edit.
+            self._load(silent=True, force=True)
             self.status.set("Poprawkę i eksport zapisano lokalnie.")
         except VideoNotesError as error:
             messagebox.showerror("Video Notes", str(error))

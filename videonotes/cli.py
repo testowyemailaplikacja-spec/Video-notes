@@ -80,6 +80,7 @@ def parser() -> argparse.ArgumentParser:
     edit.add_argument("project", type=Path)
     edit.add_argument("--segment", required=True)
     edit.add_argument("--text", required=True)
+    edit.add_argument("--expected-text", help="Opcjonalnie: oczekiwana poprzednia treść; odrzuć konflikt zamiast nadpisywać")
     status = sub.add_parser("status", help="Pokaż postęp i identyfikatory segmentów")
     status.add_argument("project", type=Path)
     notes = sub.add_parser("notes", help="Utwórz źródłowe, ekstrakcyjne notatki podstawowe (VN-02)")
@@ -341,7 +342,8 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(recover_stale_transcript_edit_lock(
                 args.project, confirm=args.confirm), ensure_ascii=False))
         elif args.action == "edit":
-            edit_segment(args.project, args.segment, args.text)
+            edit_segment(args.project, args.segment, args.text,
+                         expected_text=args.expected_text)
             export_project(args.project)
             print("Poprawka zapisana oddzielnie od surowego wyniku ASR.")
         elif args.action == "export":
