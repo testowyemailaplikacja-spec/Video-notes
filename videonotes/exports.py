@@ -44,8 +44,11 @@ def render_exports(folder: Path) -> dict[str, bytes]:
     project, transcript, edits = read_project(folder)
     segments = []
     for item in transcript["segments"]:
-        corrected = edits["edits"].get(item["id"], item["text"]).strip()
-        if corrected:
+        corrected = edits["edits"].get(item["id"], item["text"])
+        # Empty/whitespace-only corrections omit a cue. Preserve all other
+        # user whitespace verbatim in TXT and JSON, just like the web adapter;
+        # SRT/VTT still normalize line breaks to protect cue boundaries.
+        if corrected.strip():
             segments.append({"id": item["id"], "start_ms": item["start_ms"], "end_ms": item["end_ms"], "text": corrected})
     txt = "\n".join(s["text"] for s in segments) + ("\n" if segments else "")
     srt = "\n\n".join(f"{i}\n{_clock(s['start_ms'])} --> {_clock(s['end_ms'])}\n{_cue_text(s['text'])}" for i, s in enumerate(segments, 1))
