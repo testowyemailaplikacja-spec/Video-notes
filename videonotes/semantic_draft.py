@@ -119,11 +119,27 @@ def _guard_literal_evidence(statement: str, citations: list[str]) -> None:
     if new_identifiers - cited_identifiers:
         raise VideoNotesError("Szkic dodaje nieudokumentowany skrót techniczny; wymaga ręcznego sprawdzenia.")
 
+def _unique_model_fields(pairs: list[tuple[str, object]]) -> dict:
+    """Reject repeated JSON fields even when nested in model-generated claims."""
+    result = {}
+    for name, value in pairs:
+        if name in result:
+            raise VideoNotesError("Lokalny model zwrócił zduplikowany klucz JSON.")
+        result[name] = value
+    return result
+
+
+def _reject_model_constant(_name: str) -> None:
+    raise VideoNotesError("Lokalny model zwrócił liczbę spoza standardu JSON.")
+
+
 def _parse_response(payload: bytes, allowed: dict[str, str], limit: int) -> tuple[str, list[dict]]:
     if len(payload) > MAX_REPLY_BYTES:
         raise VideoNotesError("Odpowiedź lokalnego modelu jest za długa.")
     try:
-        doc = json.loads(payload.decode("utf-8").strip())
+        doc = json.loads(payload.decode("utf-8").strip(),
+                         object_pairs_hook=_unique_model_fields,
+                         parse_constant=_reject_model_constant)
     except (ValueError, UnicodeError) as error:
         raise VideoNotesError("Model nie zwrócił ścisłego JSON; nie zapisano niepewnego szkicu.") from error
     if (not isinstance(doc, dict) or set(doc) != {"heading", "claims"}
@@ -219,9 +235,15 @@ def create_semantic_draft(folder: Path, output: Path, *, model: Path,
                                        shell=False, timeout=timeout_seconds, check=False)
             except (OSError, subprocess.TimeoutExpired) as error:
                 raise VideoNotesError("Lokalny model nie zadziałał lub przekroczył limit czasu. Niczego nie zapisano.") from error
-            if completed.returncode != 0 or response_file.stat().st_size > MAX_REPLY_BYTES:
-                raise VideoNotesError("Lokalny model zwrócił błąd lub nadmierną odpowiedź. Niczego nie zapisano.")
-            heading, proposed = _parse_response(response_file.read_bytes(),
+            if completed.returncode != 0 or response_file.is_symlink():
+                raise VideoNotesError("Lokalny model zwrócił błąd lub niedozwolony plik odpowiedzi.")
+            # The runner can still append after stat(); bound the actual read
+            # so a hostile/crashed local model cannot allocate unlimited RAM.
+            with response_file.open("rb") as reader:
+                reply = reader.read(MAX_REPLY_BYTES + 1)
+            if len(reply) > MAX_REPLY_BYTES or response_file.is_symlink():
+                raise VideoNotesError("Lokalny model zwrócił nadmierną odpowiedź. Niczego nie zapisano.")
+            heading, proposed = _parse_response(reply,
                                                 {row["id"]: row["text"] for row in excerpts}, claim_limit)
             claims = []
             for n, item in enumerate(proposed):
