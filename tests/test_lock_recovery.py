@@ -100,12 +100,12 @@ class StaleLockTest(unittest.TestCase):
         self.assertFalse((self.project / ".processing.lock").exists())
 
     def test_oversized_or_growing_processing_lock_is_not_recovered(self):
-        self.lock.write_bytes(b"pid=12345\\n" + b"Z" * 1024)
+        self.lock.write_bytes(b"pid=12345\n" + b"Z" * 1024)
         self.assertEqual(transcription_lock_status(self.project)["state"], "invalid")
         with self.assertRaises(VideoNotesError):
             recover_stale_transcription_lock(self.project, confirm=True)
         self.assertTrue(self.lock.exists())
-        self.lock.write_bytes(b"pid=12345\\n")
+        self.lock.write_bytes(b"pid=12345\n")
         original_open = Path.open
         changed = []
         def grow_on_read(path, *args, **kwargs):
