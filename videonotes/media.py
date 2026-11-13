@@ -99,7 +99,9 @@ def probe(source: Path, ffprobe: str = "ffprobe") -> dict:
             index = item.get("index")
             if type(index) is not int or not 0 <= index <= 1023 or index in indices:
                 raise ValueError("duplicate or invalid stream index")
-            channels = item.get("channels") or 0
+            channels = item.get("channels", 0)
+            if channels is None:
+                channels = 0
             if type(channels) is not int or not 0 <= channels <= 64:
                 raise ValueError("invalid channel count")
             tags = item.get("tags", {})
