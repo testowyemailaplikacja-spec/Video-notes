@@ -78,6 +78,54 @@ class BackupTest(unittest.TestCase):
                 restore_backup(bad, root / "target")
             self.assertFalse((root / "target").exists())
 
+    def test_recomputed_zip_sha_does_not_authorize_duplicate_json_keys(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            project = root / "working"
+            fixture(project)
+            source = create_backup(project, root / "original.vnproj")
+            with zipfile.ZipFile(source) as archive:
+                payloads = {name: archive.read(name) for name in archive.namelist()}
+            raw = payloads["transcript.json"].decode("utf-8")
+            duplicated = raw.replace('"project_id": "notes-project"',
+                                     '"project_id": "notes-project", "project_id": "other"', 1)
+            self.assertNotEqual(duplicated, raw)
+            payloads["transcript.json"] = duplicated.encode("utf-8")
+            manifest = json.loads(payloads["archive-manifest.json"])
+            manifest["files"]["transcript.json"]["sha256"] = hashlib.sha256(payloads["transcript.json"]).hexdigest()
+            manifest["files"]["transcript.json"]["size"] = len(payloads["transcript.json"])
+            payloads["archive-manifest.json"] = json.dumps(manifest).encode("utf-8")
+            forged = root / "forged.vnproj"
+            with zipfile.ZipFile(forged, "w") as archive:
+                for name, body in payloads.items():
+                    archive.writestr(name, body)
+            with self.assertRaisesRegex(VideoNotesError, "powielony klucz"):
+                restore_backup(forged, root / "restored")
+            self.assertFalse((root / "restored").exists())
+
+    def test_nonstandard_json_and_boolean_manifest_size_rejected(self):
+        from videonotes.backup import _decode_json
+        for raw in (b'{"value":NaN}', b'{"value":Infinity}', b'{"a":{"n":1,"n":2}}'):
+            with self.subTest(raw=raw), self.assertRaises(VideoNotesError):
+                _decode_json(raw, "test.json")
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            project = root / "project"
+            fixture(project)
+            good = create_backup(project, root / "good.vnproj")
+            with zipfile.ZipFile(good) as archive:
+                payloads = {name: archive.read(name) for name in archive.namelist()}
+            manifest = json.loads(payloads["archive-manifest.json"])
+            manifest["files"]["project.json"]["size"] = True
+            payloads["archive-manifest.json"] = json.dumps(manifest).encode("utf-8")
+            forged = root / "bool-size.vnproj"
+            with zipfile.ZipFile(forged, "w") as archive:
+                for name, body in payloads.items():
+                    archive.writestr(name, body)
+            with self.assertRaisesRegex(VideoNotesError, "SHA-256"):
+                restore_backup(forged, root / "target")
+            self.assertFalse((root / "target").exists())
+
     def test_zip_slip_duplicate_or_symlink_rejected(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
