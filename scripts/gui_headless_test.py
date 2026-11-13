@@ -438,6 +438,38 @@ class GuiNotesHeadlessTest(unittest.TestCase):
         self.assertIn("Wykład dotyczy", self.gui.edit_text.get("1.0", "end-1c"))
         self.assertIn(expected_id, self.gui.status.get())
 
+    def test_real_tk_rejects_stale_editor_then_accepts_fresh_correction(self):
+        from videonotes.exports import edit_segment
+        from videonotes.storage import read_project
+        self.assertTrue(self.gui._load())
+        sid = self.gui.segments.get_children()[0]
+        self.gui.segments.selection_set(sid)
+        self.gui._selected()
+        old = self.gui.edit_text.get("1.0", "end-1c")
+        self.gui.edit_text.delete("1.0", "end")
+        self.gui.edit_text.insert("1.0", "NIEZAPISANY TEKST")
+        edit_segment(self.folder, sid, "INNA POPRAWKA", expected_text=old)
+        with patch("videonotes.gui.messagebox.showerror") as notice:
+            self.gui._save_edit()
+            notice.assert_called_once()
+            self.assertIn("Konflikt edycji", notice.call_args.args[1])
+        self.assertEqual(read_project(self.folder)[2]["edits"][sid], "INNA POPRAWKA")
+        self.assertEqual(self.gui.edit_text.get("1.0", "end-1c"), "NIEZAPISANY TEKST")
+        self.assertTrue(self.gui._has_transcript_draft())
+        self.assertFalse(self.gui._load(silent=True))
+        self.assertTrue(self.gui._load(silent=True, force=True))
+        self.gui.segments.selection_set(sid)
+        self.gui._selected()
+        self.assertEqual(self.gui._selected_original_text, "INNA POPRAWKA")
+        self.gui.edit_text.delete("1.0", "end")
+        self.gui.edit_text.insert("1.0", "POPRAWKA PO ODŚWIEŻENIU")
+        with patch("videonotes.gui.messagebox.showerror") as notice:
+            self.gui._save_edit()
+            notice.assert_not_called()
+        self.assertEqual(read_project(self.folder)[2]["edits"][sid], "POPRAWKA PO ODŚWIEŻENIU")
+        self.assertIsNone(self.gui._selected_original_text)
+        self.assertFalse((self.folder / ".transcript-edits.lock").exists())
+
     def test_jump_to_source_respects_unsaved_asr_draft_on_selection_and_reload(self):
         self.assertTrue(self.gui._load())
         ids = list(self.gui.segments.get_children())
