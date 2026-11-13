@@ -586,21 +586,45 @@ class MicrophoneTest(unittest.TestCase):
                   '[dshow @ 0x10]     Alternative name "@device_pnp_abc"\n'
                   '[dshow @ 0x10]  "Stereo Mix"\n'
                   '[dshow @ 0x10]  "Mic (USB)"\n')
-        result = mock.Mock(stderr=output, returncode=1)
+        def fake_dshow(args, **kwargs):
+            kwargs["stderr"].write(output.encode("utf-8"))
+            return subprocess.CompletedProcess(args, 1)
         with mock.patch("videonotes.microphone.sys.platform", "win32"), \
              mock.patch("videonotes.microphone.executable", return_value="ffmpeg"), \
-             mock.patch("videonotes.microphone.subprocess.run", return_value=result) as runner:
+             mock.patch("videonotes.microphone.subprocess.run", side_effect=fake_dshow) as runner:
             self.assertEqual(list_microphone_devices(), ["Mic (USB)", "Stereo Mix"])
             self.assertEqual(runner.call_args.args[0][:2], ["ffmpeg", "-hide_banner"])
+            self.assertEqual(runner.call_args.kwargs["stdout"], subprocess.DEVNULL)
             capture = io.StringIO()
             with contextlib.redirect_stdout(capture):
                 self.assertEqual(main(["record-devices"]), 0)
             self.assertEqual(json.loads(capture.getvalue()), ["Mic (USB)", "Stereo Mix"])
         with mock.patch("videonotes.microphone.sys.platform", "win32"), \
              mock.patch("videonotes.microphone.executable", return_value="ffmpeg"), \
-             mock.patch("videonotes.microphone.subprocess.run", return_value=mock.Mock(stderr="", returncode=1)):
+             mock.patch("videonotes.microphone.subprocess.run", return_value=subprocess.CompletedProcess([], 1)):
             with self.assertRaises(VideoNotesError):
                 list_microphone_devices()
+
+    def test_directshow_device_list_is_bounded_before_parsing(self):
+        def overflow(args, **kwargs):
+            kwargs["stderr"].write(b"S" * 4096)
+            return subprocess.CompletedProcess(args, 1)
+        with mock.patch("videonotes.microphone.sys.platform", "win32"), \
+             mock.patch("videonotes.microphone.executable", return_value="ffmpeg"), \
+             mock.patch("videonotes.microphone.MAX_DSHOW_LOG_BYTES", 128), \
+             mock.patch("videonotes.microphone.subprocess.run", side_effect=overflow):
+            with self.assertRaisesRegex(VideoNotesError, "przekroczyła") as issue:
+                list_microphone_devices()
+        self.assertNotIn("SSSS", str(issue.exception))
+
+    def test_directshow_failure_does_not_include_private_device_path(self):
+        with mock.patch("videonotes.microphone.sys.platform", "win32"), \
+             mock.patch("videonotes.microphone.executable", return_value="ffmpeg"), \
+             mock.patch("videonotes.microphone.subprocess.run",
+                        side_effect=OSError("PRIVATE PNP DEVICE NAME")):
+            with self.assertRaisesRegex(VideoNotesError, "Nie można pobrać") as issue:
+                list_microphone_devices()
+        self.assertNotIn("PRIVATE", str(issue.exception))
 
 
     def test_explicit_system_audio_consent_and_two_device_mix(self):
