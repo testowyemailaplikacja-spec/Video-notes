@@ -75,6 +75,30 @@ class StaleLockTest(unittest.TestCase):
         self.assertEqual((folder / ".processing.lock").read_text("ascii"), "pid=987654321\n")
         self.assertEqual((folder / "transcript.json").read_bytes(), before)
 
+    def test_cancel_arriving_during_asr_does_not_commit_late_chunk(self):
+        import threading
+        cancelled = threading.Event()
+        original_transcript = (self.project / "transcript.json").read_bytes()
+        class SlowEngine:
+            def __init__(self, cli, model):
+                pass
+            def transcribe(self, wav, *, language, offset_ms, duration_ms):
+                cancelled.set()  # Simulate Stop while the ASR engine was working
+                return [{"start_ms": offset_ms,
+                         "end_ms": offset_ms + duration_ms,
+                         "text": "synthetic not committed"}]
+        with patch("videonotes.pipeline._check_resume_source",
+                   return_value=Path("/synthetic/input.wav")), patch(
+            "videonotes.pipeline._file_identity", return_value=(0, 0, 0, 0, 0)
+        ), patch("videonotes.pipeline.extract_chunk",
+                  side_effect=lambda *args, **kw: kw["destination"].write_bytes(b"fake")):
+            with self.assertRaisesRegex(VideoNotesError, "Przerwano na żądanie"):
+                transcribe_project(self.project, asr_factory=SlowEngine,
+                                   cancel=cancelled.is_set)
+        self.assertTrue(cancelled.is_set())
+        self.assertEqual((self.project / "transcript.json").read_bytes(), original_transcript)
+        self.assertFalse((self.project / ".processing.lock").exists())
+
     def test_missing_and_active_pid_are_never_removed(self):
         self.assertEqual(transcription_lock_status(self.project)["state"], "missing")
         self.lock.write_text(f"pid={os.getpid()}\n", encoding="ascii")
