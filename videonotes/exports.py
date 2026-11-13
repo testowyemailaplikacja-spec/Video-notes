@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import tempfile
 from pathlib import Path
 
 from .errors import VideoNotesError
@@ -99,9 +102,76 @@ def export_project(folder: Path) -> list[Path]:
                 "Transkrypcja lub poprawki zmieniły się podczas przygotowania eksportu; "
                 "poprzednie pliki pozostawiono bez zmian."
             )
-        result = []
-        for name, payload in rendered.items():
-            dest = folder / "exports" / name
-            atomic_write(dest, payload)
-            result.append(dest)
-        return result
+        outputs = folder / "exports"
+        if (outputs.is_symlink() or getattr(outputs, "is_junction", lambda: False)()
+                or (outputs.exists() and not outputs.is_dir())):
+            raise VideoNotesError("Katalog eksportu jest dowiązaniem lub nie jest zwykłym katalogiem.")
+        # Check ALL targets before changing even the first one. In particular
+        # a symlink must not be silently replaced with a transcript file.
+        for name in rendered:
+            dest = outputs / name
+            if dest.is_symlink() or (dest.exists() and not dest.is_file()):
+                raise VideoNotesError("Plik eksportu jest dowiązaniem lub nie jest zwykłym plikiem.")
+        outputs.mkdir(parents=True, exist_ok=True)
+        # Stage every new file BEFORE replacing any previous exports.
+        # Disk-full errors during staging cannot leave a mixture of versions.
+        # Keep hard-link snapshots of previous files for rollback if a later
+        # replace fails. This is a best-effort filesystem transaction, NOT a
+        # power-loss atomic publication of four independent filenames.
+        with tempfile.TemporaryDirectory(prefix=".vn-exports-", dir=outputs) as tmp:
+            stage = Path(tmp)
+            backups: dict[str, Path] = {}
+            for name, payload in rendered.items():
+                candidate = stage / name
+                with candidate.open("wb") as writer:
+                    writer.write(payload)
+                    writer.flush()
+                    os.fsync(writer.fileno())
+                dest = outputs / name
+                if dest.is_symlink() or (dest.exists() and not dest.is_file()):
+                    raise VideoNotesError("Cel eksportu zmienił się; poprzednie pliki zachowano.")
+                if dest.is_file():
+                    previous = stage / ("old-" + name)
+                    try:
+                        os.link(dest, previous)
+                    except OSError:
+                        # Some Windows/FAT/network filesystems disallow links.
+                        # Stream an ordinary local backup instead of reading
+                        # the previous multi-hour export into memory.
+                        with dest.open("rb") as reader, previous.open("xb") as writer:
+                            shutil.copyfileobj(reader, writer, length=1024 * 1024)
+                            writer.flush()
+                            os.fsync(writer.fileno())
+                    backups[name] = previous
+            # An outside tool can bypass our cooperative edit lock. Rebuild
+            # once more after staging, and never publish a stale snapshot.
+            if rendered != render_exports(folder):
+                raise VideoNotesError("Transkrypcja zmieniła się podczas eksportu; zachowano poprzednie pliki.")
+            published: list[str] = []
+            try:
+                for name in rendered:
+                    dest = outputs / name
+                    if dest.is_symlink() or (dest.exists() and not dest.is_file()):
+                        raise OSError("export target was replaced")
+                    os.replace(stage / name, dest)
+                    published.append(name)
+            except OSError as error:
+                rollback_failed = False
+                for name in reversed(published):
+                    dest = outputs / name
+                    try:
+                        if name in backups:
+                            os.replace(backups[name], dest)
+                        else:
+                            dest.unlink(missing_ok=True)
+                    except OSError:
+                        rollback_failed = True
+                if rollback_failed:
+                    raise VideoNotesError(
+                        "Publikacja eksportu przerwana, nie udało się przywrócić wszystkich plików. "
+                        "Sprawdź katalog exports i ponów eksport."
+                    ) from error
+                raise VideoNotesError(
+                    "Eksport nie został ukończony; wcześniejsze pliki przywrócono."
+                ) from error
+        return [outputs / name for name in rendered]
