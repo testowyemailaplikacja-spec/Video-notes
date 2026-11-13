@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+import sys
 import subprocess
 import tempfile
 import unittest
@@ -9,7 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from videonotes.errors import VideoNotesError
-from videonotes.media import choose_stream, extract_chunk, probe
+from videonotes.media import _run, choose_stream, extract_chunk, probe
 
 FFMPEG = bool(shutil.which("ffmpeg") and shutil.which("ffprobe"))
 
@@ -59,6 +60,27 @@ class FFmpegMediaTest(unittest.TestCase):
                 probe(bad)
             with self.assertRaises(VideoNotesError):
                 probe(Path(tmp) / "missing.mp4")
+
+
+class OfflineFFmpegProcessSafetyTest(unittest.TestCase):
+    def test_real_process_stdout_is_bounded_and_does_not_leak(self):
+        with self.assertRaisesRegex(VideoNotesError, "przekroczyły limit") as issue:
+            _run([sys.executable, "-c",
+                  "import sys;sys.stdout.buffer.write(b'PRIVATE'*400000)"], timeout=15)
+        self.assertNotIn("PRIVATE", str(issue.exception))
+
+    def test_real_process_stderr_is_not_collected(self):
+        proc = _run([sys.executable, "-c",
+                     "import sys;sys.stderr.write('SECRET\\n');print('READY')"], timeout=15)
+        self.assertEqual(proc.stdout.strip(), "READY")
+        self.assertEqual(proc.stderr, "")
+
+    def test_nonzero_exit_does_not_reveal_stdout_or_stderr(self):
+        with self.assertRaisesRegex(VideoNotesError, "zgłosiło błąd") as issue:
+            _run([sys.executable, "-c",
+                  "import sys;print('PRIVATE');sys.stderr.write('SECRET');sys.exit(4)"], timeout=15)
+        self.assertNotIn("PRIVATE", str(issue.exception))
+        self.assertNotIn("SECRET", str(issue.exception))
 
 
 class OfflineWavExtractionValidationTest(unittest.TestCase):
