@@ -134,7 +134,7 @@ class PDFOfflineTest(unittest.TestCase):
                 render_pdf_from_docx(invalid)
 
     def test_local_converter_pdf_symlink_is_rejected_before_read(self):
-        data = b"PK\\x03\\x04" + b"x" * 200
+        data = b"PK\x03\x04" + b"x" * 200
         with tempfile.TemporaryDirectory() as temp:
             unrelated = Path(temp) / "unrelated-private.pdf"
             unrelated.write_bytes(PDF)
@@ -154,7 +154,7 @@ class PDFOfflineTest(unittest.TestCase):
 
     def test_local_converter_growing_pdf_rejected_by_actual_bounded_read(self):
         from videonotes import pdf_export
-        source = b"PK\\x03\\x04" + b"x" * 200
+        source = b"PK\x03\x04" + b"x" * 200
         real_stat = Path.stat
         checked = []
         def grow_after_stat(path, *args, **kwargs):
