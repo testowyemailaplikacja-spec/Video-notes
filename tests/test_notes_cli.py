@@ -22,7 +22,7 @@ class NotesCliTest(unittest.TestCase):
             with contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(main(["notes", str(folder)]), 0)
             exports = folder / "exports"
-            exports.mkdir()
+            exports.mkdir(exist_ok=True)
             names = ("notes-basic.md", "notes-basic.txt", "notes-basic.docx")
             reviewed = {name: b"APPROVED " + name.encode() for name in names}
             for name, payload in reviewed.items():
