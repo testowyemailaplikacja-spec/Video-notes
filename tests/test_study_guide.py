@@ -34,6 +34,50 @@ class SourceStudyGuideTest(unittest.TestCase):
             segment["text"] = text
         save_json(self.root / "transcript.json", doc)
 
+    def test_multiformat_guide_export_restores_all_prior_formats(self):
+        import os
+        from videonotes import storage
+        directory = self.root / "exports"
+        directory.mkdir(exist_ok=True)
+        names = ("notes-study.md", "notes-study.json", "notes-study.docx")
+        original = {name: ("PRIOR " + name).encode("utf-8") for name in names}
+        for name, payload in original.items():
+            (directory / name).write_bytes(payload)
+        real_replace = os.replace
+        def fail_third(src, dst):
+            if Path(dst).name == "notes-study.docx":
+                raise OSError("simulated disk failure")
+            return real_replace(src, dst)
+        with patch("videonotes.storage.os.replace", side_effect=fail_third):
+            with self.assertRaisesRegex(VideoNotesError, "wcześniejsze pliki zostały przywrócone"):
+                export_study_guide(self.root, include_docx=True)
+        self.assertEqual(
+            {p.name: p.read_bytes() for p in directory.iterdir()}, original
+        )
+        created = export_study_guide(self.root, include_docx=True)
+        self.assertEqual(tuple(p.name for p in created), names)
+        self.assertNotEqual((directory / "notes-study.json").read_bytes(),
+                            original["notes-study.json"])
+
+    def test_study_export_aborts_before_write_on_staging_disk_full(self):
+        from videonotes import storage
+        directory = self.root / "exports"
+        directory.mkdir(exist_ok=True)
+        original = {name: b"PRIOR" for name in ("notes-study.md", "notes-study.json")}
+        for name, body in original.items():
+            (directory / name).write_bytes(body)
+        real_fsync = storage.os.fsync
+        count = []
+        def fail_second(fd):
+            count.append(True)
+            if len(count) == 2:
+                raise OSError("simulated full disk")
+            return real_fsync(fd)
+        with patch("videonotes.storage.os.fsync", side_effect=fail_second):
+            with self.assertRaisesRegex(VideoNotesError, "Nie można przygotować plików eksportu"):
+                export_study_guide(self.root)
+        self.assertEqual({p.name: p.read_bytes() for p in directory.iterdir()}, original)
+
     def test_full_guide_has_toc_source_citations_and_classified_quotes(self):
         texts = [
             "Serwer DHCP oznacza automatyczne przydzielanie adresu IP.",
