@@ -542,23 +542,32 @@ def record_microphone(device: str, folder: Path, *, consent: bool,
         raise
 
 
+MAX_DSHOW_LOG_BYTES = 256 * 1024
+
+
 def list_microphone_devices(ffmpeg: str = "ffmpeg") -> list[str]:
-    """Enumerate local Windows DirectShow audio inputs without recording anything."""
+    """Enumerate Windows devices without collecting unbounded private stderr."""
     if sys.platform != "win32":
         raise VideoNotesError("Lista urządzeń mikrofonowych wymaga Windows/DirectShow.")
     tool = executable(ffmpeg)
     try:
-        result = subprocess.run(
-            [tool, "-hide_banner", "-list_devices", "true", "-f", "dshow", "-i", "dummy"],
-            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, encoding="utf-8", errors="replace", timeout=20, check=False,
-        )
+        with tempfile.TemporaryFile(mode="w+b") as errors:
+            subprocess.run(
+                [tool, "-hide_banner", "-list_devices", "true", "-f", "dshow", "-i", "dummy"],
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=errors,
+                timeout=20, check=False, shell=False,
+            )
+            errors.seek(0)
+            raw = errors.read(MAX_DSHOW_LOG_BYTES + 1)
     except (OSError, subprocess.TimeoutExpired) as error:
         raise VideoNotesError("Nie można pobrać listy urządzeń audio z lokalnego FFmpeg.") from error
-    # FFmpeg returns nonzero after device enumeration: this is expected.
+    if len(raw) > MAX_DSHOW_LOG_BYTES:
+        raise VideoNotesError("Lista urządzeń DirectShow przekroczyła dopuszczalny rozmiar.")
+    # FFmpeg returns a nonzero exit code after enumeration; this is expected.
+    # Discard device names with impossible lengths rather than copying them to logs.
     in_audio = False
     devices: list[str] = []
-    for line in result.stderr.splitlines():
+    for line in raw.decode("utf-8", errors="replace").splitlines():
         if "DirectShow audio devices" in line:
             in_audio = True
             continue
