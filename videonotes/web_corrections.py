@@ -44,7 +44,7 @@ def _load_patch(path: Path) -> tuple[dict, str]:
             raw = reader.read(MAX_PATCH_BYTES + 1)
         if len(raw) > MAX_PATCH_BYTES:
             raise VideoNotesError("Plik poprawek WWW przekracza limit 20 MB.")
-        data = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_object)
+        data = json.loads(raw.decode("utf-8-sig"), object_pairs_hook=_unique_object)
     except (OSError, UnicodeError, json.JSONDecodeError) as error:
         raise VideoNotesError("Nie można odczytać poprawnego pliku poprawek WWW.") from error
     return data, hashlib.sha256(raw).hexdigest()

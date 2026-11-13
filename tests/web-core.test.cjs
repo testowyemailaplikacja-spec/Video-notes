@@ -38,6 +38,20 @@ test("browser JSON parser rejects duplicate root and nested keys, including unic
                colonAndBraces.segments[0].text);
 });
 
+test("UTF-8 BOM is accepted for exported transcript and correction patches", () => {
+  const base = fixture();
+  assert.deepEqual(core.parseExport(String.fromCharCode(0xFEFF) + JSON.stringify(base)), base);
+  const changes = Object.create(null);
+  changes[base.segments[0].id] = "Corrected";
+  const patch = core.renderCorrections(base, changes);
+  assert.deepEqual(
+    {...core.parseCorrections(base, String.fromCharCode(0xFEFF) + patch)},
+    {...changes}
+  );
+  assert.throws(() => core.parseExport(String.fromCharCode(0xFEFF) +
+    '{"schema":"videonotes-export-v1","schema":"other"}'), /Zduplikowany/);
+});
+
 test("browser patch import refuses duplicate edit after fields before applying any changes", () => {
   const doc = fixture();
   const edited = Object.create(null);

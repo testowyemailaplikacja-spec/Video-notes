@@ -89,6 +89,17 @@ class WebCorrectionsTest(unittest.TestCase):
                     import_web_corrections(self.project, self.patchfile, apply=True)
                 self.assertFalse((self.project / "edits.json").exists())
 
+    def test_utf8_bom_patch_import_keeps_raw_transcript_unchanged(self):
+        self.patch()
+        raw = (self.project / "transcript.json").read_bytes()
+        self.patchfile.write_bytes(b"\xef\xbb\xbf" + self.patchfile.read_bytes())
+        preview = import_web_corrections(self.project, self.patchfile)
+        self.assertEqual(preview["changed"], 1)
+        applied = import_web_corrections(self.project, self.patchfile, apply=True)
+        self.assertEqual(applied["changed"], 1)
+        self.assertEqual((self.project / "transcript.json").read_bytes(), raw)
+        self.assertEqual(read_project(self.project)[2]["edits"]["c0000000-s00000"], "Zażółć gęślą jaźń")
+
     def test_duplicate_json_fields_are_rejected_before_any_edit(self):
         duplicated = ('{"schema":"videonotes-web-corrections-v1",'
                       '"project_id":"test-123",'
