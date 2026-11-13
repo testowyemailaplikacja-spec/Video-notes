@@ -96,6 +96,9 @@
   // browser's import rules identical. Syntax is parsed FIRST by JSON.parse;
   // this bounded scan only tracks keys inside objects (never string values).
   function parseUniqueJSON(source) {
+    // Python's portable import accepts a UTF-8 BOM. File.text() preserves
+    // it, but JSON.parse does not. Normalize ONLY a single leading BOM.
+    if (source.charCodeAt(0) === 0xFEFF) source = source.slice(1);
     var parsed = JSON.parse(source);
     var frames = [];
     for (var i = 0; i < source.length; i += 1) {
