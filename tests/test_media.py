@@ -83,6 +83,83 @@ class OfflineFFmpegProcessSafetyTest(unittest.TestCase):
         self.assertNotIn("SECRET", str(issue.exception))
 
 
+class FFprobeMetadataSafetyTest(unittest.TestCase):
+    def test_invalid_ffprobe_metadata_refused_before_stream_selection(self):
+        import json
+        from subprocess import CompletedProcess
+        with tempfile.TemporaryDirectory() as root:
+            source = Path(root) / "lecture.mkv"
+            source.write_bytes(b"synthetic media marker; ffprobe result injected")
+            valid = {"format": {"duration": "3.25"}, "streams": [
+                {"index": 0, "codec_type": "video"},
+                {"index": 1, "codec_type": "audio", "codec_name": "aac",
+                 "channels": 2, "tags": {"title": "Mic", "language": "pol"}},
+                {"index": 2, "codec_type": "audio", "codec_name": "aac",
+                 "channels": 2, "tags": {"title": "System"}}]}
+            def fake(payload):
+                with patch("videonotes.media.executable", return_value="ffprobe"), patch(
+                    "videonotes.media._run",
+                    return_value=CompletedProcess(["ffprobe"], 0, payload, "")
+                ):
+                    return probe(source)
+            info = fake(json.dumps(valid))
+            self.assertEqual([x["index"] for x in info["audio_streams"]], [1, 2])
+            self.assertEqual(info["duration_ms"], 3250)
+            with self.assertRaisesRegex(VideoNotesError, "Wybierz --stream"):
+                choose_stream(info, None)
+            self.assertEqual(choose_stream(info, 2)["title"], "System")
+            bad = []
+            data = json.loads(json.dumps(valid))
+            data["streams"][2]["index"] = 1
+            bad.append(json.dumps(data))
+            data = json.loads(json.dumps(valid))
+            data["streams"][1]["index"] = True
+            bad.append(json.dumps(data))
+            data = json.loads(json.dumps(valid))
+            data["streams"][1]["channels"] = -1
+            bad.append(json.dumps(data))
+            data = json.loads(json.dumps(valid))
+            data["streams"][1]["channels"] = False
+            bad.append(json.dumps(data))
+            data = json.loads(json.dumps(valid))
+            data["streams"][1]["tags"] = []
+            bad.append(json.dumps(data))
+            data = json.loads(json.dumps(valid))
+            data["streams"][1]["tags"]["title"] = "x" * 300
+            bad.append(json.dumps(data))
+            data = json.loads(json.dumps(valid))
+            data["format"]["duration"] = "0.00001"
+            bad.append(json.dumps(data))
+            data = json.loads(json.dumps(valid))
+            data["streams"] = [valid["streams"][1]] * 129
+            bad.append(json.dumps(data))
+            bad.append('{"format":{"duration":"3","duration":"4"},"streams":[]}')
+            bad.append('{"format":{"duration":NaN},"streams":[]}')
+            bad.append('{"format":{"duration":"3"},"streams":"not a list"}')
+            for payload in bad:
+                with self.subTest(payload=payload[:100]), self.assertRaises(VideoNotesError):
+                    fake(payload)
+
+    def test_stream_index_and_extraction_values_must_be_true_integers(self):
+        meta = {"audio_streams": [{"index": 1, "codec": "aac"}]}
+        for bad in (True, 1.0, "1", -1):
+            with self.subTest(bad=bad), self.assertRaises(VideoNotesError):
+                choose_stream(meta, bad)
+        with tempfile.TemporaryDirectory() as root:
+            target = Path(root) / "chunk.wav"
+            with patch("videonotes.media._run") as runner:
+                for values in (
+                    {"stream_index": True, "start_ms": 0, "duration_ms": 1000},
+                    {"stream_index": 1, "start_ms": 1.5, "duration_ms": 1000},
+                    {"stream_index": 1, "start_ms": 0, "duration_ms": True},
+                    {"stream_index": 1, "start_ms": 0, "duration_ms": 24 * 3600 * 1000 + 1},
+                ):
+                    with self.subTest(values=values), self.assertRaises(VideoNotesError):
+                        extract_chunk(Path(root) / "lecture.mkv", destination=target, **values)
+                runner.assert_not_called()
+            self.assertFalse(target.exists())
+
+
 class OfflineWavExtractionValidationTest(unittest.TestCase):
     def test_rejects_declared_pcm_frames_truncated_on_disk(self):
         with tempfile.TemporaryDirectory() as folder:
