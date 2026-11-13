@@ -88,7 +88,7 @@ class ExportSnapshotTest(unittest.TestCase):
                 raise OSError("simulate disk full")
             return real_fsync(fd)
         with patch("videonotes.exports.os.fsync", side_effect=fail_staging):
-            with self.assertRaises(OSError):
+            with self.assertRaisesRegex(VideoNotesError, "przygotować plików eksportu"):
                 export_project(self.root)
         self.assertEqual(len(calls), 2)
         self.assertEqual({p.name: p.read_bytes() for p in self.outputs.iterdir()},
