@@ -89,6 +89,10 @@ def validate_transcript(data: Any, project: dict[str, Any]) -> dict[str, Any]:
         raise VideoNotesError("Zapisano więcej fragmentów niż ma źródło.")
     ids: set[str] = set()
     last: tuple[int, int, int] = (-1, -1, -1)
+    # At any given timestamp pair, reject identical text delivered under
+    # different segment IDs (including by non-whisper.cpp ASR adapters).
+    # Retain repetitions at genuinely different timestamps.
+    same_window_texts: set[str] = set()
     for segment in segments:
         if not isinstance(segment, dict):
             raise VideoNotesError("Uszkodzony segment transkrypcji.")
@@ -103,10 +107,16 @@ def validate_transcript(data: Any, project: dict[str, Any]) -> dict[str, Any]:
             raise VideoNotesError("Segment należy do niedokończonego fragmentu.")
         if end <= start or end > duration or start < idx * chunk_ms or end > min(duration, (idx + 1) * chunk_ms):
             raise VideoNotesError("Segment ma nieprawidłowy przedział czasu.")
-        if sid in ids or (idx, start, end) < last:
+        window = (idx, start, end)
+        if sid in ids or window < last:
             raise VideoNotesError("Duplikat identyfikatora lub nieprawidłowa kolejność.")
+        if window != last:
+            same_window_texts.clear()
+        if segment["text"] in same_window_texts:
+            raise VideoNotesError("Silnik ASR zwrócił zdublowaną wypowiedź o identycznym czasie.")
+        same_window_texts.add(segment["text"])
         ids.add(sid)
-        last = (idx, start, end)
+        last = window
     warnings = data.get("warnings", [])
     if not isinstance(warnings, list) or len(warnings) > 1000:
         raise VideoNotesError("Nieprawidłowa lista ostrzeżeń transkrypcji.")
