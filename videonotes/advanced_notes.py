@@ -9,7 +9,7 @@ from pathlib import Path
 from .errors import VideoNotesError
 from .contracts import sha256_file
 from .notes import STOPWORDS, _hash, _select, _source
-from .storage import atomic_write, checked_export_paths, read_project, load_json
+from .storage import publish_export_bundle, read_project, load_json
 
 SCHEMA = "videonotes-source-outline-v1"
 TEMPLATES = {
@@ -265,22 +265,18 @@ def export_advanced_outline(folder: Path, *, template: str = "lecture", detail: 
             "Transkrypcja lub poprawki zmieniły się podczas tworzenia konspektu; "
             "nie nadpisano wcześniejszych plików."
         )
-    required = ["notes-advanced.md", "notes-advanced.json"]
+    contents = {"notes-advanced.md": markdown_content,
+                "notes-advanced.json": json_content}
     if include_docx:
-        required.append("notes-advanced.docx")
+        contents["notes-advanced.docx"] = docx_content
     if pdf_content is not None:
-        required.append("notes-advanced.pdf")
-    checked_export_paths(folder, required)
-    atomic_write(markdown, markdown_content)
-    atomic_write(structured, json_content)
-    paths = [markdown, structured]
-    if include_docx:
-        atomic_write(docx, docx_content)
-        paths.append(docx)
-    if pdf_content is not None:
-        atomic_write(pdf, pdf_content)
-        paths.append(pdf)
-    return tuple(paths)
+        contents["notes-advanced.pdf"] = pdf_content
+    return publish_export_bundle(
+        folder, contents,
+        verify=lambda: build_advanced_outline(
+            folder, template=template, detail=detail,
+            section_minutes=section_minutes) == outline,
+    )
 
 def verify_advanced_outline(folder: Path, *, document: Path | None = None) -> dict:
     """Read-only full JSON recheck against current corrected local transcript.
