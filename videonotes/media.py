@@ -27,6 +27,17 @@ def executable(command: str) -> str:
 # FFprobe metadata may contain source-controlled, oversized stream tags.
 # The extractor has no textual output, while FFprobe only needs bounded JSON.
 MAX_TOOL_STDOUT_BYTES = 2 * 1024 * 1024
+MAX_AUDIO_STREAMS = 128
+MAX_STREAM_LABEL = 256
+
+
+def _unique_probe_keys(pairs: list[tuple[str, object]]) -> dict:
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise VideoNotesError("FFprobe zwrócił zduplikowane pola metadanych.")
+        result[key] = value
+    return result
 
 
 def _run(args: list[str], *, timeout: int = 120) -> subprocess.CompletedProcess[str]:
@@ -62,23 +73,57 @@ def probe(source: Path, ffprobe: str = "ffprobe") -> dict:
         raise VideoNotesError("Plik źródłowy jest pusty.")
     result = _run([executable(ffprobe), "-v", "error", "-show_entries", "format=duration:stream=index,codec_type,codec_name,channels:stream_tags=language,title", "-of", "json", str(source)])
     try:
-        data = json.loads(result.stdout)
-        duration = float(data.get("format", {}).get("duration", "nan"))
+        data = json.loads(result.stdout, object_pairs_hook=_unique_probe_keys,
+                          parse_constant=lambda value: (_ for _ in ()).throw(ValueError("invalid number")))
+        if not isinstance(data, dict) or not isinstance(data.get("format"), dict):
+            raise ValueError("invalid probe structure")
+        duration_field = data["format"].get("duration")
+        if not isinstance(duration_field, (str, int, float)) or isinstance(duration_field, bool):
+            raise ValueError("invalid duration type")
+        duration = float(duration_field)
         if not math.isfinite(duration) or duration <= 0 or duration > 24 * 3600:
             raise ValueError("unsupported duration")
-        streams = [
-            {"index": int(s["index"]), "codec": str(s.get("codec_name") or "unknown"), "channels": int(s.get("channels") or 0),
-             "language": str(s.get("tags", {}).get("language") or ""), "title": str(s.get("tags", {}).get("title") or "")}
-            for s in data.get("streams", []) if s.get("codec_type") == "audio"
-        ]
+        duration_ms = round(duration * 1000)
+        if duration_ms < 1:
+            raise ValueError("duration rounds to zero")
+        raw_streams = data.get("streams")
+        if not isinstance(raw_streams, list) or len(raw_streams) > MAX_AUDIO_STREAMS:
+            raise ValueError("invalid stream list")
+        streams = []
+        indices = set()
+        for item in raw_streams:
+            if not isinstance(item, dict):
+                raise ValueError("invalid stream entry")
+            if item.get("codec_type") != "audio":
+                continue
+            index = item.get("index")
+            if type(index) is not int or not 0 <= index <= 1023 or index in indices:
+                raise ValueError("duplicate or invalid stream index")
+            channels = item.get("channels") or 0
+            if type(channels) is not int or not 0 <= channels <= 64:
+                raise ValueError("invalid channel count")
+            tags = item.get("tags") or {}
+            if not isinstance(tags, dict):
+                raise ValueError("invalid stream tags")
+            labels = (item.get("codec_name") or "unknown",
+                      tags.get("language") or "", tags.get("title") or "")
+            if any(not isinstance(value, str) or len(value) > MAX_STREAM_LABEL or "\x00" in value
+                   for value in labels):
+                raise ValueError("invalid stream metadata")
+            codec, language, title = labels
+            streams.append({"index": index, "codec": codec, "channels": channels,
+                            "language": language, "title": title})
+            indices.add(index)
     except (ValueError, TypeError, KeyError, json.JSONDecodeError) as error:
         raise VideoNotesError("FFprobe nie rozpoznał czasu lub ścieżek audio.") from error
     if not streams:
         raise VideoNotesError("Nagranie nie zawiera ścieżki dźwiękowej.")
-    return {"source": str(source), "duration_ms": round(duration * 1000), "audio_streams": streams}
+    return {"source": str(source), "duration_ms": duration_ms, "audio_streams": streams}
 
 
 def choose_stream(media: dict, requested: int | None) -> dict:
+    if requested is not None and (type(requested) is not int or requested < 0):
+        raise VideoNotesError("Indeks ścieżki dźwiękowej musi być nieujemną liczbą całkowitą.")
     streams = media["audio_streams"]
     if requested is None and len(streams) > 1:
         raise VideoNotesError("Nagranie ma wiele ścieżek audio. Wybierz --stream z wyniku inspect.")
@@ -90,7 +135,10 @@ def choose_stream(media: dict, requested: int | None) -> dict:
 
 
 def extract_chunk(source: Path, stream_index: int, *, start_ms: int, duration_ms: int, destination: Path, ffmpeg: str = "ffmpeg") -> None:
-    if start_ms < 0 or duration_ms < 1 or stream_index < 0:
+    if (type(start_ms) is not int or type(duration_ms) is not int
+            or type(stream_index) is not int or start_ms < 0
+            or not 1 <= duration_ms <= 24 * 3600 * 1000
+            or stream_index < 0):
         raise VideoNotesError("Nieprawidłowy zakres fragmentu audio.")
     target = Path(destination)
     if target.exists() or target.is_symlink():
