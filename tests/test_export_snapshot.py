@@ -53,6 +53,61 @@ class ExportSnapshotTest(unittest.TestCase):
         self.assertFalse((self.root / ".transcript-edits.lock").exists())
         self.assertFalse(self.outputs.exists())
 
+    def test_late_export_replace_failure_restores_all_previous_formats(self):
+        from videonotes import exports as module
+        self.outputs.mkdir(exist_ok=True)
+        original = {}
+        for name in ("transcript.txt", "transcript.srt", "transcript.vtt", "transcript.json"):
+            content = ("OLD REVIEWED " + name).encode("utf-8")
+            (self.outputs / name).write_bytes(content)
+            original[name] = content
+        real_replace = module.os.replace
+        replaced = []
+        def fail_third(src, dst):
+            if Path(dst).name == "transcript.vtt":
+                raise OSError("simulate target locked by another application")
+            replaced.append(Path(dst).name)
+            return real_replace(src, dst)
+        with patch("videonotes.exports.os.replace", side_effect=fail_third):
+            with self.assertRaisesRegex(VideoNotesError, "wcześniejsze pliki przywrócono"):
+                export_project(self.root)
+        self.assertEqual(replaced[:2], ["transcript.txt", "transcript.srt"])
+        self.assertEqual({p.name: p.read_bytes() for p in self.outputs.iterdir()},
+                         original)
+
+    def test_staging_failure_preserves_old_exports_without_half_update(self):
+        self.outputs.mkdir(exist_ok=True)
+        for name in ("transcript.txt", "transcript.srt", "transcript.vtt", "transcript.json"):
+            (self.outputs / name).write_bytes(b"OLD")
+        from videonotes import exports as module
+        real_fsync = module.os.fsync
+        calls = []
+        def fail_staging(fd):
+            calls.append(True)
+            if len(calls) == 2:
+                raise OSError("simulate disk full")
+            return real_fsync(fd)
+        with patch("videonotes.exports.os.fsync", side_effect=fail_staging):
+            with self.assertRaisesRegex(VideoNotesError, "przygotować plików eksportu"):
+                export_project(self.root)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual({p.name: p.read_bytes() for p in self.outputs.iterdir()},
+                         {name: b"OLD" for name in ("transcript.txt", "transcript.srt", "transcript.vtt", "transcript.json")})
+
+    def test_symlinked_export_directory_is_never_written(self):
+        with tempfile.TemporaryDirectory() as temp:
+            external = Path(temp) / "unrelated"
+            external.mkdir()
+            protected = external / "transcript.txt"
+            protected.write_bytes(b"OWNER DATA")
+            try:
+                self.outputs.symlink_to(external, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest("No symlink privileges on this filesystem")
+            with self.assertRaisesRegex(VideoNotesError, "Katalog eksportu"):
+                export_project(self.root)
+            self.assertEqual(protected.read_bytes(), b"OWNER DATA")
+
     def test_export_stable_source_preserves_four_consistent_formats(self):
         produced = export_project(self.root)
         self.assertEqual(len(produced), 4)
