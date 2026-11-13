@@ -15,7 +15,7 @@ from pathlib import Path
 
 from .errors import VideoNotesError
 from .edit_lock import _same_lock
-from .storage import atomic_write, checked_export_paths, load_json, read_project, save_json
+from .storage import atomic_write, checked_export_paths, publish_export_bundle, load_json, read_project, save_json
 
 SCHEMA = "videonotes-basic-notes-v1"
 EDITS_SCHEMA = "videonotes-note-edits-v1"
@@ -273,6 +273,34 @@ def _assert_notes_unchanged(folder: Path, original: tuple[dict, dict]) -> None:
             "Notatka lub ręczne poprawki zmieniły się podczas eksportu; "
             "poprzednie pliki pozostawiono bez zmian."
         )
+
+
+def export_basic_notes_bundle(folder: Path, *, include_txt: bool = False,
+                              include_docx: bool = False, include_pdf: bool = False,
+                              office: str = "libreoffice") -> tuple[Path, ...]:
+    """Publish all CLI-selected basic note formats from one validated snapshot.
+
+    Pre-render and stage all requested files before modifying any prior
+    reviewed export. The shared bundle writer rolls back failed replacements;
+    it does not claim crash/power-loss atomicity across different filenames.
+    """
+    folder = Path(folder)
+    snapshot = read_basic_notes(folder)
+    rendered = {"notes-basic.md": render_basic_markdown(folder).encode("utf-8")}
+    if include_txt:
+        rendered["notes-basic.txt"] = render_basic_text(folder).encode("utf-8")
+    if include_docx or include_pdf:
+        from .docx_export import render_basic_docx
+        docx_payload = render_basic_docx(*snapshot)
+        if include_docx:
+            rendered["notes-basic.docx"] = docx_payload
+        if include_pdf:
+            from .pdf_export import render_pdf_from_docx
+            rendered["notes-basic.pdf"] = render_pdf_from_docx(docx_payload, office=office)
+    _assert_notes_unchanged(folder, snapshot)
+    return publish_export_bundle(
+        folder, rendered, verify=lambda: read_basic_notes(folder) == snapshot,
+    )
 
 
 def export_basic_notes_text(folder: Path) -> Path:
