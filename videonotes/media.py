@@ -5,6 +5,7 @@ import json
 import math
 import shutil
 import subprocess
+import tempfile
 import wave
 from pathlib import Path
 
@@ -23,22 +24,40 @@ def executable(command: str) -> str:
     return resolved
 
 
+# FFprobe metadata may contain source-controlled, oversized stream tags.
+# The extractor has no textual output, while FFprobe only needs bounded JSON.
+MAX_TOOL_STDOUT_BYTES = 2 * 1024 * 1024
+
+
 def _run(args: list[str], *, timeout: int = 120) -> subprocess.CompletedProcess[str]:
+    """Spool stdout to disk; never buffer unbounded or private process logs."""
     try:
-        return subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout, check=True, stdin=subprocess.DEVNULL)
+        with tempfile.TemporaryFile(mode="w+b") as stdout_file:
+            result = subprocess.run(
+                args, stdin=subprocess.DEVNULL, stdout=stdout_file,
+                stderr=subprocess.DEVNULL, check=True, timeout=timeout, shell=False,
+            )
+            stdout_file.seek(0)
+            data = stdout_file.read(MAX_TOOL_STDOUT_BYTES + 1)
+        if len(data) > MAX_TOOL_STDOUT_BYTES:
+            raise VideoNotesError("Dane wyjściowe narzędzia FFmpeg/FFprobe przekroczyły limit bezpieczeństwa.")
+        return subprocess.CompletedProcess(args, result.returncode,
+                                           data.decode("utf-8", errors="replace"), "")
     except FileNotFoundError as err:
         raise VideoNotesError("Brakuje wymaganego lokalnego programu.") from err
     except subprocess.TimeoutExpired as err:
         raise VideoNotesError("Przekroczono czas działania narzędzia lokalnego.") from err
     except subprocess.CalledProcessError as err:
-        # Do not echo stderr/stdout: engines may include spoken words or paths.
+        # Never return process stderr or stdout: paths and speech can be private.
         raise VideoNotesError("Lokalne narzędzie zgłosiło błąd. Sprawdź format i kodek źródła.") from err
+    except OSError as err:
+        raise VideoNotesError("Nie udało się uruchomić lokalnego narzędzia multimedialnego.") from err
 
 
 def probe(source: Path, ffprobe: str = "ffprobe") -> dict:
     source = Path(source).expanduser().resolve()
     if not source.is_file() or source.suffix.lower() not in SUPPORTED_SOURCE_SUFFIXES:
-        raise VideoNotesError("Wybierz istniejący plik wideo OBS lub audio (MP4/MKV/WebM/MOV/WAV/MP3/M4A/FLAC/OGG/OPUS).")
+        raise VideoNotesError("Wybierz istniejący plik wideo OBS lub audio (MP4/MKV/WebM/MOV/WAV/MP3/M4A/AAC/FLAC/OGG/OPUS).")
     if source.stat().st_size == 0:
         raise VideoNotesError("Plik źródłowy jest pusty.")
     result = _run([executable(ffprobe), "-v", "error", "-show_entries", "format=duration:stream=index,codec_type,codec_name,channels:stream_tags=language,title", "-of", "json", str(source)])
