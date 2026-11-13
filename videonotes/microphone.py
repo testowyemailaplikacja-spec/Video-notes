@@ -373,6 +373,20 @@ def _capture_with_pauses(tool: str, device: str, folder: Path, report: dict,
             stopped = True
             returncode = _stop_ffmpeg(process)
             reason = "stop"
+        except BaseException:
+            # A GUI progress callback can raise after DirectShow capture has
+            # started (e.g. window closes). Always finalize/stop the recorder
+            # instead of leaving the device recording in the background.
+            # Keep the staging WAV for explicit recovery; do not publish an
+            # incomplete take or silently mark the session finished.
+            try:
+                if process.poll() is None:
+                    _stop_ffmpeg(process)
+            except (OSError, VideoNotesError):
+                # Preserve the original exception. The outer caller records
+                # needs_review and leaves on-disk audio available for recovery.
+                pass
+            raise
         finally:
             if process.stdin:
                 try:
