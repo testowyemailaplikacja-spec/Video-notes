@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Callable
 
@@ -17,21 +18,53 @@ from .errors import VideoNotesError
 from .media import executable, probe
 
 
+# External -version and --list-langs output may contain private paths or
+# arbitrarily long diagnostic logs. Keep stdout/stderr out of memory and
+# expose only validated, bounded summary data to the offline doctor.
+MAX_TOOL_REPORT_BYTES = 256 * 1024
+
+
+def _bounded_tool_response(args: list[str], *, runner, timeout: int) -> tuple[int, str, str]:
+    with tempfile.TemporaryFile(mode="w+b") as stdout_file, tempfile.TemporaryFile(mode="w+b") as stderr_file:
+        completed = runner(
+            args, stdin=subprocess.DEVNULL, stdout=stdout_file,
+            stderr=stderr_file, timeout=timeout, check=False,
+        )
+        stdout_file.seek(0)
+        stderr_file.seek(0)
+        stdout = stdout_file.read(MAX_TOOL_REPORT_BYTES + 1)
+        stderr = stderr_file.read(MAX_TOOL_REPORT_BYTES + 1)
+    # Some unit-test runners return a CompletedProcess with in-memory output
+    # instead of writing into the supplied file handles.
+    if isinstance(completed.stdout, str):
+        stdout = completed.stdout.encode("utf-8")
+    elif isinstance(completed.stdout, bytes):
+        stdout = completed.stdout
+    if isinstance(completed.stderr, str):
+        stderr = completed.stderr.encode("utf-8")
+    elif isinstance(completed.stderr, bytes):
+        stderr = completed.stderr
+    if len(stdout) > MAX_TOOL_REPORT_BYTES or len(stderr) > MAX_TOOL_REPORT_BYTES:
+        raise VideoNotesError("Lokalne narzędzie zwróciło nadmierny raport diagnostyczny.")
+    return (completed.returncode,
+            stdout.decode("utf-8", errors="replace"),
+            stderr.decode("utf-8", errors="replace"))
+
+
 def _tool_status(name: str, command: str, *, runner=subprocess.run) -> dict:
     try:
         binary = executable(command)
-        completed = runner(
-            [binary, "-version"], stdin=subprocess.DEVNULL,
-            capture_output=True, text=True, encoding="utf-8",
-            errors="replace", timeout=10, check=False,
-        )
-        first_line = (completed.stdout or "").splitlines()[:1]
+        code, stdout, _ = _bounded_tool_response([binary, "-version"],
+                                                   runner=runner, timeout=10)
+        first_line = stdout.splitlines()[:1]
         # Check identity without reporting arbitrary command output. An unrelated
         # executable's --version is not sufficient evidence of FFmpeg.
-        if completed.returncode != 0 or not first_line or not first_line[0].lower().startswith(name + " version"):
+        if code != 0 or not first_line or not first_line[0].lower().startswith(name + " version"):
             return {"state": "unverified", "version": None}
         version = first_line[0].split()[2] if len(first_line[0].split()) >= 3 else "unknown"
-        return {"state": "responding", "version": version[:80]}
+        if not re.fullmatch(r"[A-Za-z0-9_.+:-]{1,80}", version):
+            return {"state": "unverified", "version": None}
+        return {"state": "responding", "version": version}
     except (VideoNotesError, OSError, subprocess.TimeoutExpired, ValueError):
         return {"state": "missing_or_failed", "version": None}
 
@@ -98,20 +131,18 @@ def _tesseract_status(command: str | None, language: str, *,
     requested = language.split("+")
     try:
         tool = executable(command)
-        version = runner([tool, "--version"], stdin=subprocess.DEVNULL,
-                         capture_output=True, text=True, encoding="utf-8",
-                         errors="replace", timeout=12, check=False)
-        header = ((version.stdout or "") + "\n" + (version.stderr or "")).strip().splitlines()
-        if version.returncode != 0 or not any(line.lower().startswith("tesseract ") for line in header[:3]):
+        code, stdout, stderr = _bounded_tool_response(
+            [tool, "--version"], runner=runner, timeout=12)
+        header = (stdout + "\n" + stderr).strip().splitlines()
+        if code != 0 or not any(line.lower().startswith("tesseract ") for line in header[:3]):
             return {"state": "unverified", "requested_languages": requested,
                     "language_state": "not_checked"}
-        listed = runner([tool, "--list-langs"], stdin=subprocess.DEVNULL,
-                        capture_output=True, text=True, encoding="utf-8",
-                        errors="replace", timeout=12, check=False)
-        if listed.returncode != 0:
+        code, stdout, stderr = _bounded_tool_response(
+            [tool, "--list-langs"], runner=runner, timeout=12)
+        if code != 0:
             return {"state": "responding", "requested_languages": requested,
                     "language_state": "not_checked"}
-        output = (listed.stdout or "") + "\n" + (listed.stderr or "")
+        output = stdout + "\n" + stderr
         # Only accept exact 3-letter installed language codes. Do not expose
         # arbitrary tool output (it can include private paths and flags).
         installed = set(re.findall(r"(?m)^([a-z]{3})\s*$", output))
