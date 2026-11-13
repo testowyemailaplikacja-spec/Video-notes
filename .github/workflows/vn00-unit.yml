@@ -73,7 +73,7 @@ jobs:
         run: |
           node --check web/transcript-core.js
           node --check web/app.js
-          node --test tests/web-core.test.cjs tests/web-controller.test.cjs
+          node --test tests/web-core.test.cjs tests/web-controller.test.cjs tests/web-mobile-contract.test.cjs
   unit-windows:
     name: Python stdlib contracts on Windows (not full Windows acceptance)
     runs-on: windows-latest
@@ -99,7 +99,7 @@ jobs:
         run: |
           node --check web/transcript-core.js
           node --check web/app.js
-          node --test tests/web-core.test.cjs tests/web-controller.test.cjs
+          node --test tests/web-core.test.cjs tests/web-controller.test.cjs tests/web-mobile-contract.test.cjs
 
   browser-chromium-linux:
     name: Real Chromium file:// browser smoke (Linux)
