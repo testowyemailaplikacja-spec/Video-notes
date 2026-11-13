@@ -79,6 +79,25 @@ class TranscriptEditLockTest(unittest.TestCase):
                 raise RuntimeError("expected")
         self.assertFalse(self.path.exists())
 
+    def test_oversized_or_growing_edit_lock_fails_closed(self):
+        self.path.write_bytes(b"pid=12345\n" + b"Z" * 1024)
+        self.assertEqual(transcript_edit_lock_status(self.project)["state"], "invalid")
+        with self.assertRaises(VideoNotesError):
+            recover_stale_transcript_edit_lock(self.project, confirm=True)
+        self.path.write_bytes(b"pid=12345\n")
+        original_open = Path.open
+        changed = []
+        def grow_on_read(path, *args, **kwargs):
+            if path == self.path and not changed:
+                changed.append(True)
+                with original_open(path, "ab") as file:
+                    file.write(b"Z" * 1000)
+            return original_open(path, *args, **kwargs)
+        with patch.object(Path, "open", grow_on_read):
+            self.assertEqual(transcript_edit_lock_status(self.project)["state"], "invalid")
+        self.assertEqual(changed, [True])
+        self.assertGreater(self.path.stat().st_size, 80)
+
     def test_bad_pid_and_live_process_do_not_get_removed(self):
         self.path.write_text("not a lock", encoding="ascii")
         self.assertEqual(transcript_edit_lock_status(self.project)["state"], "invalid")
