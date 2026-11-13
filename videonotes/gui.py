@@ -932,7 +932,10 @@ class VideoNotesWindow:
                          self.edit_text.get("1.0", "end-1c"),
                          expected_text=self._selected_original_text)
             export_project(Path(self.project.get()))
-            self._load(silent=True)
+            # The pending editor draft has just been committed. A regular
+            # reload would still compare it to the old baseline and refuse
+            # to update the view, leaving a stale CAS token for the next edit.
+            self._load(silent=True, force=True)
             self.status.set("Poprawkę i eksport zapisano lokalnie.")
         except VideoNotesError as error:
             messagebox.showerror("Video Notes", str(error))
