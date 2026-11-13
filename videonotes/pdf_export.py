@@ -42,12 +42,23 @@ def render_pdf_from_docx(docx: bytes, *, office: str = "libreoffice") -> bytes:
         except (subprocess.TimeoutExpired, OSError) as error:
             raise VideoNotesError("Lokalny LibreOffice nie wykonał konwersji PDF.") from error
         target = destination / "document.pdf"
-        if result.returncode != 0 or not target.is_file():
-            raise VideoNotesError("Nie udało się otworzyć DOCX w lokalnym LibreOffice. Starsze pliki pozostają zachowane.")
+        if (result.returncode != 0 or target.is_symlink()
+                or not target.is_file()):
+            raise VideoNotesError(
+                "LibreOffice nie utworzył zwykłego lokalnego PDF. "
+                "Starsze pliki pozostają zachowane."
+            )
         try:
             if not 10 <= target.stat().st_size <= MAX_PDF_BYTES:
                 raise VideoNotesError("Wygenerowany PDF ma nieprawidłowy rozmiar.")
-            output = target.read_bytes()
+            # A local converter can continue writing after its process exits
+            # (or be replaced by another process). Bound the *actual* read,
+            # not just the earlier stat(), and reject symlinks again afterward.
+            with target.open("rb") as reader:
+                output = reader.read(MAX_PDF_BYTES + 1)
+            if (len(output) > MAX_PDF_BYTES or len(output) < 10
+                    or target.is_symlink()):
+                raise VideoNotesError("Wygenerowany PDF zmienił się lub przekroczył limit.")
         except OSError as error:
             raise VideoNotesError("Nie można odczytać lokalnego wyniku PDF.") from error
         if not output.startswith(b"%PDF-") or b"%%EOF" not in output[-1024:]:

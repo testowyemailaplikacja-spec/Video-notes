@@ -133,6 +133,50 @@ class PDFOfflineTest(unittest.TestCase):
             with self.subTest(size=len(invalid)), self.assertRaises(VideoNotesError):
                 render_pdf_from_docx(invalid)
 
+    def test_local_converter_pdf_symlink_is_rejected_before_read(self):
+        data = b"PK\x03\x04" + b"x" * 200
+        with tempfile.TemporaryDirectory() as temp:
+            unrelated = Path(temp) / "unrelated-private.pdf"
+            unrelated.write_bytes(PDF)
+            def symlink_result(args, **kw):
+                target = Path(args[args.index("--outdir") + 1]) / "document.pdf"
+                try:
+                    target.symlink_to(unrelated)
+                except (OSError, NotImplementedError):
+                    self.skipTest("Local filesystem does not permit symlink creation")
+                return subprocess.CompletedProcess(args, 0)
+            with patch("videonotes.pdf_export.executable", return_value="office"), patch(
+                "videonotes.pdf_export.subprocess.run", side_effect=symlink_result
+            ):
+                with self.assertRaisesRegex(VideoNotesError, "zwykłego lokalnego PDF"):
+                    render_pdf_from_docx(data)
+            self.assertEqual(unrelated.read_bytes(), PDF)
+
+    def test_local_converter_growing_pdf_rejected_by_actual_bounded_read(self):
+        source = b"PK\x03\x04" + b"x" * 200
+        original_open = Path.open
+        changed = []
+        def grow_when_pdf_is_opened(path, mode="r", *args, **kwargs):
+            result = original_open(path, mode, *args, **kwargs)
+            if Path(path).name == "document.pdf" and mode == "rb":
+                # PDF was short at stat(), now exceeds the configured limit.
+                with original_open(path, "ab") as writer:
+                    writer.write(b"G" * 1100)
+                changed.append(True)
+            return result
+        def original_result(args, **kw):
+            target = Path(args[args.index("--outdir") + 1]) / "document.pdf"
+            target.write_bytes(PDF)
+            return subprocess.CompletedProcess(args, 0)
+        with patch("videonotes.pdf_export.MAX_PDF_BYTES", 1024), patch(
+            "videonotes.pdf_export.executable", return_value="office"
+        ), patch("videonotes.pdf_export.subprocess.run", side_effect=original_result), patch(
+            "pathlib.Path.open", new=grow_when_pdf_is_opened
+        ):
+            with self.assertRaisesRegex(VideoNotesError, "przekroczył limit"):
+                render_pdf_from_docx(source)
+        self.assertEqual(changed, [True])
+
     def test_broken_or_missing_pdf_result_fails_closed(self):
         data = b"PK\x03\x04" + b"x" * 500
         def bad_writer(command, **kwargs):
@@ -146,7 +190,7 @@ class PDFOfflineTest(unittest.TestCase):
         with patch("videonotes.pdf_export.executable", return_value="/tmp/office"), \
              patch("videonotes.pdf_export.subprocess.run",
                    return_value=subprocess.CompletedProcess(["/tmp/office"], 0)):
-            with self.assertRaisesRegex(VideoNotesError, "Nie udało"):
+            with self.assertRaisesRegex(VideoNotesError, "nie utworzył"):
                 render_pdf_from_docx(data)
 
     def test_cli_pdf_options_and_default_unchanged_with_simulated_conversion(self):
