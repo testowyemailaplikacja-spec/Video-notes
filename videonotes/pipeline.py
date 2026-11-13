@@ -14,6 +14,7 @@ from .asr import WhisperCpp
 from .contracts import PROJECT_SCHEMA, empty_edits, empty_transcript, sha256_file, validate_transcript
 from .errors import VideoNotesError
 from .media import choose_stream, extract_chunk, probe
+from .lock_content import read_bounded_lock
 from .storage import read_project, save_json
 
 Progress = Callable[[int, int], None]
@@ -147,7 +148,9 @@ def transcription_lock_status(folder: Path) -> dict:
     try:
         if lock.stat().st_size > 80:
             return {"state": "invalid"}
-        match = re.fullmatch(rb"pid=([1-9][0-9]{0,9})\r?\n", lock.read_bytes())
+        match = re.fullmatch(rb"pid=([1-9][0-9]{0,9})\r?\n", read_bounded_lock(lock))
+    except VideoNotesError:
+        return {"state": "invalid"}
     except OSError:
         return {"state": "unknown"}
     if match is None:
@@ -165,7 +168,7 @@ def recover_stale_transcription_lock(folder: Path, *, confirm: bool = False) -> 
     lock = folder / ".processing.lock"
     try:
         before = lock.lstat()
-        payload = lock.read_bytes()
+        payload = read_bounded_lock(lock)
     except OSError as error:
         raise VideoNotesError("Nie znaleziono istniejącej blokady transkrypcji.") from error
     status = transcription_lock_status(folder)
@@ -176,7 +179,7 @@ def recover_stale_transcription_lock(folder: Path, *, confirm: bool = False) -> 
         after = lock.lstat()
         if (before.st_ino != after.st_ino or before.st_dev != after.st_dev or
                 before.st_mtime_ns != after.st_mtime_ns or before.st_size != after.st_size or
-                payload != lock.read_bytes()):
+                payload != read_bounded_lock(lock)):
             raise VideoNotesError("Blokada zmieniła się podczas sprawdzania; przerwano odzyskiwanie.")
     except OSError as error:
         raise VideoNotesError("Nie można bezpiecznie potwierdzić tożsamości blokady.") from error
