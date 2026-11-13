@@ -287,6 +287,11 @@ def transcribe_project(folder: Path, *, ffmpeg: str = "ffmpeg", ffprobe: str = "
             if warnings:
                 candidate["warnings"] = warnings
             validate_transcript(candidate, project)
+            # Cancellation may arrive while a long local ASR call is running.
+            # Never publish that late result after the user already requested
+            # Stop. Earlier committed chunks remain resumable.
+            if cancel and cancel():
+                raise VideoNotesError("Przerwano na żądanie. Zakończone fragmenty zapisano; użyj resume.")
             ensure_processing_lock()
             save_json(folder / "transcript.json", candidate)
             transcript = candidate
