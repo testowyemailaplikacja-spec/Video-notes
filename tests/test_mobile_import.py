@@ -1,0 +1,76 @@
+"""Test read-only portable file import; not physical Android/iOS testing."""
+from __future__ import annotations
+
+import json
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from videonotes.errors import VideoNotesError
+from videonotes.mobile_contract import MAX_JSON_BYTES
+from videonotes.mobile_import import import_portable_file
+
+
+class PortableImportTest(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.source = Path(self.temp.name) / "input.json"
+        self.doc = {"schema": "videonotes-export-v1", "project_id": "local",
+                    "language": "pl", "complete": False,
+                    "segments": [{"id": "s0", "start_ms": 0,
+                                  "end_ms": 1000, "text": "Zażółć"}]}
+
+    def test_roundtrip_is_read_only_and_returns_digest(self):
+        raw = json.dumps(self.doc, ensure_ascii=False).encode("utf-8")
+        self.source.write_bytes(raw)
+        reply = import_portable_file(self.source)
+        self.assertEqual(reply["document"], self.doc)
+        self.assertEqual(reply["source_bytes"], len(raw))
+        self.assertEqual(len(reply["source_sha256"]), 64)
+        reply["document"]["segments"][0]["text"] = "changed"
+        self.assertEqual(self.source.read_bytes(), raw)
+
+    def test_bad_json_and_oversized_file_are_refused(self):
+        self.source.write_bytes(b"{invalid")
+        with self.assertRaises(VideoNotesError):
+            import_portable_file(self.source)
+        with self.source.open("wb") as fh:
+            fh.truncate(MAX_JSON_BYTES + 1)
+        with self.assertRaises(VideoNotesError):
+            import_portable_file(self.source)
+
+    def test_missing_and_symlink_are_refused(self):
+        with self.assertRaises(VideoNotesError):
+            import_portable_file(self.source)
+        real = Path(self.temp.name) / "real.json"
+        real.write_text(json.dumps(self.doc), encoding="utf-8")
+        try:
+            self.source.symlink_to(real)
+        except (OSError, NotImplementedError):
+            self.skipTest("symlink creation unavailable")
+        with self.assertRaises(VideoNotesError):
+            import_portable_file(self.source)
+
+    def test_truncated_read_rejects_without_modification(self):
+        raw = json.dumps(self.doc).encode("utf-8")
+        self.source.write_bytes(raw)
+        import videonotes.mobile_import as module
+        actual_read = module.os.read
+        attempts = 0
+
+        def short_read(fd, n):
+            nonlocal attempts
+            attempts += 1
+            return b"" if attempts == 2 else actual_read(fd, 5)
+
+        with patch.object(module.os, "read", side_effect=short_read):
+            with self.assertRaises(VideoNotesError):
+                import_portable_file(self.source)
+        self.assertEqual(self.source.read_bytes(), raw)
+        self.assertEqual(import_portable_file(self.source)["document"], self.doc)
+
+
+if __name__ == "__main__":
+    unittest.main()

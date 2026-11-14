@@ -61,6 +61,8 @@ test("desktop, mobile and browser reject the same malformed source fields", () =
   push(doc => { doc.segments[1].id = doc.segments[0].id; });
   push(doc => { doc.segments[1].start_ms = 0; doc.segments[1].end_ms = 0; });
   push(doc => { doc.complete = "yes"; });
+  push(doc => { doc.language = []; });
+  push(doc => { doc.language = {}; });
   push(doc => { doc.segments[1].start_ms = true; });
   push(doc => { doc.segments[0].text = "😀".repeat(5001); });
   push(doc => { doc.segments[1].id = "../bad"; });
@@ -93,4 +95,60 @@ test("both parsers accept extra metadata but strip it from canonical result", ()
   assert.deepEqual(mobile, browser);
   assert.equal(Object.hasOwn(browser, "untrusted"), false);
   assert.equal(Object.hasOwn(browser.segments[0], "debug"), false);
+});
+
+
+const PYTHON_CORRECTIONS = [
+  "import json,sys",
+  "from videonotes.mobile_corrections import render_mobile_corrections, parse_mobile_corrections",
+  "value=json.load(sys.stdin)",
+  "try:",
+  "    if value['mode']=='render':",
+  "        out=render_mobile_corrections(value['document'],value['edits'])",
+  "        print(out.decode('utf-8'))",
+  "    else:",
+  "        patch=parse_mobile_corrections(value['document'],value['raw'].encode('utf-8'))",
+  "        print(json.dumps(patch,ensure_ascii=False))",
+  "except Exception:",
+  "    sys.exit(2)",
+].join("\n");
+
+function pythonCorrections(payload) {
+  return spawnSync("python", ["-c", PYTHON_CORRECTIONS], {
+    cwd: path.resolve(__dirname, ".."), input: JSON.stringify(payload),
+    encoding: "utf8", timeout: 15000, maxBuffer: 4 * 1024 * 1024
+  });
+}
+
+test("Mobile Python corrections are accepted by offline browser without source loss", () => {
+  const original = documentFixture();
+  const untouched = JSON.stringify(original);
+  const edits = {"c0000000-s00001": "Poprawka: DHCP i zażółć 😀"};
+  const python = pythonCorrections({mode: "render", document: original, edits});
+  assert.equal(python.status, 0, python.stderr);
+  const imported = core.parseCorrections(original, python.stdout.trim());
+  assert.equal(Object.getPrototypeOf(imported), null);
+  assert.deepEqual({...imported}, edits);
+  assert.equal(JSON.stringify(original), untouched, "input source was mutated");
+  const browserPatch = core.renderCorrections(original, edits);
+  const parsed = pythonCorrections({mode: "parse", document: original, raw: browserPatch});
+  assert.equal(parsed.status, 0, parsed.stderr);
+  assert.deepEqual(JSON.parse(parsed.stdout), edits);
+});
+
+test("Mobile and browser corrections reject same-source mismatches and duplicate JSON keys", () => {
+  const model = documentFixture();
+  const raw = core.renderCorrections(model, {"c0000000-s00000": "Poprawiono"});
+  const invalid = [
+    raw.replace('"project_id": "local-PL-01"', '"project_id": "wrong"'),
+    raw.replace('"start_ms": 0', '"start_ms": 19'),
+    raw.replace('"before": "Zażółć', '"before": "Niepoparte Zażółć'),
+    raw.replace('"after": "Poprawiono"', '"after": "Poprawiono", "after": "inne"'),
+  ];
+  for (const patch of invalid) {
+    assert.notEqual(patch, raw, "fixture mutation failed");
+    assert.throws(() => core.parseCorrections(model, patch));
+    const py = pythonCorrections({mode: "parse", document: model, raw: patch});
+    assert.equal(py.status, 2, py.stderr);
+  }
 });

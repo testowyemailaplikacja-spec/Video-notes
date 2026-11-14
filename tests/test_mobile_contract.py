@@ -70,5 +70,16 @@ class PortableMobileContractTest(unittest.TestCase):
             parse_portable_export(b" " * (20 * 1024 * 1024 + 1))
 
 
+    def test_unhashable_language_payloads_fail_closed(self):
+        for value in ([], {}, ["pl"]):
+            with self.subTest(value=value):
+                sample = json.loads(json.dumps(self.sample))
+                sample["language"] = value
+                with self.assertRaises(VideoNotesError):
+                    validate_portable_export(sample)
+                with self.assertRaises(VideoNotesError):
+                    parse_portable_export(json.dumps(sample).encode("utf-8"))
+
+
 if __name__ == "__main__":
     unittest.main()
