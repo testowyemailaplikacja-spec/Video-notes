@@ -42,6 +42,22 @@ def _read_stable_file(source: Path) -> tuple[bytes, str]:
                 digest.update(block)
                 if len(contents) > MAX_JSON_BYTES:
                     raise VideoNotesError("Eksport przekracza limit 20 MiB.")
+            # Some Windows filesystems coarsen timestamps. Read the bounded
+            # descriptor a second time and compare bytes via SHA-256 even when
+            # the file metadata appears unchanged after an in-place rewrite.
+            os.lseek(fd, 0, os.SEEK_SET)
+            verify = hashlib.sha256()
+            verified_bytes = 0
+            while True:
+                block = os.read(fd, min(READ_SIZE, MAX_JSON_BYTES + 1 - verified_bytes))
+                if not block:
+                    break
+                verify.update(block)
+                verified_bytes += len(block)
+                if verified_bytes > MAX_JSON_BYTES:
+                    raise VideoNotesError("Eksport przekracza limit 20 MiB.")
+            if verified_bytes != len(contents) or verify.digest() != digest.digest():
+                raise VideoNotesError("Zawartość pliku zmieniła się podczas importu.")
             after = os.fstat(fd)
             if (before.st_dev != after.st_dev or
                     before.st_ino != after.st_ino or
