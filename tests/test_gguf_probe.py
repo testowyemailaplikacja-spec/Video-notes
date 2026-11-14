@@ -1,8 +1,10 @@
 """Synthetic metadata tests; not a real GGUF inference acceptance."""
 import struct
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from videonotes.errors import VideoNotesError
 from videonotes.gguf_probe import inspect_gguf_header
@@ -50,6 +52,55 @@ class GGUFHeaderTest(unittest.TestCase):
             self.skipTest("symlinks unavailable")
         with self.assertRaises(VideoNotesError):
             inspect_gguf_header(self.model)
+
+
+    def test_inplace_header_rewrite_during_probe_is_rejected(self):
+        self.write()
+        import videonotes.gguf_probe as module
+        actual_read = module.os.read
+        calls = 0
+
+        def rewrite_after_first_read(fd, size):
+            nonlocal calls
+            data = actual_read(fd, size)
+            calls += 1
+            if calls == 1:
+                try:
+                    with self.model.open("r+b") as writer:
+                        writer.seek(8)
+                        writer.write(struct.pack("<Q", 3))
+                        writer.flush()
+                except OSError:
+                    self.skipTest("Concurrent model write is disallowed on this filesystem")
+            return data
+
+        with patch.object(module.os, "read", side_effect=rewrite_after_first_read):
+            with self.assertRaises(VideoNotesError):
+                inspect_gguf_header(self.model)
+
+    def test_path_replacement_after_open_is_rejected(self):
+        self.write()
+        replacement = Path(self.temp.name) / "replacement.gguf"
+        replacement.write_bytes(struct.pack("<4sIQQ", b"GGUF", 3, 2, 1) + b"test")
+        import videonotes.gguf_probe as module
+        actual_read = module.os.read
+        calls = 0
+
+        def replace_after_first_read(fd, size):
+            nonlocal calls
+            data = actual_read(fd, size)
+            calls += 1
+            if calls == 1:
+                try:
+                    os.replace(replacement, self.model)
+                except OSError:
+                    self.skipTest("Replacing a currently open model is disallowed")
+            return data
+
+        with patch.object(module.os, "read", side_effect=replace_after_first_read):
+            with self.assertRaises(VideoNotesError):
+                inspect_gguf_header(self.model)
+
 
 
 if __name__ == "__main__":
