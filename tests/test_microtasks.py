@@ -42,6 +42,9 @@ class MicrotaskAuditTests(unittest.TestCase):
     def test_done_without_evidence_is_rejected(self):
         queue = copy.deepcopy(self.queue)
         queue["tasks"][0]["status"] = "DONE"
+        # Earlier TODO tasks may legitimately carry preparatory PR evidence.
+        # This negative test must remove references regardless of ledger state.
+        queue["tasks"][0]["evidence_refs"] = []
         self.assertTrue(any("DONE requires" in x for x in audit(queue, self.phases)))
 
     def test_done_with_unfinished_prerequisite_is_rejected(self):
