@@ -52,6 +52,30 @@ Testy syntetyczne obejmują poprawny podgląd, SHA-256, błędne lub zduplikowan
 pola JSON, limit rozmiaru, symlinki i zmianę zawartości podczas odczytu.
 To przygotowanie kontraktu, nie odbiór rzeczywistego Androida/iOS.
 
+### Bezpieczny lokalny eksport poprawek do pliku
+
+`videonotes.mobile_import.export_mobile_corrections_file(document, edits, destination)`
+tworzy nową paczkę JSON w istniejącym lokalnym katalogu. Nie nadpisuje
+poprzedniej paczki ani istniejących plików: przygotowuje i synchronizuje
+plik tymczasowy, a następnie publikuje go atomowym hard linkiem. Na nośniku
+bez obsługi hard linków zgłasza błąd zamiast zostawić plik częściowy.
+Odrzuca dowiązania katalogów na ścieżce docelowej oraz nazwy inne niż `.json`.
+
+~~~python
+from pathlib import Path
+from videonotes.mobile_import import export_mobile_corrections_file, import_mobile_corrections_file
+report = export_mobile_corrections_file(source["document"], {"s0": "Poprawiona wypowiedź"}, Path("corrections-new.json"))
+preview = import_mobile_corrections_file(source["document"], Path("corrections-new.json"))
+assert report["patch_sha256"] == preview["source_sha256"]
+~~~
+
+Te funkcje nie aktualizują żadnych edycji projektu; podgląd służy do
+świadomego przekazania później do obsługi desktopowej. Testy obejmują
+roundtrip, integralność SHA, odmowę nadpisania, niepowodzenie publikacji
+i symulację równoległego utworzenia pliku. Nie jest to test fizycznego
+urządzenia, aktualizacji mobilnego pliku przez system Android/iOS ani
+gwarancja trwałości na nagły zanik zasilania.
+
 ## Testy automatyczne
 
 ~~~sh

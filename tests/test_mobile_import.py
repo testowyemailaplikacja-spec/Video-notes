@@ -10,7 +10,9 @@ from unittest.mock import patch
 
 from videonotes.errors import VideoNotesError
 from videonotes.mobile_contract import MAX_JSON_BYTES
-from videonotes.mobile_import import import_portable_file, import_mobile_corrections_file
+from videonotes.mobile_import import (
+    import_portable_file, import_mobile_corrections_file, export_mobile_corrections_file,
+)
 from videonotes.mobile_corrections import render_mobile_corrections
 
 
@@ -132,6 +134,55 @@ class PortableImportTest(unittest.TestCase):
                 import_mobile_corrections_file(self.doc, self.source)
         self.assertTrue(changed)
         self.assertEqual(self.source.read_bytes(), raw.replace(b"nowe", b"inne"))
+
+
+
+    def test_local_corrections_write_and_reimport_roundtrip(self):
+        output = Path(self.temp.name) / "corrections.json"
+        result = export_mobile_corrections_file(self.doc, {"s0": "Po poprawce"}, output)
+        saved = output.read_bytes()
+        self.assertFalse(result["applied"])
+        self.assertEqual(result["patch_bytes"], len(saved))
+        self.assertEqual(result["patch_sha256"], hashlib.sha256(saved).hexdigest())
+        preview = import_mobile_corrections_file(self.doc, output)
+        self.assertEqual(preview["changes"], {"s0": "Po poprawce"})
+        self.assertEqual(preview["source_sha256"], result["patch_sha256"])
+        self.assertEqual(self.doc["segments"][0]["text"], "Zażółć")
+
+    def test_local_corrections_write_refuses_existing_file_and_bad_destination(self):
+        self.source.write_bytes(b"DO_NOT_OVERWRITE")
+        with self.assertRaises(VideoNotesError):
+            export_mobile_corrections_file(self.doc, {"s0": "new"}, self.source)
+        self.assertEqual(self.source.read_bytes(), b"DO_NOT_OVERWRITE")
+        with self.assertRaises(VideoNotesError):
+            export_mobile_corrections_file(
+                self.doc, {"s0": "new"}, Path(self.temp.name) / "not-json.txt")
+        with self.assertRaises(VideoNotesError):
+            export_mobile_corrections_file(
+                self.doc, {"s0": "new"}, Path(self.temp.name) / "missing" / "change.json")
+
+    def test_local_corrections_write_link_failure_leaves_no_partial_patch(self):
+        import videonotes.mobile_import as module
+        output = Path(self.temp.name) / "patch.json"
+        with patch.object(module.os, "link", side_effect=OSError("unsupported")):
+            with self.assertRaises(VideoNotesError):
+                export_mobile_corrections_file(self.doc, {"s0": "new"}, output)
+        self.assertFalse(output.exists())
+        self.assertFalse(any(p.name.startswith(".vn-mobile-patch-")
+                             for p in Path(self.temp.name).iterdir()))
+
+    def test_local_corrections_write_race_never_clobbers_other_writer(self):
+        import videonotes.mobile_import as module
+        output = Path(self.temp.name) / "patch.json"
+
+        def existing_concurrent_target(_source, destination):
+            Path(destination).write_bytes(b"OTHER_WRITER")
+            raise FileExistsError("already exists")
+
+        with patch.object(module.os, "link", side_effect=existing_concurrent_target):
+            with self.assertRaises(VideoNotesError):
+                export_mobile_corrections_file(self.doc, {"s0": "new"}, output)
+        self.assertEqual(output.read_bytes(), b"OTHER_WRITER")
 
 
 

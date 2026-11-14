@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import os
 import stat
+import tempfile
 from pathlib import Path
 
 from .errors import VideoNotesError
@@ -100,3 +101,47 @@ def import_mobile_corrections_file(document: dict, source: Path) -> dict:
     changes = parse_mobile_corrections(document, raw)
     return {"changes": changes, "source_sha256": source_sha256,
             "source_bytes": len(raw), "read_only": True}
+
+
+def export_mobile_corrections_file(document: dict, edits: dict[str, str],
+                                   destination: Path) -> dict:
+    """Publish a local corrections JSON without replacing any existing file.
+
+    Stage and fsync under a private temporary directory on the same volume,
+    then create the final path by hard link (atomic no-clobber). If the
+    filesystem cannot create a hard link, refuse rather than leave an
+    incomplete/partially visible patch. No project data is applied or uploaded.
+    """
+    from .mobile_corrections import render_mobile_corrections
+
+    payload = render_mobile_corrections(document, edits)
+    target = Path(destination).expanduser().absolute()
+    if target.suffix.lower() != ".json":
+        raise VideoNotesError("Wybierz docelowy plik poprawek .json.")
+    parent = target.parent
+    if any(folder.is_symlink() or getattr(folder, "is_junction", lambda: False)()
+           for folder in (parent, *parent.parents)):
+        raise VideoNotesError("Katalog docelowy nie może być dowiązaniem.")
+    if not parent.is_dir():
+        raise VideoNotesError("Katalog docelowy poprawek musi już istnieć.")
+    if target.exists() or target.is_symlink():
+        raise VideoNotesError("Plik poprawek już istnieje; nie nadpisuję go.")
+    try:
+        with tempfile.TemporaryDirectory(prefix=".vn-mobile-patch-", dir=parent) as temp:
+            stage = Path(temp) / "corrections.json"
+            with stage.open("xb") as writer:
+                writer.write(payload)
+                writer.flush()
+                os.fsync(writer.fileno())
+            try:
+                os.link(stage, target)
+            except FileExistsError as error:
+                raise VideoNotesError("Plik poprawek powstał równolegle; nie nadpisuję go.") from error
+            except OSError as error:
+                raise VideoNotesError(
+                    "Nośnik nie pozwala bezpiecznie opublikować nowej paczki poprawek."
+                ) from error
+    except OSError as error:
+        raise VideoNotesError("Nie można przygotować lokalnego pliku poprawek.") from error
+    return {"patch_sha256": hashlib.sha256(payload).hexdigest(),
+            "patch_bytes": len(payload), "applied": False}
