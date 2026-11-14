@@ -16,8 +16,12 @@ from .mobile_contract import MAX_JSON_BYTES, parse_portable_export
 READ_SIZE = 64 * 1024
 
 
-def import_portable_file(source: Path) -> dict:
-    """Validate a stable local export without partially applying user edits."""
+def _read_stable_file(source: Path) -> tuple[bytes, str]:
+    """Read a bounded regular file through one descriptor; reject swaps/edits.
+
+    Portable transcript JSON and corrections JSON have the same 20 MiB cap.
+    The digest describes the exact bytes parsed, not a later file reread.
+    """
     path = Path(source).expanduser()
     if path.is_symlink():
         raise VideoNotesError("Import nie pozwala na dowiązania symboliczne.")
@@ -54,8 +58,30 @@ def import_portable_file(source: Path) -> dict:
     if (not stat.S_ISREG(visible.st_mode)
             or visible.st_dev != after.st_dev or visible.st_ino != after.st_ino
             or visible.st_size != after.st_size
-            or visible.st_mtime_ns != after.st_mtime_ns):
+            or visible.st_mtime_ns != after.st_mtime_ns
+            or visible.st_ctime_ns != after.st_ctime_ns):
         raise VideoNotesError("Źródłowy plik importu został podmieniony.")
-    doc = parse_portable_export(bytes(contents))
-    return {"document": doc, "source_sha256": digest.hexdigest(),
-            "source_bytes": len(contents), "read_only": True}
+    return bytes(contents), digest.hexdigest()
+
+
+def import_portable_file(source: Path) -> dict:
+    """Validate a stable local transcript without partially applying edits."""
+    raw, source_sha256 = _read_stable_file(source)
+    doc = parse_portable_export(raw)
+    return {"document": doc, "source_sha256": source_sha256,
+            "source_bytes": len(raw), "read_only": True}
+
+
+def import_mobile_corrections_file(document: dict, source: Path) -> dict:
+    """Preview an on-disk mobile/browser patch against a specific export.
+
+    Fail the entire preview on a wrong project, stale source, duplicate IDs,
+    malformed JSON, oversized data or an in-place file change. Never save
+    project state. A deliberate desktop import is needed to apply corrections.
+    """
+    from .mobile_corrections import parse_mobile_corrections
+
+    raw, source_sha256 = _read_stable_file(source)
+    changes = parse_mobile_corrections(document, raw)
+    return {"changes": changes, "source_sha256": source_sha256,
+            "source_bytes": len(raw), "read_only": True}
