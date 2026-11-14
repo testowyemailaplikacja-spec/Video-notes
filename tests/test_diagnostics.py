@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import struct
 import tempfile
 import unittest
 from pathlib import Path
@@ -84,7 +85,7 @@ class DiagnosticsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             gguf = root / "private-lecture.gguf"
-            gguf.write_bytes(b"GGUF" + b"\x00" * 20)
+            gguf.write_bytes(struct.pack("<4sIQQ", b"GGUF", 3, 2, 1) + b"weights")
             tool = root / "private-llama-cli"
             tool.write_bytes(b"local test executable")
             # executable is only a lookup: fake versions never perform ASR.
@@ -111,6 +112,20 @@ class DiagnosticsTest(unittest.TestCase):
                 self.assertIs(report[key], False)
             self.assertNotIn(str(root), json.dumps(report))
             self.assertNotIn("/private", json.dumps(report))
+
+    def test_gguf_header_v1_or_zero_tensors_are_rejected_from_capability(self):
+        from videonotes.diagnostics import _gguf_model_status
+        with tempfile.TemporaryDirectory() as temp:
+            model = Path(temp) / "fake.gguf"
+            for version, tensors in ((1, 2), (4, 2), (3, 0)):
+                with self.subTest(version=version, tensors=tensors):
+                    model.write_bytes(struct.pack("<4sIQQ", b"GGUF", version, tensors, 1) + b"x")
+                    self.assertEqual(_gguf_model_status(model)["state"], "invalid_header")
+            model.write_bytes(struct.pack("<4sIQQ", b"GGUF", 3, 2, 1) + b"weights")
+            accepted = _gguf_model_status(model)
+            self.assertEqual(accepted["state"], "header_fingerprinted")
+            self.assertEqual(accepted["gguf_version"], 3)
+            self.assertFalse(accepted["model_inference_tested"])
 
     def test_missing_tesseract_language_and_bogus_gguf_cannot_claim_capability(self):
         with tempfile.TemporaryDirectory() as temp:

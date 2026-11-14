@@ -395,7 +395,22 @@ async function main() {
       socket.addEventListener("message", onMessage);
       socket.send(JSON.stringify({id, method, params}));
     });
+    // CDP observes attempted network requests, not just successful resource
+    // timing entries. This includes failed outbound fetch attempts by the page.
+    let outboundAttempts = 0;
+    socket.addEventListener("message", event => {
+      try {
+        const data = JSON.parse(String(event.data));
+        if (data.method === "Network.requestWillBeSent" &&
+            /^https?:/i.test(data.params?.request?.url || "")) {
+          outboundAttempts += 1;
+        }
+      } catch (_error) {
+        // Other CDP events are irrelevant; never log their user data.
+      }
+    });
     await cdp(1, "Page.enable", {});
+    await cdp(12, "Network.enable", {});
     const navigation = await cdp(2, "Page.navigate", {url: pathToFileURL(root).href});
     if (navigation.errorText) throw new Error("Chrome cannot navigate to local KWN file: " + navigation.errorText);
     await pause(800);
@@ -417,6 +432,7 @@ async function main() {
     assert.equal(payload.exportContainsEdit, true);
     assert.equal(payload.deniedReplacePreserved, true);
     assert.equal(payload.networkRequests, 0);
+    assert.equal(outboundAttempts, 0, "Page attempted an HTTP(S) request under file://");
     process.stdout.write("Chromium file:// KWN import/edit/export/replace smoke PASS\n");
     // A separate fresh page avoids the in-memory anchor/Blob mocks used by
     // cross-browser functional smoke; verify what really lands on disk.

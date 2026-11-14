@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Callable
 
 from .errors import VideoNotesError
+from .gguf_probe import inspect_gguf_header
 from .media import executable, probe
 
 
@@ -98,27 +99,31 @@ def _optional_binary(command: str | None) -> dict:
 
 
 def _gguf_model_status(path: Path | None) -> dict:
-    """Check a *possible* GGUF file without loading its contents as a model."""
+    """Inspect a real GGUF header, never equate magic bytes with model readiness."""
     if path is None:
         return {"state": "not_provided"}
     value = Path(path).expanduser()
     try:
-        if (value.is_symlink() or not value.is_file() or value.suffix.lower() != ".gguf"
-                or not 16 <= value.stat().st_size <= 32 * 1024 ** 3):
+        if value.is_symlink() or not value.is_file() or value.suffix.lower() != ".gguf":
             return {"state": "invalid"}
-        with value.open("rb") as stream:
-            if stream.read(4) != b"GGUF":
-                return {"state": "invalid_header"}
+        try:
+            header = inspect_gguf_header(value)
+        except VideoNotesError:
+            return {"state": "invalid_header"}
         digest = hashlib.sha256()
         with value.open("rb") as stream:
             for block in iter(lambda: stream.read(2 * 1024 * 1024), b""):
                 digest.update(block)
+        if inspect_gguf_header(value) != header:
+            return {"state": "invalid", "reason": "changed_during_inspection"}
         return {"state": "header_fingerprinted", "sha256": digest.hexdigest(),
-                "size_bytes": value.stat().st_size,
+                "size_bytes": header["model_bytes"],
+                "gguf_version": header["gguf_version"],
+                "tensor_count": header["tensor_count"],
+                "metadata_entries": header["metadata_entries"],
                 "format_verified_beyond_header": False, "model_inference_tested": False}
-    except OSError:
+    except (OSError, VideoNotesError):
         return {"state": "invalid"}
-
 
 def _tesseract_status(command: str | None, language: str, *,
                       runner: Callable[..., object]) -> dict:
