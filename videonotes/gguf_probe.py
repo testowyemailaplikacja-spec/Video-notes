@@ -12,7 +12,11 @@ MAX_BYTES = 32 * 1024**3
 
 
 def inspect_gguf_header(model: Path) -> dict:
-    """Inspect local v2/v3 GGUF metadata without loading or executing weights."""
+    """Inspect local v2/v3 header and reject same-descriptor/path swaps.
+
+    This only examines 24 header bytes; it does not inspect all GGUF metadata,
+    verify model weights, authorize licenses or attempt llama.cpp inference.
+    """
     path = Path(model).expanduser()
     if path.is_symlink():
         raise VideoNotesError("Model GGUF nie może być dowiązaniem symbolicznym.")
@@ -30,16 +34,29 @@ def inspect_gguf_header(model: Path) -> dict:
             if (magic != b"GGUF" or version not in (2, 3)
                     or not 0 < tensors <= 2_000_000 or metadata > 1_000_000):
                 raise VideoNotesError("Nieobsługiwany nagłówek GGUF.")
+            # Recheck the same opened file: coarse timestamp resolution on
+            # Windows can hide an in-place header rewrite between stat calls.
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            if os.read(descriptor, 24) != raw:
+                raise VideoNotesError("Nagłówek GGUF zmienił się podczas sprawdzania.")
             last = os.fstat(descriptor)
-            if (first.st_size != last.st_size or
-                    first.st_mtime_ns != last.st_mtime_ns or first.st_ino != last.st_ino):
+            if (first.st_dev != last.st_dev or first.st_size != last.st_size
+                    or first.st_mtime_ns != last.st_mtime_ns
+                    or first.st_ctime_ns != last.st_ctime_ns
+                    or first.st_ino != last.st_ino):
                 raise VideoNotesError("Model GGUF zmienił się podczas sprawdzania.")
         finally:
             os.close(descriptor)
+        # Verify the visible pathname still names the same regular file.
+        # Compare portable file identity and mtime, not Windows path-vs-fd ctime.
+        visible = path.lstat()
     except OSError as error:
         raise VideoNotesError("Nie można bezpiecznie odczytać GGUF.") from error
-    if path.is_symlink() or not path.is_file():
-        raise VideoNotesError("Model GGUF zmienił się podczas sprawdzania.")
+    if (not stat.S_ISREG(visible.st_mode)
+            or visible.st_dev != last.st_dev or visible.st_ino != last.st_ino
+            or visible.st_size != last.st_size
+            or visible.st_mtime_ns != last.st_mtime_ns):
+        raise VideoNotesError("Model GGUF został podmieniony podczas sprawdzania.")
     return {"gguf_version": version, "tensor_count": tensors,
             "metadata_entries": metadata, "model_bytes": first.st_size,
             "header_only": True, "runtime_compatibility_verified": False}
