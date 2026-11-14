@@ -58,8 +58,7 @@ def _read_stable_file(source: Path) -> tuple[bytes, str]:
     if (not stat.S_ISREG(visible.st_mode)
             or visible.st_dev != after.st_dev or visible.st_ino != after.st_ino
             or visible.st_size != after.st_size
-            or visible.st_mtime_ns != after.st_mtime_ns
-            or visible.st_ctime_ns != after.st_ctime_ns):
+            or visible.st_mtime_ns != after.st_mtime_ns):
         raise VideoNotesError("Źródłowy plik importu został podmieniony.")
     return bytes(contents), digest.hexdigest()
 
