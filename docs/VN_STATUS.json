@@ -119,7 +119,8 @@
         "2026-11-13: PR #190 współdzielony bezpieczny pakiet publikacji konspektów i przewodników Markdown/JSON/DOCX/PDF, staging+rollback przy awarii zapisu oraz ponowne sprawdzenie aktualności źródła. Final head 74625edd2077e75e9579d95b977ba76990d9ad59, CI 12/12 PASS, develop squash bf4043c18f7ce034fc4959f97b3cd305f17ac4f9. Brak gwarancji wieloplikowej atomowości przy awarii zasilania; kontrola człowieka nadal NOT_RUN.",
         "2026-11-13: PR #191 wynik LibreOffice PDF czytany z rzeczywistym limitem 64 MiB (także po stat), odmowa symlinków poza tmp, testy symulacji wzrostu oraz symlinków. Final head d804ea74fb7123f45733b04436a300a94be7043a: 8/8 CI PASS, squash 81ca7dcca7f0d7cb9618527dbcd5509caaf85a9a. Prawdziwa ręczna ocena Windows Word/LibreOffice nadal NOT_RUN.",
         "2026-11-13: PR #192 podstawowe notes-export MD/TXT/DOCX/PDF generowane z jednego snapshotu, staging i rollback po częściowym błędzie, ochrona przed przestarzałą poprawką podczas konwersji. Final head cfcf30317d7f4067aa8b1fde36f573f27834c451: 11/11 CI PASS, squash a37b27f14bad3315c8f95b3be5c4689018063db4. Fizyczny Windows/licencje NOT_RUN.",
-        "PR #194: coding-only GGUF safety probe and portable mobile adapter; no real model or device acceptance claimed; https://github.com/testowyemailaplikacja-spec/Video-notes/pull/194"
+        "PR #194: coding-only GGUF safety probe and portable mobile adapter; no real model or device acceptance claimed; https://github.com/testowyemailaplikacja-spec/Video-notes/pull/194",
+        "2026-11-14 PR #197: source-only GGUF stable header and pathname validation against concurrent replacement; synthetic tests pending final CI. Real model, license and factual human acceptance remain NOT_RUN; VN-02 stays W_TRAKCIE. https://github.com/testowyemailaplikacja-spec/Video-notes/pull/197"
       ],
       "blockers": [
         "Human assessment on real lectures",
@@ -283,7 +284,8 @@
       "evidence": [
         "2026-11-12 PR #162: przygotowano read-only, lokalny walidator przenośnego videonotes-export-v1 (20 MiB, 50k segmentów, Unicode UTF-16, unikalne ID/klucze) oraz kontrakty przyszłych adapterów Android/iOS. Testy Linux/Windows 7/7 GitHub CI PASS, squash develop 1823044ede91fbcebbdae964874e0b67f3391730. Nie ma implementacji mobilnej, decyzji produktowej ani testów fizycznych; VN-08 pozostaje PLANOWANE.",
         "2026-11-13 PR #171: automatyczne kontrakty offline Python/Node Linux/Windows dla eksportu, Unicode, błędnych kluczy, czasu, ID i powtórzeń mowy. CI 6/6 PASS; fizyczne urządzenia i decyzja mobilnego MVP NOT_RUN; VN-08 pozostaje PLANOWANE.",
-        "PR #194: coding-only GGUF safety probe and portable mobile adapter; no real model or device acceptance claimed; https://github.com/testowyemailaplikacja-spec/Video-notes/pull/194"
+        "PR #194: coding-only GGUF safety probe and portable mobile adapter; no real model or device acceptance claimed; https://github.com/testowyemailaplikacja-spec/Video-notes/pull/194",
+        "2026-11-14 PR #196: local read-only corrections-file preview, bounded 20MiB, two-pass SHA-256 and source/version checks. Seven source/browser/Windows DEV CI checks PASS, squash develop 62f6e4ebbffb4762fd0260f36c4e0a8e3ace7341. Physical Android/iOS and owner MVP decision NOT_RUN; VN-08 stays PLANOWANE. https://github.com/testowyemailaplikacja-spec/Video-notes/pull/196"
       ],
       "blockers": [
         "Mobile compatibility and optional future scope"
