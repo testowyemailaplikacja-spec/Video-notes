@@ -152,10 +152,11 @@
       "depends_on": [
         "VN-01-01"
       ],
-      "acceptance_note": "W toku: skrypt do prywatnego, rzeczywistego uruchomienia llama-cli z lokalnym GGUF, preflight nagłówka, próbkowanie RAM/CPU, źródłowe cytaty i syntetyczne testy. Brak legalnie dostarczonego pełnego modelu/wykonanego przebiegu oraz naturalnego nagrania i ręcznej oceny NOTE-01; NOT_DONE.",
+      "acceptance_note": "W toku: skrypt do prywatnego, rzeczywistego uruchomienia llama-cli z lokalnym GGUF, preflight nagłówka, próbkowanie RAM/CPU, źródłowe cytaty i syntetyczne testy. Brak legalnie dostarczonego pełnego modelu/wykonanego przebiegu oraz naturalnego nagrania i ręcznej oceny NOTE-01; NOT_DONE. PR #197 dodaje ochronę przed in-place/path swap nagłówka GGUF; bez realnego modelu, testu inferencji i odbioru jakości.",
       "evidence_refs": [
         "https://github.com/testowyemailaplikacja-spec/Video-notes/pull/194",
-        "https://github.com/testowyemailaplikacja-spec/Video-notes/blob/chatgpt/kwn-vn02-vn08-contract-20261114/docs/VN02_VN08_ACCEPTANCE_PREP_20261114.md"
+        "https://github.com/testowyemailaplikacja-spec/Video-notes/blob/chatgpt/kwn-vn02-vn08-contract-20261114/docs/VN02_VN08_ACCEPTANCE_PREP_20261114.md",
+        "https://github.com/testowyemailaplikacja-spec/Video-notes/pull/197"
       ]
     },
     {
@@ -508,10 +509,11 @@
       "depends_on": [
         "VN-08-01"
       ],
-      "acceptance_note": "W toku: bezpieczny lokalny import, SHA-256, ograniczenia wielkości, odwracalne paczki korekt do desktop/browser i testy kontraktu. Brak zatwierdzonej VN-08-01 (Android/iOS MVP), emulatorów/fizycznych urządzeń i odbioru MOB-01; NOT_DONE.",
+      "acceptance_note": "W toku: bezpieczny lokalny import, SHA-256, ograniczenia wielkości, odwracalne paczki korekt do desktop/browser i testy kontraktu. Brak zatwierdzonej VN-08-01 (Android/iOS MVP), emulatorów/fizycznych urządzeń i odbioru MOB-01; NOT_DONE. PR #196 scalony do develop (62f6e4e): walidowany dwukrotnym SHA import paczki poprawek z lokalnego pliku i brak zapisu; 7/7 CI PASS. Decyzja i urządzenia nadal NOT_RUN.",
       "evidence_refs": [
         "https://github.com/testowyemailaplikacja-spec/Video-notes/pull/194",
-        "https://github.com/testowyemailaplikacja-spec/Video-notes/blob/chatgpt/kwn-vn02-vn08-contract-20261114/docs/VN02_VN08_ACCEPTANCE_PREP_20261114.md"
+        "https://github.com/testowyemailaplikacja-spec/Video-notes/blob/chatgpt/kwn-vn02-vn08-contract-20261114/docs/VN02_VN08_ACCEPTANCE_PREP_20261114.md",
+        "https://github.com/testowyemailaplikacja-spec/Video-notes/pull/196"
       ]
     }
   ]
