@@ -61,6 +61,8 @@ test("desktop, mobile and browser reject the same malformed source fields", () =
   push(doc => { doc.segments[1].id = doc.segments[0].id; });
   push(doc => { doc.segments[1].start_ms = 0; doc.segments[1].end_ms = 0; });
   push(doc => { doc.complete = "yes"; });
+  push(doc => { doc.language = []; });
+  push(doc => { doc.language = {}; });
   push(doc => { doc.segments[1].start_ms = true; });
   push(doc => { doc.segments[0].text = "😀".repeat(5001); });
   push(doc => { doc.segments[1].id = "../bad"; });
