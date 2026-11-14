@@ -54,7 +54,8 @@ def validate_portable_export(data: Any) -> dict:
     """
     if (not isinstance(data, dict) or data.get("schema") != SCHEMA
             or not _text(data.get("project_id"), 128) or not data["project_id"].strip()
-            or data.get("language") not in {"pl", "en", "auto"}
+            or not isinstance(data.get("language"), str)
+            or data["language"] not in {"pl", "en", "auto"}
             or type(data.get("complete")) is not bool
             or not isinstance(data.get("segments"), list)
             or len(data["segments"]) > MAX_SEGMENTS):
