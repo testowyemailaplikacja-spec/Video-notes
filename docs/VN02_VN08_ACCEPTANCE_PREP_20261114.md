@@ -42,3 +42,9 @@ Testy syntetyczne w CI potwierdzają wyłącznie działanie kodu oraz zgodność
 Zwykły ChatGPT / CI: poprawki kodu, testy bez modelu, weryfikacja kontraktu, raport techniczny i przygotowanie scenariuszy.
 
 Work / tester: tylko brakujący odbiór realnego GGUF i naturalnego audio, fizyczne Windows/Android/iOS oraz ręczne sprawdzenie twierdzeń. Decyzja o zakresie aplikacji i licencjach należy do właściciela/osoby upoważnionej.
+
+## Mobilny obieg poprawek (niezależny od natywnych API)
+
+`videonotes/mobile_corrections.py` zawiera `render_mobile_corrections(document, edits) -> bytes` i `parse_mobile_corrections(document, payload) -> dict`. Korzysta z istniejącego odwracalnego `videonotes-web-corrections-v1`; sprawdza oryginalny tekst (`before`), ID segmentu i czasy, limit 20 MiB, JSON i kompletność wszystkich zmian przed ich zwróceniem. Jest to warstwa pamięciowa: nie zapisuje projektu ani nie nakłada zmian bez decyzji użytkownika. Import eksportu i stworzenie paczki poprawek można testować bez urządzeń mobilnych; konkretna aplikacja Android/iOS nadal zależy od VN-08-01.
+
+Test `tests/test_mobile_corrections.py` kontroluje źródła, brak zapisu, niejednoznaczne pola i konflikty; `tests/web-mobile-contract.test.cjs` sprawdza dwustronne przyjęcie paczki przez walidator Python i faktyczny kod JS przeglądarki. Nadal trzeba zweryfikować urządzenia i zatwierdzić zakres mobilnego MVP.
