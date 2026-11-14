@@ -27,6 +27,31 @@ C — zakres B plus lokalne ASR na urządzeniu z osobną analizą RAM, baterii, 
 
 Do pełnej specyfikacji potrzebne: decyzja A/B/C, wersje Android/iOS, minimalny budżet pamięci, testy rzeczywistych urządzeń, polityka trwałych checkpointów, osobne import/eksport poprawek i odbiór uprawnień. Nie włączono żadnych niezatwierdzonych funkcji mobilnych.
 
+
+### Lokalny podgląd paczki poprawek z pliku (VN-08-02)
+
+`videonotes.mobile_import.import_mobile_corrections_file(document, path)` czyta lokalny
+plik poprawki bez jej zastosowania. Sprawdza, czy plik jest regularny,
+nie jest symlinkiem, ma nie więcej niż 20 MiB, nie zmienił się podczas odczytu,
+a następnie wymaga pełnej zgodności ID projektu, źródłowych ID, czasów i tekstu
+przed poprawkami. Zwraca odłączone `changes`, `source_sha256`,
+`source_bytes` i `read_only=True`. Digest odpowiada dokładnie bajtom,
+które zostały zwalidowane. Nie tworzy mobilnej aplikacji i nie zapisuje
+zmian do projektu. Przykład integracji (wyłącznie pliki własne użytkownika):
+
+~~~python
+from pathlib import Path
+from videonotes.mobile_import import import_portable_file, import_mobile_corrections_file
+source = import_portable_file(Path("transcript.json"))
+preview = import_mobile_corrections_file(source["document"], Path("corrections.json"))
+# Przed zastosowaniem zmian wymagana jest oddzielna, świadoma operacja
+# desktopowa z walidacją aktualnego stanu projektu.
+~~~
+
+Testy syntetyczne obejmują poprawny podgląd, SHA-256, błędne lub zduplikowane
+pola JSON, limit rozmiaru, symlinki i zmianę zawartości podczas odczytu.
+To przygotowanie kontraktu, nie odbiór rzeczywistego Androida/iOS.
+
 ## Testy automatyczne
 
 ~~~sh
