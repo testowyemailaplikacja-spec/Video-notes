@@ -286,7 +286,7 @@
         "2026-11-13 PR #171: automatyczne kontrakty offline Python/Node Linux/Windows dla eksportu, Unicode, błędnych kluczy, czasu, ID i powtórzeń mowy. CI 6/6 PASS; fizyczne urządzenia i decyzja mobilnego MVP NOT_RUN; VN-08 pozostaje PLANOWANE.",
         "PR #194: coding-only GGUF safety probe and portable mobile adapter; no real model or device acceptance claimed; https://github.com/testowyemailaplikacja-spec/Video-notes/pull/194",
         "2026-11-14 PR #196: local read-only corrections-file preview, bounded 20MiB, two-pass SHA-256 and source/version checks. Seven source/browser/Windows DEV CI checks PASS, squash develop 62f6e4ebbffb4762fd0260f36c4e0a8e3ace7341. Physical Android/iOS and owner MVP decision NOT_RUN; VN-08 stays PLANOWANE. https://github.com/testowyemailaplikacja-spec/Video-notes/pull/196",
-        "2026-11-14 PR #198: new atomic no-clobber local patch publication API (stage, fsync, hardlink) and file roundtrip/hash tests; final CI pending. No mobile device, product-scope approval or public release acceptance. VN-08 remains PLANOWANE. https://github.com/testowyemailaplikacja-spec/Video-notes/pull/198"
+        "2026-11-14 PR #198: atomic no-clobber local corrections JSON publication API (stage, fsync, hardlink), roundtrip/hash, disk-error and concurrent-write tests. Final GitHub CI 9/9 PASS, squash develop ffbb42aece76ba854562eec9485206184eaab70c. No physical Android/iOS tests, product scope approval or release acceptance; VN-08 remains PLANOWANE. https://github.com/testowyemailaplikacja-spec/Video-notes/pull/198"
       ],
       "blockers": [
         "Mobile compatibility and optional future scope"
