@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
@@ -9,7 +10,8 @@ from unittest.mock import patch
 
 from videonotes.errors import VideoNotesError
 from videonotes.mobile_contract import MAX_JSON_BYTES
-from videonotes.mobile_import import import_portable_file
+from videonotes.mobile_import import import_portable_file, import_mobile_corrections_file
+from videonotes.mobile_corrections import render_mobile_corrections
 
 
 class PortableImportTest(unittest.TestCase):
@@ -70,6 +72,67 @@ class PortableImportTest(unittest.TestCase):
                 import_portable_file(self.source)
         self.assertEqual(self.source.read_bytes(), raw)
         self.assertEqual(import_portable_file(self.source)["document"], self.doc)
+
+
+    def test_local_corrections_preview_preserves_source_and_digest(self):
+        import copy
+        doc_before = copy.deepcopy(self.doc)
+        raw = render_mobile_corrections(self.doc, {"s0": "Poprawione zdanie"})
+        self.source.write_bytes(raw)
+        preview = import_mobile_corrections_file(self.doc, self.source)
+        self.assertEqual(preview["changes"], {"s0": "Poprawione zdanie"})
+        self.assertEqual(preview["source_sha256"], hashlib.sha256(raw).hexdigest())
+        self.assertEqual(preview["source_bytes"], len(raw))
+        self.assertTrue(preview["read_only"])
+        self.assertEqual(self.source.read_bytes(), raw)
+        self.assertEqual(self.doc, doc_before)
+
+    def test_local_corrections_file_rejects_corrupt_foreign_and_oversized(self):
+        raw = render_mobile_corrections(self.doc, {"s0": "nowe"})
+        for invalid in (
+            b"{not json}",
+            raw.replace(b'"project_id": "local"', b'"project_id": "other"'),
+            raw.replace(b'"schema":', b'"schema":"evil","schema":', 1),
+        ):
+            with self.subTest(case=invalid[:40]):
+                self.source.write_bytes(invalid)
+                with self.assertRaises(VideoNotesError):
+                    import_mobile_corrections_file(self.doc, self.source)
+        with self.source.open("wb") as out:
+            out.truncate(MAX_JSON_BYTES + 1)
+        with self.assertRaises(VideoNotesError):
+            import_mobile_corrections_file(self.doc, self.source)
+
+    def test_local_corrections_file_refuses_symlink_and_modification_during_read(self):
+        raw = render_mobile_corrections(self.doc, {"s0": "nowe"})
+        real = Path(self.temp.name) / "other.json"
+        real.write_bytes(raw)
+        try:
+            self.source.symlink_to(real)
+        except (OSError, NotImplementedError):
+            self.skipTest("symlink creation unavailable")
+        with self.assertRaises(VideoNotesError):
+            import_mobile_corrections_file(self.doc, self.source)
+        self.source.unlink()
+        self.source.write_bytes(raw)
+        import videonotes.mobile_import as module
+        original_read = module.os.read
+        changed = False
+
+        def mutation_after_first_read(fd, size):
+            nonlocal changed
+            block = original_read(fd, size)
+            if block and not changed:
+                changed = True
+                self.source.write_bytes(raw.replace(b"nowe", b"inne"))
+            return block
+
+        with patch.object(module.os, "read", side_effect=mutation_after_first_read):
+            with self.assertRaises(VideoNotesError):
+                import_mobile_corrections_file(self.doc, self.source)
+        self.assertTrue(changed)
+        self.assertEqual(self.source.read_bytes(), raw.replace(b"nowe", b"inne"))
+
 
 
 if __name__ == "__main__":
