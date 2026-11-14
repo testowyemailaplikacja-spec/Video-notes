@@ -8,6 +8,9 @@ import sys
 import time
 from pathlib import Path
 
+# Permit running this helper directly from a source checkout without pip install.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from videonotes.asr_lab import _stop_process_tree
 from videonotes.errors import VideoNotesError
 from videonotes.gguf_probe import inspect_gguf_header
