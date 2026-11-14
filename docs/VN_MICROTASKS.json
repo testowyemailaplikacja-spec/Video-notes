@@ -30,10 +30,15 @@
       "stage": "VN-00",
       "priority": "P0",
       "owner": "HUMAN_TEST",
-      "status": "TODO",
+      "status": "IN_PROGRESS",
       "title": "Przygotować legalne próbki naturalnej mowy PL/EN i ręczne transkrypcje referencyjne",
       "acceptance_id": "ASR-01",
-      "depends_on": []
+      "depends_on": [],
+      "acceptance_note": "IN_PROGRESS wyłącznie techniczna część: lokalny preflight PL/EN FFprobe/SHA-256 i walidacja referencji. Naturalne legalne próbki z prawdziwymi ręcznymi referencjami nadal nie zostały dostarczone ani odsłuchane.",
+      "evidence_refs": [
+        "https://github.com/testowyemailaplikacja-spec/Video-notes/pull/195",
+        "https://github.com/testowyemailaplikacja-spec/Video-notes/blob/chatgpt/kwn-vn00-vn06-vn07-preflight-20261114/docs/KWN_AUTOMATED_PREFLIGHT_20261114.md"
+      ]
     },
     {
       "id": "VN-00-02",
@@ -52,11 +57,16 @@
       "stage": "VN-00",
       "priority": "P0",
       "owner": "LEGAL",
-      "status": "TODO",
+      "status": "IN_PROGRESS",
       "title": "Zweryfikować pochodzenie/licencje modeli i binariów; podjąć udokumentowaną decyzję technologiczną",
       "acceptance_id": "PKG-02",
       "depends_on": [
         "VN-00-02"
+      ],
+      "acceptance_note": "IN_PROGRESS wyłącznie automatyczna identyfikacja flag FFmpeg i nagłówka GGUF; legal review dokładnych zależności oraz decyzja technologiczna po prawdziwym benchmarku nadal NOT_RUN.",
+      "evidence_refs": [
+        "https://github.com/testowyemailaplikacja-spec/Video-notes/pull/195",
+        "https://github.com/testowyemailaplikacja-spec/Video-notes/blob/chatgpt/kwn-vn00-vn06-vn07-preflight-20261114/docs/KWN_AUTOMATED_PREFLIGHT_20261114.md"
       ]
     },
     {
@@ -333,11 +343,16 @@
       "stage": "VN-06",
       "priority": "P0",
       "owner": "LEGAL",
-      "status": "TODO",
+      "status": "IN_PROGRESS",
       "title": "Wykonać legal review zależności, FFmpeg build, Whisper, GGUF i SPDX SBOM",
       "acceptance_id": "PKG-02",
       "depends_on": [
         "VN-00-03"
+      ],
+      "acceptance_note": "IN_PROGRESS wstępny, automatyczny zestaw buildconf FFmpeg, SHA i istniejący SPDX SBOM; brak prawnego odbioru konkretnego pakietu i prawa do redystrybucji.",
+      "evidence_refs": [
+        "https://github.com/testowyemailaplikacja-spec/Video-notes/pull/195",
+        "https://github.com/testowyemailaplikacja-spec/Video-notes/blob/chatgpt/kwn-vn00-vn06-vn07-preflight-20261114/docs/KWN_AUTOMATED_PREFLIGHT_20261114.md"
       ]
     },
     {
@@ -422,11 +437,16 @@
       "stage": "VN-07",
       "priority": "P0",
       "owner": "HUMAN_TEST",
-      "status": "TODO",
+      "status": "IN_PROGRESS",
       "title": "Przeprowadzić test klawiatury, czytnika ekranu, dużego JSON i prywatności sieciowej",
       "acceptance_id": "WEB-02",
       "depends_on": [
         "VN-07-02"
+      ],
+      "acceptance_note": "IN_PROGRESS test rzeczywistego Chromium/Chrome/Edge file:// z obserwacją prób HTTP(S) CDP i istniejącą automatyzacją 50k/focus; fizyczny Windows klawiatura i NVDA oraz całościowy przegląd prywatności nadal NOT_RUN.",
+      "evidence_refs": [
+        "https://github.com/testowyemailaplikacja-spec/Video-notes/pull/195",
+        "https://github.com/testowyemailaplikacja-spec/Video-notes/blob/chatgpt/kwn-vn00-vn06-vn07-preflight-20261114/docs/KWN_AUTOMATED_PREFLIGHT_20261114.md"
       ]
     },
     {
